@@ -42,24 +42,24 @@ Mist is a high-performance native Windows game-streaming platform designed to ac
 
 The codebase is strictly separated into independent sub-libraries to ensure clean compile-time decoupling and testability:
 
-| Directory | Target | Responsibility | Milestone 0 Status |
+| Directory | Target | Responsibility | Status |
 |---|---|---|---|
-| `engine/common` | `mist_common` | Type safety primitives (`Result<T>`, `Error`), structured thread-safe `Logger`, versioned `AppConfig` parser/validator. | **Implemented & Verified** |
-| `engine/session` | `mist_session` | Session state machine (`SessionState`), lifecycle interface (`ISession`), observer notifications. | **Implemented & Verified** |
-| `engine/telemetry` | `mist_telemetry` | Lock-free counters, gauges, bounded latency histograms, diagnostic metrics registry. | **Implemented & Verified** |
-| `engine/security` | `mist_security` | Constant-time string comparison, device identity contracts, auth token expiration, credential validation. | **Implemented & Verified** |
-| `platform/windows`| `mist_platform_windows` | Win32 error translation (`GetLastError` to `Error`), HRESULT translation, high-resolution QPC timer, DPI awareness. | **Implemented & Verified** |
-| `engine/capture` | `mist_capture` | Abstract capture contract (`ICaptureEngine`, `CapturedFrame`, `CaptureConfig`). | **Interface Only** (No DXGI) |
-| `engine/encode` | `mist_encode` | Abstract video encoder contract (`IVideoEncoder`, `EncodedPacket`, `EncodeConfig`). | **Interface Only** (No NVENC) |
-| `engine/decode` | `mist_decode` | Abstract video decoder contract (`IVideoDecoder`, `DecodedFrame`, `DecodeConfig`). | **Interface Only** (No NVDEC) |
-| `engine/render` | `mist_render` | Abstract renderer contract (`IRenderer`, `RenderConfig`). | **Interface Only** (No D3D) |
-| `engine/transport`| `mist_transport`| Abstract network transport contract (`ITransport`, `TransportChannel`). | **Interface Only** (No WebRTC) |
-| `engine/audio` | `mist_audio` | Abstract WASAPI audio capture and playback contracts (`IAudioCapture`, `IAudioPlayback`). | **Interface Only** (No WASAPI) |
-| `engine/input` | `mist_input` | Abstract input injection and polling contracts (`IInputManager`, input variant events). | **Interface Only** (No SendInput) |
-| `services` | `mist_services` | Signaling client interface (`ISignalingClient`, `SignalingMessage`). | **Interface Only** (No WebSockets) |
-| `apps/host` | `mist_host` | Host executable entry point, CLI arguments, configuration loading, lifecycle management, self-test. | **Implemented & Verified** |
-| `apps/client` | `mist_client` | Client executable entry point, CLI arguments, configuration loading, lifecycle management, self-test. | **Implemented & Verified** |
-| `apps/desktop` | `mist_desktop` | Unified desktop shell boundary. | **Implemented & Verified** |
+| `engine/common` | `mist_common` | Type safety primitives (`Result<T>`, `Error`), structured thread-safe `Logger`, versioned `AppConfig` parser/validator. | **Implemented & Verified** (M0) |
+| `engine/session` | `mist_session` | Session state machine (`SessionState`), lifecycle interface (`ISession`), observer notifications. | **Implemented & Verified** (M0) |
+| `engine/telemetry` | `mist_telemetry` | Lock-free counters, gauges, bounded latency histograms, diagnostic metrics registry. | **Implemented & Verified** (M0/M1) |
+| `engine/security` | `mist_security` | Constant-time string comparison, device identity contracts, auth token expiration, credential validation. | **Implemented & Verified** (M0) |
+| `platform/windows`| `mist_platform_windows` | Win32/HRESULT error translation, D3D11 device creation, display enumeration, QPC timer, DPI awareness. | **Implemented & Verified** (M0/M1) |
+| `engine/capture` | `mist_capture` | DXGI Desktop Duplication (`DxgiCaptureEngine`), GPU Synthetic Frame Generator, D3D11 Video Processor BGRA->NV12 Converter, and Bounded Pipeline. | **Implemented & Verified** (M1) |
+| `engine/encode` | `mist_encode` | NVIDIA NVENC Hardware Video Encoder (`NvencVideoEncoder`), dynamic SDK loader, capability discovery, low-latency CBR tuning. | **Implemented & Verified** (M1) |
+| `engine/decode` | `mist_decode` | Abstract video decoder contract (`IVideoDecoder`, `DecodedFrame`, `DecodeConfig`). | **Interface Only** (Milestone 2) |
+| `engine/render` | `mist_render` | Abstract renderer contract (`IRenderer`, `RenderConfig`). | **Interface Only** (Milestone 2) |
+| `engine/transport`| `mist_transport`| Abstract network transport contract (`ITransport`, `TransportChannel`). | **Interface Only** (Milestone 3) |
+| `engine/audio` | `mist_audio` | Abstract WASAPI audio capture and playback contracts (`IAudioCapture`, `IAudioPlayback`). | **Interface Only** (Milestone 4) |
+| `engine/input` | `mist_input` | Abstract input injection and polling contracts (`IInputManager`, input variant events). | **Interface Only** (Milestone 5) |
+| `services` | `mist_services` | Signaling client interface (`ISignalingClient`, `SignalingMessage`). | **Interface Only** (Milestone 3) |
+| `apps/host` | `mist_host` | Host executable entry point, CLI diagnostics (`--list-displays`, `--capture-test`, `--encode-test`, `--capture-encode-test`), self-test. | **Implemented & Verified** (M0/M1) |
+| `apps/client` | `mist_client` | Client executable entry point, CLI arguments, configuration loading, lifecycle management, self-test. | **Implemented & Verified** (M0) |
+| `apps/desktop` | `mist_desktop` | Unified desktop shell boundary. | **Implemented & Verified** (M0) |
 
 ---
 
@@ -90,10 +90,11 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 
 ---
 
-## 5. Future Streaming Pipeline (Milestones 1–5)
+## 5. Streaming Pipeline Roadmap
 
-- **Milestone 1:** Direct3D 11 / DXGI Desktop Capture & Native Presenter.
-- **Milestone 2:** NVIDIA NVENC Video Encoding (H.264 / HEVC) & Hardware Decoding.
-- **Milestone 3:** Low-latency WebRTC DataChannel & Video Transport pipeline.
-- **Milestone 4:** WASAPI Audio Loopback Capture & Playback.
-- **Milestone 5:** Low-latency Windows Input Injection & Virtual Controller Emulation.
+- **Milestone 0:** Foundation, project architecture, build system, error model, telemetry, and security contracts. (**Complete**)
+- **Milestone 1:** Direct3D 11 GPU Capture (DXGI Desktop Duplication), GPU Color Conversion (D3D11 Video Processor), and Hardware Video Encoding (NVIDIA NVENC). (**Complete & Hardware Verified**)
+- **Milestone 2:** Client-Side Hardware Video Decoding (NVDEC / D3D11VA) & Direct3D 11 Low-Latency Presentation.
+- **Milestone 3:** Native WebRTC Transport (DataChannels, SRTP Video/Audio Streaming, STUN/TURN).
+- **Milestone 4:** Low-Latency Audio Streaming (WASAPI Loopback Capture & Playback).
+- **Milestone 5:** Low-Latency Input Streaming (Raw Input Polling, Virtual Gamepad, SendInput Injection).

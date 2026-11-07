@@ -10,6 +10,8 @@ target_include_directories(mist_host PRIVATE
 target_link_libraries(mist_host PRIVATE
     mist_common
     mist_session
+    mist_capture
+    mist_encode
     mist_telemetry
     mist_security
     mist_platform_windows

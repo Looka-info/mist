@@ -1,0 +1,35 @@
+{
+  "hardware": {
+    "gpu": "NVIDIA GeForce GTX 1660 SUPER",
+    "driver": "NVENC 12.x"
+  },
+  "stream": {
+    "width": 1920,
+    "height": 1200,
+    "target_fps": 60,
+    "actual_fps": 32.67,
+    "avg_bitrate_kbps": 917.09
+  },
+  "counters": {
+    "frames_acquired": 167,
+    "frames_encoded": 166,
+    "frames_dropped": 0,
+    "capture_timeouts": 0,
+    "capture_errors": 0,
+    "encode_errors": 0
+  },
+  "latencies_us": {
+    "capture": {
+      "min": 16169.40, "max": 32574.70, "avg": 30386.21, "p50": 31103.30, "p95": 31989.30, "p99": 32202.00
+    },
+    "conversion": {
+      "min": 43.70, "max": 777.00, "avg": 75.84, "p50": 58.40, "p95": 115.50, "p99": 357.30
+    },
+    "encode": {
+      "min": 3540.70, "max": 8866.30, "avg": 4520.17, "p50": 4061.40, "p95": 6330.50, "p99": 7767.10
+    },
+    "capture_to_bitstream": {
+      "min": 3612.60, "max": 9385.40, "avg": 4627.95, "p50": 4172.30, "p95": 6408.70, "p99": 7877.10
+    }
+  }
+}

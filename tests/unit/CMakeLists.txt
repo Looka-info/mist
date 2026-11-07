@@ -7,6 +7,10 @@ add_executable(mist_unit_tests
     TestSecurity.cpp
     TestTelemetry.cpp
     TestPlatformWindows.cpp
+    TestCapture.cpp
+    TestEncoder.cpp
+    TestPipeline.cpp
+    TestStability.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

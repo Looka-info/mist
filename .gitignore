@@ -42,3 +42,7 @@ vcpkg/
 Thumbs.db
 [Dd]esktop.ini
 $RECYCLE.BIN/
+
+# Test artifacts
+artifacts/*.h264
+artifacts/*.mp4
