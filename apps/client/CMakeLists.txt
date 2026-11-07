@@ -13,5 +13,7 @@ target_link_libraries(mist_client PRIVATE
     mist_telemetry
     mist_security
     mist_platform_windows
+    mist_decode
+    mist_render
     mist_warnings
 )

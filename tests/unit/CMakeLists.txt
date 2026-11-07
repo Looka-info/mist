@@ -11,6 +11,12 @@ add_executable(mist_unit_tests
     TestEncoder.cpp
     TestPipeline.cpp
     TestStability.cpp
+    TestH264Parser.cpp
+    TestAnnexBReader.cpp
+    TestDecoder.cpp
+    TestRenderer.cpp
+    TestClientPipeline.cpp
+    TestClientStability.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

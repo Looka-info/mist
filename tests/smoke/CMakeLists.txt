@@ -20,12 +20,22 @@ add_test(NAME smoke_client_self_test
     COMMAND mist_client --self-test
 )
 
+add_test(NAME smoke_client_decoder_info
+    COMMAND mist_client --decoder-info
+)
+
+add_test(NAME smoke_client_present_test_headless
+    COMMAND mist_client --present-test --headless --fps 60
+)
+
 set_tests_properties(
     smoke_host_version
     smoke_host_self_test
     smoke_host_list_displays
     smoke_client_version
     smoke_client_self_test
+    smoke_client_decoder_info
+    smoke_client_present_test_headless
     PROPERTIES
         TIMEOUT 15
 )

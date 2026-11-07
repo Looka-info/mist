@@ -31,6 +31,7 @@ public:
     [[nodiscard]] virtual common::Result<DecodedFrame> getNextFrame() = 0;
     [[nodiscard]] virtual common::Result<void> releaseFrame(const DecodedFrame& frame) = 0;
     [[nodiscard]] virtual common::Result<void> flush() = 0;
+    [[nodiscard]] virtual common::Result<void> shutdown() = 0;
 };
 
 } // namespace mist::decode

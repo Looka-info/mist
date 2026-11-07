@@ -28,6 +28,12 @@ Mist employs a multi-tiered automated testing strategy:
 | `EncoderTest` | `TestEncoder.cpp` | NVENC API runtime loading, hardware capability query, session initialization, H.264 NAL start-code bitstream validation. |
 | `PipelineTest` | `TestPipeline.cpp` | Bounded frame queue (max 2), frame dropping on lag, synthetic capture-to-NVENC pipeline benchmark, report serialization. |
 | `StabilityTest` | `TestStability.cpp` | Repeated capture initialization/teardown (5 iterations), repeated encoder session initialization/teardown (5 iterations) without memory/VRAM leaks. |
+| `H264ParserTest` | `TestH264Parser.cpp` | Annex-B start-code search (3-byte/4-byte), NAL parsing, AUD/SPS/PPS/IDR detection, Exp-Golomb bit reading, access unit extraction. |
+| `AnnexBReaderTest` | `TestAnnexBReader.cpp` | Offline stream loading, access-unit partitioning, stream metadata estimation, size guards. |
+| `DecoderTest` | `TestDecoder.cpp` | Direct3D 11 hardware decoder capability discovery, live hardware decoding of H.264 bitstream to `ID3D11Texture2D` NV12 surfaces. |
+| `RendererTest` | `TestRenderer.cpp` | `D3D11Renderer` headless initialization, synthetic frame presentation, dynamic viewport resize, vsync toggle, clean shutdown. |
+| `ClientPipelineTest` | `TestClientPipeline.cpp` | End-to-end paced decode and present pipeline on test bitstream, non-zero FPS, JSON report generation. |
+| `ClientStabilityTest` | `TestClientStability.cpp` | Repeated decoder, renderer, and client pipeline creation/teardown (5 iterations each) without GPU resource leaks. |
 
 ### 2.2 Smoke Tests (CTest)
 
@@ -37,15 +43,32 @@ Mist employs a multi-tiered automated testing strategy:
 | `smoke_host_self_test` | `mist_host.exe --self-test` | Runs host self-test suite (config check, timer check, display check, NVENC hardware probe, test frame encode) non-interactively. |
 | `smoke_host_list_displays` | `mist_host.exe --list-displays` | Enumerates DXGI displays and GPU adapters and exits with code 0. |
 | `smoke_client_version` | `mist_client.exe --version` | Verifies client outputs version 0.1.0 and exits cleanly with code 0. |
-| `smoke_client_self_test` | `mist_client.exe --self-test` | Runs client self-test suite non-interactively. |
+| `smoke_client_self_test` | `mist_client.exe --self-test` | Runs client self-test suite (config check, timer check, D3D11 hardware decoder probe, renderer check) non-interactively. |
+| `smoke_client_decoder_info` | `mist_client.exe --decoder-info` | Queries Direct3D 11 hardware decoder capabilities (adapter, H.264 profile, max resolution) and exits with code 0. |
+| `smoke_client_present_test_headless` | `mist_client.exe --present-test --headless --fps 60` | Runs headless Direct3D 11 presentation loop (60 frames), verifying timing and zero frame drops. |
 
 ---
 
 ## 3. Running Tests
 
-### Automated Milestone 1 Verification Suite
+### Automated Milestone 2 Verification Suite
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\verify-milestone-1.ps1 -BenchmarkSeconds 5
+powershell -ExecutionPolicy Bypass -File scripts\verify-milestone-2.ps1
+```
+
+### Client CLI Diagnostic Commands
+```powershell
+# Query Direct3D 11 hardware decoder capabilities
+./build/release/apps/client/mist_client.exe --decoder-info
+
+# Run Direct3D 11 presentation loop (headless or windowed)
+./build/release/apps/client/mist_client.exe --present-test --headless --fps 60
+
+# Decode test bitstream with hardware acceleration
+./build/release/apps/client/mist_client.exe --decode-test --input artifacts/test.h264 --headless --fps 60 --duration 2
+
+# Run full client hardware decode and presentation benchmark
+./build/release/apps/client/mist_client.exe --decode-benchmark --input artifacts/test.h264 --report artifacts/milestone-2.json --headless
 ```
 
 ### CLI Diagnostic Commands

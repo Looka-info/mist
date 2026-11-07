@@ -12,6 +12,7 @@ int main(int argc, char* argv[]) {
 
     // Immediate exit requested by CLI option (--help, --version, --self-test)
     if (initRes.value().has_value()) {
+        (void)app.shutdown();
         return initRes.value().value();
     }
 

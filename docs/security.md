@@ -22,6 +22,15 @@ Mist handles desktop capture, input injection, and low-latency network streaming
 - **Credential Storage:** Storing access tokens or shared secrets in plain-text configuration files or logs.
   - *Mitigation:* Strict prohibition of credentials in `mist.ini` / `AppConfig`. `mist::common::Logger` implements automated token redaction (`[REDACTED_SENSITIVE_DATA]`). Secrets are stored using Windows DPAPI (`CryptProtectData`) or the Windows Credential Locker in production milestones.
 
+### 2.3 Video Bitstream & Decoder Attack Surfaces (Milestone 2)
+- **Malformed NAL Units & Truncated Packets:** Malicious or corrupted video bitstream payloads designed to trigger out-of-bounds reads or buffer overflows.
+  - *Mitigation:* `H264Parser` uses strict pointer-range arithmetic with explicit end-of-buffer bounds checks. Start code scanning validates 3-byte and 4-byte boundaries before byte dereferencing. Emulation prevention stripping rejects corrupted sequences without allocating unbounded memory.
+- **Exp-Golomb Integer Overflow / DoS:** Corrupted SPS syntax elements triggering integer overflows in macroblock dimension calculations.
+  - *Mitigation:* Exp-Golomb reader explicitly validates zero-bit run length (capped at 31 bits) and rejects shifts exceeding 32-bit integer capacity. Parsed dimensions are validated against hardware limits (max 4096x4096).
+- **VRAM / GPU Memory Exhaustion:** Flooding the decoder with high-frequency frames to exhaust GPU VRAM or DXGI surfaces.
+  - *Mitigation:* Decoded frame queue is strictly bounded to a maximum of 2 pending frames. When downstream presentation lags, the oldest frame is dropped immediately, guaranteeing that unpresented textures are returned to the hardware decoder's allocator.
+- **Host / Client VRAM Isolation:** Direct3D 11 device contexts are private to each client process. Zero-copy hardware decoded DXGI surfaces are managed via `IMFDXGIDeviceManager` within the local GPU memory boundary without arbitrary memory exposure.
+
 ---
 
 ## 3. Cryptographic & Device Authorization Requirements

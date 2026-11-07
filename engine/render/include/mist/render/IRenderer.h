@@ -12,6 +12,7 @@ struct RenderConfig {
     uint32_t height{1080};
     bool vsync{false};
     bool enableHdr{false};
+    bool headless{false};
 };
 
 class IRenderer {
