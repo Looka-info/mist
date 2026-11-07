@@ -1,0 +1,44 @@
+# Build directories
+build/
+build-*/
+out/
+bin/
+lib/
+
+# CMake artifacts
+CMakeUserPresets.json
+CMakeFiles/
+CMakeCache.txt
+*.cmake
+!CMakeLists.txt
+!cmake/*.cmake
+
+# vcpkg
+vcpkg_installed/
+vcpkg/
+
+# IDE / Editor
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.vcxproj*
+*.sln
+
+# Compiled binaries and libraries
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+*.pdb
+*.obj
+*.o
+*.log
+
+# Windows temporary / thumbs
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/

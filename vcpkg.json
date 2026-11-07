@@ -1,0 +1,10 @@
+{
+  "name": "mist",
+  "version-string": "0.1.0",
+  "description": "High-performance native Windows game-streaming platform",
+  "homepage": "https://github.com/mist/mist",
+  "license": "Proprietary",
+  "dependencies": [
+    "gtest"
+  ]
+}
