@@ -326,10 +326,13 @@ common::Result<void> DesktopApplication::shutdown() {
 
 #if defined(_WIN32)
 void DesktopApplication::handleResize(uint32_t width, uint32_t height) {
-    if (width == 0 || height == 0 || !swapChain_) return;
+    if (width == 0 || height == 0 || !swapChain_ || !d3d11Device_) return;
     guiWidth_ = width;
     guiHeight_ = height;
 
+    if (d3d11Context_) {
+        d3d11Context_->OMSetRenderTargets(0, nullptr, nullptr);
+    }
     rtv_.Reset();
     HRESULT hr = swapChain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
     if (SUCCEEDED(hr)) {
@@ -517,15 +520,17 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
         return platform::windows::hresultToMistError(hr, common::SubsystemId::DesktopApp, "Failed to cast to IDXGISwapChain1");
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-    hr = swapChain_->GetBuffer(0, IID_PPV_ARGS(backBuffer.GetAddressOf()));
-    if (FAILED(hr)) {
-        return platform::windows::hresultToMistError(hr, common::SubsystemId::DesktopApp, "swapChain_->GetBuffer failed");
-    }
+    {
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+        hr = swapChain_->GetBuffer(0, IID_PPV_ARGS(backBuffer.GetAddressOf()));
+        if (FAILED(hr)) {
+            return platform::windows::hresultToMistError(hr, common::SubsystemId::DesktopApp, "swapChain_->GetBuffer failed");
+        }
 
-    hr = d3d11Device_->CreateRenderTargetView(backBuffer.Get(), nullptr, rtv_.GetAddressOf());
-    if (FAILED(hr)) {
-        return platform::windows::hresultToMistError(hr, common::SubsystemId::DesktopApp, "CreateRenderTargetView failed");
+        hr = d3d11Device_->CreateRenderTargetView(backBuffer.Get(), nullptr, rtv_.GetAddressOf());
+        if (FAILED(hr)) {
+            return platform::windows::hresultToMistError(hr, common::SubsystemId::DesktopApp, "CreateRenderTargetView failed");
+        }
     }
 
     IMGUI_CHECKVERSION();
@@ -632,13 +637,26 @@ common::Result<void> DesktopApplication::runGuiLoop() {
 
         ImGui::Render();
 
+        // Ensure render target view is valid (self-healing if lost during resize/unfocus)
+        if (!rtv_ && swapChain_ && d3d11Device_) {
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> bb;
+            if (SUCCEEDED(swapChain_->GetBuffer(0, IID_PPV_ARGS(bb.GetAddressOf())))) {
+                (void)d3d11Device_->CreateRenderTargetView(bb.Get(), nullptr, rtv_.GetAddressOf());
+            }
+        }
+
         const auto& c = tokens::getActiveTheme(currentTheme_);
         const float clearColor[4] = { c.bg.x, c.bg.y, c.bg.z, 1.00f };
-        d3d11Context_->OMSetRenderTargets(1, rtv_.GetAddressOf(), nullptr);
-        d3d11Context_->ClearRenderTargetView(rtv_.Get(), clearColor);
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+        if (rtv_ && d3d11Context_) {
+            ID3D11RenderTargetView* rtvPtr = rtv_.Get();
+            d3d11Context_->OMSetRenderTargets(1, &rtvPtr, nullptr);
+            d3d11Context_->ClearRenderTargetView(rtvPtr, clearColor);
+            ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+        }
 
-        (void)swapChain_->Present(1, 0);
+        if (swapChain_) {
+            (void)swapChain_->Present(1, 0);
+        }
     }
 
     cleanupD3D11Gui();
@@ -2040,11 +2058,13 @@ void DesktopApplication::renderGuiNetworkScreen() {
 void DesktopApplication::renderGuiLoadingScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     ImVec2 dispSize = ImGui::GetIO().DisplaySize;
+    float dw = (dispSize.x > 100.0f) ? dispSize.x : static_cast<float>(guiWidth_);
+    float dh = (dispSize.y > 100.0f) ? dispSize.y : static_cast<float>(guiHeight_);
 
-    float cardW = std::min(460.0f, dispSize.x - 48.0f);
+    float cardW = std::min(460.0f, dw - 48.0f);
     float cardH = 320.0f;
-    float posX = (dispSize.x - cardW) * 0.5f;
-    float posY = (dispSize.y - cardH) * 0.45f;
+    float posX = (dw - cardW) * 0.5f;
+    float posY = (dh - cardH) * 0.45f;
 
     ImGui::SetNextWindowPos(ImVec2(posX, posY));
     ImGui::SetNextWindowSize(ImVec2(cardW, cardH));
