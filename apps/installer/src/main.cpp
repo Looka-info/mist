@@ -43,13 +43,15 @@ constexpr int IDC_DESKTOP_CHK    = 1008;
 constexpr int IDC_STARTMENU_CHK  = 1009;
 constexpr int IDC_LAUNCH_CHK     = 1010;
 
-COLORREF MINT_PRIMARY  = RGB(16, 185, 129);  // #10B981
-COLORREF MINT_HOVER    = RGB(5, 150, 105);   // #059669
-COLORREF MINT_LIGHT    = RGB(209, 250, 229); // #D1FAE5
-COLORREF BG_SURFACE    = RGB(248, 252, 250); // #F8FCFA
-COLORREF TEXT_SLATE    = RGB(15, 23, 42);    // #0F172A
-COLORREF TEXT_MUTED    = RGB(100, 116, 139); // #64748B
-COLORREF BORDER_MINT   = RGB(167, 243, 208); // #A7F3D0
+COLORREF MINT_BRAND   = RGB(70, 222, 181);  // #46deb5 (--mint)
+COLORREF MINT_ACCENT  = RGB(15, 132, 102);  // #0f8466 (--acc)
+COLORREF MINT_CONTAIN = RGB(191, 240, 221); // #bff0dd (--ct)
+COLORREF MINT_SOFT    = RGB(227, 246, 238); // #e3f6ee (--ct2)
+COLORREF BG_CLOUD     = RGB(240, 250, 246); // #f0faf6 (--bg)
+COLORREF SF_WHITE     = RGB(255, 255, 255); // #ffffff (--sf)
+COLORREF TEXT_INK     = RGB(16, 35, 29);    // #10231d (--ink)
+COLORREF TEXT_MUTED   = RGB(79, 101, 93);   // #4f655d (--mute)
+COLORREF BORDER_LINE  = RGB(212, 231, 223); // #d4e7df (--line)
 
 bool ExtractResourceToFile(HINSTANCE hInstance, int resourceId, const std::wstring& outputPath) {
     HRSRC hRes = FindResourceW(hInstance, MAKEINTRESOURCEW(resourceId), MAKEINTRESOURCEW(10)); // RT_RCDATA
@@ -300,64 +302,38 @@ bool PerformUninstall(const std::wstring& installDir, bool silent) {
 }
 
 void DrawSleekMintLogoGdi(HDC hdc, int x, int y, int size) {
-    HBRUSH hSlateBrush = CreateSolidBrush(RGB(15, 23, 42)); // #0F172A
-    HPEN hMintPen = CreatePen(PS_SOLID, 2, MINT_PRIMARY);
+    HBRUSH hMintBrush = CreateSolidBrush(MINT_BRAND); // #46deb5
+    HPEN hBorderPen = CreatePen(PS_SOLID, 1, BORDER_LINE);
 
-    HGDIOBJ oldBrush = SelectObject(hdc, hSlateBrush);
-    HGDIOBJ oldPen = SelectObject(hdc, hMintPen);
+    HGDIOBJ oldBrush = SelectObject(hdc, hMintBrush);
+    HGDIOBJ oldPen = SelectObject(hdc, hBorderPen);
 
-    RoundRect(hdc, x, y, x + size, y + size, size / 4, size / 4);
+    RoundRect(hdc, x, y, x + size, y + size, static_cast<int>(size * 0.35f), static_cast<int>(size * 0.35f));
 
-    // Left Wing (Bright Mint)
-    HBRUSH hBrightMint = CreateSolidBrush(RGB(52, 211, 153));
-    SelectObject(hdc, hBrightMint);
-    POINT leftPts[5] = {
-        { x + static_cast<int>(size * 0.22f), y + static_cast<int>(size * 0.74f) },
-        { x + static_cast<int>(size * 0.22f), y + static_cast<int>(size * 0.38f) },
-        { x + static_cast<int>(size * 0.35f), y + static_cast<int>(size * 0.32f) },
-        { x + static_cast<int>(size * 0.46f), y + static_cast<int>(size * 0.52f) },
-        { x + static_cast<int>(size * 0.32f), y + static_cast<int>(size * 0.74f) }
+    // Geometric 'M' streaming paths
+    HPEN hInkPen = CreatePen(PS_SOLID, std::max(2, static_cast<int>(size * 0.10f)), TEXT_INK);
+    SelectObject(hdc, hInkPen);
+
+    int pad = static_cast<int>(size * 0.22f);
+    int w = size - pad * 2;
+    int h = size - pad * 2;
+
+    POINT pts[5] = {
+        { x + pad, y + pad + h },
+        { x + pad, y + pad },
+        { x + pad + w / 2, y + pad + static_cast<int>(h * 0.55f) },
+        { x + pad + w, y + pad },
+        { x + pad + w, y + pad + h }
     };
-    Polygon(hdc, leftPts, 5);
 
-    // Right Wing (Vibrant Mint)
-    HBRUSH hPrimaryMint = CreateSolidBrush(MINT_PRIMARY);
-    SelectObject(hdc, hPrimaryMint);
-    POINT rightPts[5] = {
-        { x + static_cast<int>(size * 0.78f), y + static_cast<int>(size * 0.74f) },
-        { x + static_cast<int>(size * 0.78f), y + static_cast<int>(size * 0.38f) },
-        { x + static_cast<int>(size * 0.65f), y + static_cast<int>(size * 0.32f) },
-        { x + static_cast<int>(size * 0.54f), y + static_cast<int>(size * 0.52f) },
-        { x + static_cast<int>(size * 0.68f), y + static_cast<int>(size * 0.74f) }
-    };
-    Polygon(hdc, rightPts, 5);
-
-    // Center Core Diamond (Soft Mint)
-    HBRUSH hLightMint = CreateSolidBrush(RGB(167, 243, 208));
-    SelectObject(hdc, hLightMint);
-    POINT diamondPts[4] = {
-        { x + static_cast<int>(size * 0.50f), y + static_cast<int>(size * 0.38f) },
-        { x + static_cast<int>(size * 0.58f), y + static_cast<int>(size * 0.54f) },
-        { x + static_cast<int>(size * 0.50f), y + static_cast<int>(size * 0.66f) },
-        { x + static_cast<int>(size * 0.42f), y + static_cast<int>(size * 0.54f) }
-    };
-    Polygon(hdc, diamondPts, 4);
-
-    // White Center Spark
-    HBRUSH hWhite = CreateSolidBrush(RGB(255, 255, 255));
-    SelectObject(hdc, hWhite);
-    Ellipse(hdc, x + static_cast<int>(size * 0.47f), y + static_cast<int>(size * 0.50f),
-                 x + static_cast<int>(size * 0.53f), y + static_cast<int>(size * 0.56f));
+    Polyline(hdc, pts, 5);
 
     SelectObject(hdc, oldPen);
     SelectObject(hdc, oldBrush);
 
-    DeleteObject(hSlateBrush);
-    DeleteObject(hMintPen);
-    DeleteObject(hBrightMint);
-    DeleteObject(hPrimaryMint);
-    DeleteObject(hLightMint);
-    DeleteObject(hWhite);
+    DeleteObject(hMintBrush);
+    DeleteObject(hBorderPen);
+    DeleteObject(hInkPen);
 }
 
 // Dialog State
@@ -437,6 +413,16 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
             return 0;
         }
 
+        case WM_ERASEBKGND: {
+            HDC hdc = reinterpret_cast<HDC>(wParam);
+            RECT rc;
+            GetClientRect(hWnd, &rc);
+            HBRUSH hBg = CreateSolidBrush(BG_CLOUD);
+            FillRect(hdc, &rc, hBg);
+            DeleteObject(hBg);
+            return 1;
+        }
+
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
@@ -446,17 +432,17 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
 
             // Header Banner (Pure White with bottom mint border)
             RECT headerRc = { 0, 0, clientRc.right, 90 };
-            HBRUSH hWhiteBrush = CreateSolidBrush(RGB(255, 255, 255));
+            HBRUSH hWhiteBrush = CreateSolidBrush(SF_WHITE);
             FillRect(hdc, &headerRc, hWhiteBrush);
             DeleteObject(hWhiteBrush);
 
-            // Mint Border Line
-            HPEN hMintBorder = CreatePen(PS_SOLID, 2, MINT_PRIMARY);
-            HGDIOBJ oldPen = SelectObject(hdc, hMintBorder);
+            // Border Line
+            HPEN hBorderPen = CreatePen(PS_SOLID, 1, BORDER_LINE);
+            HGDIOBJ oldPen = SelectObject(hdc, hBorderPen);
             MoveToEx(hdc, 0, 90, nullptr);
             LineTo(hdc, clientRc.right, 90);
             SelectObject(hdc, oldPen);
-            DeleteObject(hMintBorder);
+            DeleteObject(hBorderPen);
 
             // Draw Sleek Mint Logo
             DrawSleekMintLogoGdi(hdc, 24, 16, 56);
@@ -467,12 +453,12 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
             HFONT hSubFont = CreateFontW(14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
 
             HGDIOBJ oldFont = SelectObject(hdc, hTitleFont);
-            SetTextColor(hdc, TEXT_SLATE);
-            TextOutW(hdc, 96, 22, L"MIST GAME STREAMING STUDIO", 26);
+            SetTextColor(hdc, TEXT_INK);
+            TextOutW(hdc, 96, 22, L"Mist Game Streaming Studio", 26);
 
             SelectObject(hdc, hSubFont);
             SetTextColor(hdc, TEXT_MUTED);
-            TextOutW(hdc, 96, 48, L"Version 0.2.0-rc1  *  Native Windows Installation", 49);
+            TextOutW(hdc, 96, 48, L"Play beyond your desk.  *  Version 0.2.0-rc1", 43);
 
             SelectObject(hdc, oldFont);
             DeleteObject(hTitleFont);
@@ -484,10 +470,23 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
 
         case WM_CTLCOLORSTATIC: {
             HDC hdcStatic = reinterpret_cast<HDC>(wParam);
-            SetTextColor(hdcStatic, TEXT_SLATE);
+            SetTextColor(hdcStatic, TEXT_INK);
             SetBkMode(hdcStatic, TRANSPARENT);
-            static HBRUSH s_bgBrush = CreateSolidBrush(BG_SURFACE);
+            static HBRUSH s_bgBrush = CreateSolidBrush(BG_CLOUD);
             return reinterpret_cast<INT_PTR>(s_bgBrush);
+        }
+
+        case WM_CTLCOLORBTN: {
+            static HBRUSH s_bgBrush = CreateSolidBrush(BG_CLOUD);
+            return reinterpret_cast<INT_PTR>(s_bgBrush);
+        }
+
+        case WM_CTLCOLOREDIT: {
+            HDC hdcEdit = reinterpret_cast<HDC>(wParam);
+            SetTextColor(hdcEdit, TEXT_INK);
+            SetBkColor(hdcEdit, SF_WHITE);
+            static HBRUSH s_whiteBrush = CreateSolidBrush(SF_WHITE);
+            return reinterpret_cast<INT_PTR>(s_whiteBrush);
         }
 
         case WM_COMMAND: {
@@ -620,7 +619,7 @@ static int RunInstaller(HINSTANCE hInstance, const wchar_t* pCmdLine) {
     wc.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
     wc.hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
     wc.hCursor = LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
-    HBRUSH hBgBrush = CreateSolidBrush(BG_SURFACE);
+    HBRUSH hBgBrush = CreateSolidBrush(BG_CLOUD);
     wc.hbrBackground = hBgBrush;
     wc.lpszClassName = clsName;
     RegisterClassExW(&wc);

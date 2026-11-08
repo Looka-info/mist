@@ -27,12 +27,22 @@ namespace mist::desktop {
 
 enum class DesktopScreen : uint8_t {
     Home = 1,
-    Pairing,
-    Host,
-    StreamSettings,
-    LiveSession,
-    DeviceManagement,
-    Exit
+    Host = 2,
+    Connect = 3,
+    Devices = 4,
+    Network = 5,
+    Pairing = 4,          // backward-compatible alias for Devices
+    StreamSettings = 5,   // backward-compatible alias for Network
+    LiveSession = 5,      // backward-compatible alias for Network
+    DeviceManagement = 4, // backward-compatible alias for Devices
+    Exit = 99
+};
+
+struct TrustedDeviceItem {
+    std::string name;
+    std::string lastSeen;
+    bool allowKbdMouse{true};
+    bool allowController{true};
 };
 
 class DesktopApplication {
@@ -55,6 +65,8 @@ public:
     void renderSettingsScreen() const;
     void renderLiveSessionScreen() const;
     void renderDeviceManagementScreen() const;
+    void renderConnectScreen() const;
+    void renderNetworkScreen() const;
 
 #if defined(_WIN32)
     // Direct3D 11 Win32 GUI
@@ -73,20 +85,23 @@ private:
     void toggleTheme();
     void renderGuiFrame();
 
-    // GUI Screen Components
+    // GUI Screen Components (Matching Mist.html design specification)
     void renderGuiHeader();
     void renderGuiNavRail();
     void renderGuiHomeScreen();
-    void renderGuiPairingScreen();
     void renderGuiHostScreen();
-    void renderGuiSettingsScreen();
-    void renderGuiLiveSessionScreen();
-    void renderGuiDeviceManagementScreen();
+    void renderGuiConnectScreen();
+    void renderGuiDevicesScreen();
+    void renderGuiNetworkScreen();
+    void renderGuiSettingsDialog();
+    void renderGuiToast();
 
     // GUI Visual Components
     void renderSleekMintLogo(float size = 36.0f) const;
-    void renderBadge(const char* text, bool isSuccess = true) const;
+    void renderChip(const char* text, int statusType = 0) const; // 0=neutral, 1=ok, 2=warn, 3=bad
     void renderMetricBox(const char* label, const char* value, const char* sublabel = nullptr) const;
+    bool renderPillButton(const char* label, bool primary = false, bool danger = false, const ImVec2& size = ImVec2(0, 40.0f));
+    void showToast(const std::string& message);
 
     HWND hwnd_{nullptr};
     Microsoft::WRL::ComPtr<ID3D11Device> d3d11Device_;
@@ -107,21 +122,74 @@ private:
     ImFont* fontHeadline_{nullptr};
     ImFont* fontDisplay_{nullptr};
     ImFont* fontSmall_{nullptr};
+    ImFont* fontCode_{nullptr};
 
-    // GUI Interactive State
-    bool isHostingActive_{true};
+    // GUI Interactive State (Matching Mist.html)
+    bool isSettingsOpen_{false};
+    char searchQuery_[128]{""};
+    std::string toastMessage_;
+    float toastTimer_{0.0f};
+
+    // Host View State
+    bool isHostingActive_{false};
+    float hostFps_{60.0f};
+    float hostBitrate_{11.5f};
+    float hostEncodeMs_{1.6f};
+    bool hostAudioStream_{true};
+    bool hostAllowRemoteInput_{false};
+    char hostSessionId_[64]{"mist-live"};
+    char hostSignalingServer_[64]{"ws://127.0.0.1:8080"};
+
+    // Connect View State
+    char connectSessionId_[64]{"mist-live"};
+    char connectSignalingServer_[64]{"ws://127.0.0.1:8080"};
+    char connectRelayServer_[64]{""};
+    bool connectHearAudio_{true};
+    bool connectSendInput_{true};
+    bool isConnecting_{false};
+    int connectStep_{0};
+    float connectStepTimer_{0.0f};
+    std::string connectStatusMsg_{"Not connected."};
+
+    // Devices View State
+    std::string pairingCode_{"7DK4LM"};
+    int wrongCodeFails_{0};
+    int codeLockSeconds_{0};
+    float codeLockTimer_{0.0f};
+    std::string codeHintMsg_{"Read this code to the person pairing. It works once."};
+    bool isDeviceApprovalPending_{true};
+    std::vector<TrustedDeviceItem> trustedDevices_;
+
+    // Network View State
+    float networkBitrate_{12.0f};
+    int networkRtt_{18};
+    float networkLoss_{0.0f};
+    int networkJitter_{2};
+    std::string networkQosState_{"Stable"};
+    std::vector<float> bitrateHistory_;
+    std::vector<float> rttHistory_;
+    bool isNetworkCongested_{false};
+    float congestionDuration_{0.0f};
+
+    // Settings Modal State
+    int settingsTheme_{0}; // 0 = Light, 1 = Dark
+    int settingsContrast_{0}; // 0 = Standard, 1 = High
+    bool settingsCompactView_{false};
+    bool settingsAnimatedShapes_{true};
+    int settingsMaxBitrateMbps_{15};
+    int settingsFrameRate_{0}; // 0 = 60 fps, 1 = 30 fps
+
+    // Legacy/compatibility members
     bool allowAudioLoopback_{true};
     bool allowKeyboard_{true};
     bool allowMouse_{true};
     bool allowGamepad_{true};
     bool localOperatorPriority_{true};
-
-    int selectedProfileIndex_{3}; // 0: Performance, 1: Balanced, 2: Quality, 3: Adaptive
+    int selectedProfileIndex_{3};
     int targetBitrateKbps_{8000};
     int minBitrateKbps_{2000};
     int maxBitrateKbps_{20000};
     bool vsyncEnabled_{false};
-
     char manualPairingCodeInput_[32]{""};
     char quickConnectHostInput_[64]{"127.0.0.1:8080"};
     bool sampleRequestPending_{true};

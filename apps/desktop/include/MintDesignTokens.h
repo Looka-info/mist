@@ -11,228 +11,314 @@ enum class ThemeMode : uint8_t {
     Dark  = 1
 };
 
+// Exact color tokens from Mist.html design specification
 struct MintPalette {
-    // Brand Base Palette
-    static constexpr ImVec4 PixelMint     { 0.722f, 0.922f, 0.835f, 1.00f }; // #B8EBD5
-    static constexpr ImVec4 FreshMint     { 0.557f, 0.847f, 0.729f, 1.00f }; // #8ED8BA
-    static constexpr ImVec4 ForestGreen   { 0.090f, 0.294f, 0.220f, 1.00f }; // #174B38
-    static constexpr ImVec4 DeepEvergreen { 0.051f, 0.188f, 0.141f, 1.00f }; // #0D3024
-    static constexpr ImVec4 CloudBg       { 0.949f, 0.973f, 0.957f, 1.00f }; // #F2F8F4
-    static constexpr ImVec4 SoftSage      { 0.867f, 0.937f, 0.894f, 1.00f }; // #DDEFE4
+    // Light Theme: :root
+    // --bg:#f0faf6; --sf:#ffffff; --ct:#bff0dd; --ct2:#e3f6ee; --mint:#46deb5; --onm:#032b20;
+    // --acc:#0f8466; --on:#ffffff; --onct:#06382b; --ink:#10231d; --mute:#4f655d; --line:#d4e7df;
+    // --ok:#0f8466; --warn:#8a5a00; --bad:#b3261e;
+    // --s1:#c2efdc; --s2:#dcf6ec; --s3:#a3e8cb; --s4:#d0f2e4;
+
+    static constexpr ImVec4 LightBg       { 0.941f, 0.980f, 0.965f, 1.00f }; // #f0faf6
+    static constexpr ImVec4 LightSurface  { 1.000f, 1.000f, 1.000f, 1.00f }; // #ffffff
+    static constexpr ImVec4 LightCt       { 0.749f, 0.941f, 0.867f, 1.00f }; // #bff0dd (Active Container / Pill)
+    static constexpr ImVec4 LightCt2      { 0.890f, 0.965f, 0.933f, 1.00f }; // #e3f6ee (Soft Container / Tile)
+    static constexpr ImVec4 LightMint     { 0.275f, 0.871f, 0.710f, 1.00f }; // #46deb5 (Vibrant Mint)
+    static constexpr ImVec4 LightOnMint   { 0.012f, 0.169f, 0.125f, 1.00f }; // #032b20 (Dark Forest Text)
+    static constexpr ImVec4 LightAcc      { 0.059f, 0.518f, 0.400f, 1.00f }; // #0f8466 (Forest Accent Green)
+    static constexpr ImVec4 LightOnCt     { 0.024f, 0.220f, 0.169f, 1.00f }; // #06382b (Text on Active Container)
+    static constexpr ImVec4 LightInk      { 0.063f, 0.137f, 0.114f, 1.00f }; // #10231d (Primary Text)
+    static constexpr ImVec4 LightMute     { 0.310f, 0.396f, 0.365f, 1.00f }; // #4f655d (Muted Secondary Text)
+    static constexpr ImVec4 LightLine     { 0.831f, 0.906f, 0.875f, 1.00f }; // #d4e7df (Border Outline)
+    static constexpr ImVec4 LightOk       { 0.059f, 0.518f, 0.400f, 1.00f }; // #0f8466
+    static constexpr ImVec4 LightWarn     { 0.541f, 0.353f, 0.000f, 1.00f }; // #8a5a00
+    static constexpr ImVec4 LightBad      { 0.702f, 0.149f, 0.118f, 1.00f }; // #b3261e
+    static constexpr ImVec4 LightS1       { 0.761f, 0.937f, 0.863f, 1.00f }; // #c2efdc
+    static constexpr ImVec4 LightS2       { 0.863f, 0.965f, 0.925f, 1.00f }; // #dcf6ec
+    static constexpr ImVec4 LightS3       { 0.639f, 0.910f, 0.796f, 1.00f }; // #a3e8cb
+    static constexpr ImVec4 LightS4       { 0.816f, 0.949f, 0.894f, 1.00f }; // #d0f2e4
+
+    // Dark Theme: :root[data-theme="dark"]
+    // --bg:#0c1915; --sf:#12231e; --mint:#6fdcb6; --onm:#00382a; --ct:#1d3d33; --ct2:#183128;
+    // --acc:#6fdcb6; --on:#00382a; --onct:#c9f4e3; --ink:#dcefe8; --mute:#92b2a6; --line:#25423a;
+    // --ok:#6fdcb6; --warn:#e5ad45; --bad:#f2867d;
+    // --s1:#1f6b57; --s2:#14463a; --s3:#2b9a7c; --s4:#0f3a30;
+
+    static constexpr ImVec4 DarkBg        { 0.047f, 0.098f, 0.082f, 1.00f }; // #0c1915
+    static constexpr ImVec4 DarkSurface   { 0.071f, 0.137f, 0.118f, 1.00f }; // #12231e
+    static constexpr ImVec4 DarkCt        { 0.114f, 0.239f, 0.200f, 1.00f }; // #1d3d33
+    static constexpr ImVec4 DarkCt2       { 0.094f, 0.192f, 0.157f, 1.00f }; // #183128
+    static constexpr ImVec4 DarkMint      { 0.435f, 0.863f, 0.714f, 1.00f }; // #6fdcb6
+    static constexpr ImVec4 DarkOnMint    { 0.000f, 0.220f, 0.165f, 1.00f }; // #00382a
+    static constexpr ImVec4 DarkAcc       { 0.435f, 0.863f, 0.714f, 1.00f }; // #6fdcb6
+    static constexpr ImVec4 DarkOnCt      { 0.788f, 0.957f, 0.890f, 1.00f }; // #c9f4e3
+    static constexpr ImVec4 DarkInk       { 0.863f, 0.937f, 0.910f, 1.00f }; // #dcefe8
+    static constexpr ImVec4 DarkMute      { 0.573f, 0.698f, 0.651f, 1.00f }; // #92b2a6
+    static constexpr ImVec4 DarkLine      { 0.145f, 0.259f, 0.227f, 1.00f }; // #25423a
+    static constexpr ImVec4 DarkOk        { 0.435f, 0.863f, 0.714f, 1.00f }; // #6fdcb6
+    static constexpr ImVec4 DarkWarn      { 0.898f, 0.678f, 0.271f, 1.00f }; // #e5ad45
+    static constexpr ImVec4 DarkBad       { 0.949f, 0.525f, 0.490f, 1.00f }; // #f2867d
+    static constexpr ImVec4 DarkS1        { 0.122f, 0.420f, 0.341f, 1.00f }; // #1f6b57
+    static constexpr ImVec4 DarkS2        { 0.078f, 0.275f, 0.227f, 1.00f }; // #14463a
+    static constexpr ImVec4 DarkS3        { 0.169f, 0.604f, 0.486f, 1.00f }; // #2b9a7c
+    static constexpr ImVec4 DarkS4        { 0.059f, 0.227f, 0.188f, 1.00f }; // #0f3a30
 };
 
 struct ThemeColors {
+    ImVec4 bg;            // --bg
+    ImVec4 surface;       // --sf
+    ImVec4 ct;            // --ct (Active container / pill selection)
+    ImVec4 ct2;           // --ct2 (Soft container / tile background)
+    ImVec4 mint;          // --mint (Vibrant brand mint)
+    ImVec4 onMint;        // --onm (Dark text on mint)
+    ImVec4 acc;           // --acc (Accent green)
+    ImVec4 on;            // --on (Pure white / dark on accent)
+    ImVec4 onCt;          // --onct (Text on active container)
+    ImVec4 ink;           // --ink (Primary typography)
+    ImVec4 mute;          // --mute (Muted secondary typography)
+    ImVec4 line;          // --line (Border lines and dividers)
+    ImVec4 ok;            // --ok
+    ImVec4 warn;          // --warn
+    ImVec4 bad;           // --bad
+    ImVec4 s1;            // Ambient shapes
+    ImVec4 s2;
+    ImVec4 s3;
+    ImVec4 s4;
+
+    // Backward-compatible aliases for existing calls
     ImVec4 background;
-    ImVec4 surface;
-    ImVec4 surfaceContainerLow;
-    ImVec4 surfaceContainer;
-    ImVec4 surfaceContainerHigh;
-    ImVec4 surfaceContainerHighest;
     ImVec4 primary;
     ImVec4 onPrimary;
     ImVec4 primaryContainer;
     ImVec4 onPrimaryContainer;
     ImVec4 secondary;
-    ImVec4 onSecondary;
-    ImVec4 secondaryContainer;
-    ImVec4 onSecondaryContainer;
-    ImVec4 outline;
-    ImVec4 outlineVariant;
     ImVec4 textPrimary;
     ImVec4 textSecondary;
     ImVec4 textDisabled;
-    ImVec4 success;
-    ImVec4 successContainer;
-    ImVec4 onSuccessContainer;
-    ImVec4 error;
-    ImVec4 errorContainer;
-    ImVec4 onErrorContainer;
     ImVec4 cardBg;
     ImVec4 cardBorder;
-    ImVec4 inputBg;
-    ImVec4 inputBorder;
     ImVec4 controlBg;
     ImVec4 controlHovered;
     ImVec4 controlActive;
+    ImVec4 error;
+    ImVec4 errorContainer;
+    ImVec4 onErrorContainer;
+    ImVec4 success;
+    ImVec4 successContainer;
+    ImVec4 onSuccessContainer;
+    ImVec4 surfaceContainerHigh;
+    ImVec4 surfaceContainerLow;
 };
 
-// Material Design 3 Shape Hierarchy (Derived from reference design)
+// Material 3 & Mint Shape Metrics
 struct MintShapes {
-    static constexpr float ExtraLarge = 28.0f; // Modal dialogs, popup sheets (36px in modal)
-    static constexpr float Large      = 24.0f; // Cards, large surface containers
-    static constexpr float Medium     = 16.0f; // Buttons, input fields, controls
-    static constexpr float Small      = 12.0f; // Chips, badges, small items
-    static constexpr float Pill       = 9999.0f; // Fully-rounded pill buttons/badges (100px)
+    static constexpr float Dialog = 28.0f; // dialog border-radius: 28px
+    static constexpr float Card   = 28.0f; // .card border-radius: 28px
+    static constexpr float Tile   = 24.0f; // .tile border-radius: 24px
+    static constexpr float Control= 16.0f; // .ic border-radius: 16px, inputs: 12-16px
+    static constexpr float Small  = 8.0f;  // .chip border-radius: 8px
+    static constexpr float Pill   = 99.0f; // .btn, .rail a, .search border-radius: 99px
 };
 
-// Typography Scale (Derived from reference design: Google Sans / Segoe UI)
+// Typography Scale
 struct MintTypography {
-    static constexpr float Display  = 32.0f; // Hero Title
-    static constexpr float Headline = 24.0f; // Page Titles
-    static constexpr float Title    = 20.0f; // Card headers, section titles
-    static constexpr float BodyBold = 16.0f; // Emphasized text
-    static constexpr float Body     = 15.0f; // Default standard text
-    static constexpr float Label    = 12.0f; // Overlines, badges, tags
+    static constexpr float Display  = 32.0f; // h1 font: 500 32px
+    static constexpr float Headline = 22.0f; // .top .t font: 500 22px
+    static constexpr float Title    = 20.0f; // h2 font: 500 20px
+    static constexpr float Section  = 18.0f; // .sec font: 500 18px
+    static constexpr float BodyBold = 16.0f; // h3 font: 500 16px
+    static constexpr float Body     = 15.0f; // body font: 400 15px
+    static constexpr float Label    = 13.0f; // .chip, mute small font: 12-13px
+    static constexpr float Badge    = 12.0f; // .badge font: 12px
+    static constexpr float Code     = 34.0f; // .code span font: 26-40px
 };
 
-// 4px Base Spacing Grid
+// Spacing Grid
 struct MintSpacing {
     static constexpr float S4  = 4.0f;
+    static constexpr float S6  = 6.0f;
     static constexpr float S8  = 8.0f;
+    static constexpr float S10 = 10.0f;
     static constexpr float S12 = 12.0f;
+    static constexpr float S14 = 14.0f;
     static constexpr float S16 = 16.0f;
     static constexpr float S20 = 20.0f;
+    static constexpr float S22 = 22.0f;
     static constexpr float S24 = 24.0f;
+    static constexpr float S28 = 28.0f;
     static constexpr float S32 = 32.0f;
-    static constexpr float S48 = 48.0f;
 };
 
-// Semantic Tokens - Light Theme (Mint & White Material)
+// Theme Definitions
 inline const ThemeColors LightTheme = {
-    /* background              */ ImVec4(0.949f, 0.973f, 0.957f, 1.00f), // #F2F8F4 Cloud Mint Canvas
-    /* surface                 */ ImVec4(1.000f, 1.000f, 1.000f, 1.00f), // #FFFFFF Pure Crisp White
-    /* surfaceContainerLow     */ ImVec4(0.965f, 0.980f, 0.969f, 1.00f), // #F6FAF7 Low Surface
-    /* surfaceContainer        */ ImVec4(0.933f, 0.961f, 0.945f, 1.00f), // #EEF5F1 Standard Surface Container
-    /* surfaceContainerHigh    */ ImVec4(0.898f, 0.941f, 0.914f, 1.00f), // #E5F0E9 High Surface Container
-    /* surfaceContainerHighest */ ImVec4(0.867f, 0.937f, 0.894f, 1.00f), // #DDEFE4 Highest Surface / Soft Sage
-    /* primary                 */ ImVec4(0.090f, 0.294f, 0.220f, 1.00f), // #174B38 Forest Green
-    /* onPrimary               */ ImVec4(1.000f, 1.000f, 1.000f, 1.00f), // #FFFFFF White
-    /* primaryContainer        */ ImVec4(0.867f, 0.937f, 0.894f, 1.00f), // #DDEFE4 Soft Sage Container
-    /* onPrimaryContainer      */ ImVec4(0.051f, 0.188f, 0.141f, 1.00f), // #0D3024 Deep Evergreen Text
-    /* secondary               */ ImVec4(0.322f, 0.447f, 0.388f, 1.00f), // #527263 Sage Gray
-    /* onSecondary             */ ImVec4(1.000f, 1.000f, 1.000f, 1.00f), // #FFFFFF White
-    /* secondaryContainer      */ ImVec4(0.886f, 0.925f, 0.898f, 1.00f), // #E2ECE5
-    /* onSecondaryContainer    */ ImVec4(0.118f, 0.208f, 0.169f, 1.00f), // #1E352B
-    /* outline                 */ ImVec4(0.722f, 0.788f, 0.749f, 1.00f), // #B8C9BF Muted Mint
-    /* outlineVariant          */ ImVec4(0.835f, 0.886f, 0.851f, 1.00f), // #D5E2D9 Subtle Divider
-    /* textPrimary             */ ImVec4(0.051f, 0.188f, 0.141f, 1.00f), // #0D3024 Deep Evergreen
-    /* textSecondary           */ ImVec4(0.322f, 0.447f, 0.388f, 1.00f), // #527263 Sage
-    /* textDisabled            */ ImVec4(0.541f, 0.620f, 0.576f, 1.00f), // #8A9E93
-    /* success                 */ ImVec4(0.090f, 0.294f, 0.220f, 1.00f), // #174B38
-    /* successContainer        */ ImVec4(0.867f, 0.937f, 0.894f, 1.00f), // #DDEFE4
-    /* onSuccessContainer      */ ImVec4(0.051f, 0.188f, 0.141f, 1.00f), // #0D3024
-    /* error                   */ ImVec4(0.730f, 0.180f, 0.180f, 1.00f), // #BA1A1A Red
-    /* errorContainer          */ ImVec4(0.996f, 0.886f, 0.886f, 1.00f), // #FEE2E2 Soft Pink
-    /* onErrorContainer        */ ImVec4(0.600f, 0.106f, 0.106f, 1.00f), // #991B1B Deep Red
-    /* cardBg                  */ ImVec4(1.000f, 1.000f, 1.000f, 1.00f), // #FFFFFF Pure White
-    /* cardBorder              */ ImVec4(0.835f, 0.886f, 0.851f, 1.00f), // #D5E2D9
-    /* inputBg                 */ ImVec4(0.933f, 0.961f, 0.945f, 0.85f), // Soft Mint Input
-    /* inputBorder             */ ImVec4(0.722f, 0.788f, 0.749f, 1.00f), // Outline
-    /* controlBg               */ ImVec4(0.867f, 0.937f, 0.894f, 1.00f), // Soft Sage Fill
-    /* controlHovered          */ ImVec4(0.722f, 0.922f, 0.835f, 1.00f), // Pixel Mint Hover
-    /* controlActive           */ ImVec4(0.557f, 0.847f, 0.729f, 1.00f)  // Fresh Mint Active
+    MintPalette::LightBg,       // bg
+    MintPalette::LightSurface,  // surface
+    MintPalette::LightCt,       // ct
+    MintPalette::LightCt2,      // ct2
+    MintPalette::LightMint,     // mint
+    MintPalette::LightOnMint,   // onMint
+    MintPalette::LightAcc,      // acc
+    ImVec4(1.0f, 1.0f, 1.0f, 1.0f), // on
+    MintPalette::LightOnCt,     // onCt
+    MintPalette::LightInk,      // ink
+    MintPalette::LightMute,     // mute
+    MintPalette::LightLine,     // line
+    MintPalette::LightOk,       // ok
+    MintPalette::LightWarn,     // warn
+    MintPalette::LightBad,      // bad
+    MintPalette::LightS1,       // s1
+    MintPalette::LightS2,       // s2
+    MintPalette::LightS3,       // s3
+    MintPalette::LightS4,       // s4
+
+    // Aliases
+    MintPalette::LightBg,       // background
+    MintPalette::LightAcc,      // primary
+    ImVec4(1.0f, 1.0f, 1.0f, 1.0f), // onPrimary
+    MintPalette::LightCt,       // primaryContainer
+    MintPalette::LightOnCt,     // onPrimaryContainer
+    MintPalette::LightMute,     // secondary
+    MintPalette::LightInk,      // textPrimary
+    MintPalette::LightMute,     // textSecondary
+    MintPalette::LightMute,     // textDisabled
+    MintPalette::LightSurface,  // cardBg
+    MintPalette::LightLine,     // cardBorder
+    MintPalette::LightCt2,      // controlBg
+    MintPalette::LightCt,       // controlHovered
+    MintPalette::LightMint,     // controlActive
+    MintPalette::LightBad,      // error
+    ImVec4(0.996f, 0.886f, 0.886f, 1.00f), // errorContainer
+    MintPalette::LightBad,      // onErrorContainer
+    MintPalette::LightOk,       // success
+    MintPalette::LightCt,       // successContainer
+    MintPalette::LightOnCt,     // onSuccessContainer
+    MintPalette::LightCt,       // surfaceContainerHigh
+    MintPalette::LightCt2       // surfaceContainerLow
 };
 
-// Semantic Tokens - Dark Theme (Deep Charcoal Mint with Material You Surface Containers)
 inline const ThemeColors DarkTheme = {
-    /* background              */ ImVec4(0.055f, 0.082f, 0.067f, 1.00f), // #0E1511 Deep Dark Canvas
-    /* surface                 */ ImVec4(0.082f, 0.125f, 0.102f, 1.00f), // #15201A Elevated Card Surface
-    /* surfaceContainerLow     */ ImVec4(0.067f, 0.102f, 0.082f, 1.00f), // #111A15 Low Surface
-    /* surfaceContainer        */ ImVec4(0.094f, 0.145f, 0.118f, 1.00f), // #18251E Container Surface
-    /* surfaceContainerHigh    */ ImVec4(0.125f, 0.192f, 0.157f, 1.00f), // #203128 High Surface
-    /* surfaceContainerHighest */ ImVec4(0.157f, 0.243f, 0.200f, 1.00f), // #283E33 Highest Surface
-    /* primary                 */ ImVec4(0.722f, 0.922f, 0.835f, 1.00f), // #B8EBD5 Pixel Mint
-    /* onPrimary               */ ImVec4(0.051f, 0.188f, 0.141f, 1.00f), // #0D3024 Deep Evergreen Text
-    /* primaryContainer        */ ImVec4(0.133f, 0.282f, 0.212f, 1.00f), // #224836 Pine Container
-    /* onPrimaryContainer      */ ImVec4(0.867f, 0.961f, 0.910f, 1.00f), // #DDF5E8 Mint Light Text
-    /* secondary               */ ImVec4(0.690f, 0.780f, 0.725f, 1.00f), // #B0C7B9 Pale Sage
-    /* onSecondary             */ ImVec4(0.082f, 0.125f, 0.102f, 1.00f), // Dark Charcoal
-    /* secondaryContainer      */ ImVec4(0.161f, 0.231f, 0.192f, 1.00f), // #293B31
-    /* onSecondaryContainer    */ ImVec4(0.878f, 0.933f, 0.898f, 1.00f), // #E0EEE5
-    /* outline                 */ ImVec4(0.251f, 0.349f, 0.294f, 1.00f), // #40594B Restrained Sage
-    /* outlineVariant          */ ImVec4(0.169f, 0.239f, 0.204f, 1.00f), // #2B3D34 Subtle Inner Line
-    /* textPrimary             */ ImVec4(0.949f, 0.973f, 0.957f, 1.00f), // #F2F8F4 Light Cloud
-    /* textSecondary           */ ImVec4(0.690f, 0.780f, 0.725f, 1.00f), // #B0C7B9
-    /* textDisabled            */ ImVec4(0.365f, 0.459f, 0.408f, 1.00f), // #5D7568
-    /* success                 */ ImVec4(0.722f, 0.922f, 0.835f, 1.00f), // #B8EBD5
-    /* successContainer        */ ImVec4(0.133f, 0.282f, 0.212f, 1.00f), // #224836
-    /* onSuccessContainer      */ ImVec4(0.867f, 0.961f, 0.910f, 1.00f), // #DDF5E8
-    /* error                   */ ImVec4(1.000f, 0.450f, 0.450f, 1.00f), // Light Red
-    /* errorContainer          */ ImVec4(0.380f, 0.118f, 0.118f, 1.00f), // Deep Crimson
-    /* onErrorContainer        */ ImVec4(1.000f, 0.850f, 0.850f, 1.00f), // Pale Pink
-    /* cardBg                  */ ImVec4(0.082f, 0.125f, 0.102f, 1.00f), // #15201A Elevated Surface
-    /* cardBorder              */ ImVec4(0.251f, 0.349f, 0.294f, 1.00f), // #40594B
-    /* inputBg                 */ ImVec4(0.125f, 0.192f, 0.157f, 0.85f), // #203128 High Surface
-    /* inputBorder             */ ImVec4(0.251f, 0.349f, 0.294f, 1.00f), // Outline
-    /* controlBg               */ ImVec4(0.133f, 0.282f, 0.212f, 1.00f), // #224836
-    /* controlHovered          */ ImVec4(0.180f, 0.360f, 0.270f, 1.00f), // Lighter Green
-    /* controlActive           */ ImVec4(0.240f, 0.450f, 0.340f, 1.00f)  // Active Green
+    MintPalette::DarkBg,        // bg
+    MintPalette::DarkSurface,   // surface
+    MintPalette::DarkCt,        // ct
+    MintPalette::DarkCt2,       // ct2
+    MintPalette::DarkMint,      // mint
+    MintPalette::DarkOnMint,    // onMint
+    MintPalette::DarkAcc,       // acc
+    ImVec4(0.0f, 0.220f, 0.165f, 1.0f), // on
+    MintPalette::DarkOnCt,      // onCt
+    MintPalette::DarkInk,       // ink
+    MintPalette::DarkMute,      // mute
+    MintPalette::DarkLine,      // line
+    MintPalette::DarkOk,        // ok
+    MintPalette::DarkWarn,      // warn
+    MintPalette::DarkBad,       // bad
+    MintPalette::DarkS1,        // s1
+    MintPalette::DarkS2,        // s2
+    MintPalette::DarkS3,        // s3
+    MintPalette::DarkS4,        // s4
+
+    // Aliases
+    MintPalette::DarkBg,        // background
+    MintPalette::DarkAcc,       // primary
+    ImVec4(0.0f, 0.220f, 0.165f, 1.0f), // onPrimary
+    MintPalette::DarkCt,        // primaryContainer
+    MintPalette::DarkOnCt,      // onPrimaryContainer
+    MintPalette::DarkMute,      // secondary
+    MintPalette::DarkInk,       // textPrimary
+    MintPalette::DarkMute,      // textSecondary
+    MintPalette::DarkMute,      // textDisabled
+    MintPalette::DarkSurface,   // cardBg
+    MintPalette::DarkLine,      // cardBorder
+    MintPalette::DarkCt2,       // controlBg
+    MintPalette::DarkCt,        // controlHovered
+    MintPalette::DarkMint,      // controlActive
+    MintPalette::DarkBad,       // error
+    ImVec4(0.380f, 0.118f, 0.118f, 1.00f), // errorContainer
+    ImVec4(1.000f, 0.850f, 0.850f, 1.00f), // onErrorContainer
+    MintPalette::DarkOk,        // success
+    MintPalette::DarkCt,        // successContainer
+    MintPalette::DarkOnCt,      // onSuccessContainer
+    MintPalette::DarkCt,        // surfaceContainerHigh
+    MintPalette::DarkCt2        // surfaceContainerLow
 };
 
 inline const ThemeColors& getActiveTheme(ThemeMode mode) {
     return (mode == ThemeMode::Light) ? LightTheme : DarkTheme;
 }
 
-inline void applyTheme(ThemeMode mode) {
+inline void applyTheme(ThemeMode mode, bool highContrast = false) {
     ImGuiStyle& style = ImGui::GetStyle();
     const ThemeColors& c = getActiveTheme(mode);
     ImVec4* colors = style.Colors;
 
-    // Material 3 Rounded Metrics
-    style.WindowRounding    = MintShapes::Large;      // 24px
-    style.ChildRounding     = MintShapes::Large;      // 24px
-    style.FrameRounding     = MintShapes::Medium;     // 16px
-    style.PopupRounding     = MintShapes::ExtraLarge; // 28px
-    style.ScrollbarRounding = MintShapes::Small;      // 12px
-    style.GrabRounding      = MintShapes::Medium;     // 16px
-    style.TabRounding       = MintShapes::Medium;     // 16px
+    // Material 3 Rounded Metrics from HTML mockup
+    style.WindowRounding    = 0.0f;                    // Window canvas fills screen
+    style.ChildRounding     = MintShapes::Card;       // 28px card rounding
+    style.FrameRounding     = MintShapes::Control;    // 16px
+    style.PopupRounding     = MintShapes::Dialog;     // 28px dialogs
+    style.ScrollbarRounding = MintShapes::Control;
+    style.GrabRounding      = MintShapes::Pill;
+    style.TabRounding       = MintShapes::Control;
 
-    style.WindowBorderSize  = 1.0f;
+    style.WindowBorderSize  = 0.0f;
     style.ChildBorderSize   = 1.0f;
     style.PopupBorderSize   = 1.0f;
     style.FrameBorderSize   = 1.0f;
 
-    style.WindowPadding     = ImVec2(MintSpacing::S16, MintSpacing::S16);
-    style.FramePadding      = ImVec2(MintSpacing::S12, MintSpacing::S8);
-    style.ItemSpacing       = ImVec2(MintSpacing::S12, MintSpacing::S8);
-    style.ItemInnerSpacing  = ImVec2(MintSpacing::S8,  MintSpacing::S4);
-    style.ScrollbarSize     = MintSpacing::S12;
+    style.WindowPadding     = ImVec2(16.0f, 16.0f);
+    style.FramePadding      = ImVec2(16.0f, 10.0f);
+    style.ItemSpacing       = ImVec2(12.0f, 12.0f);
+    style.ItemInnerSpacing  = ImVec2(8.0f,  6.0f);
+    style.ScrollbarSize     = 10.0f;
 
-    colors[ImGuiCol_Text]                  = c.textPrimary;
-    colors[ImGuiCol_TextDisabled]          = c.textDisabled;
-    colors[ImGuiCol_WindowBg]              = c.background;
-    colors[ImGuiCol_ChildBg]               = c.cardBg;
+    ImVec4 lineCol = highContrast ? c.mute : c.line;
+    ImVec4 muteCol = highContrast ? c.ink : c.mute;
+
+    colors[ImGuiCol_Text]                  = c.ink;
+    colors[ImGuiCol_TextDisabled]          = muteCol;
+    colors[ImGuiCol_WindowBg]              = c.bg;
+    colors[ImGuiCol_ChildBg]               = c.surface;
     colors[ImGuiCol_PopupBg]               = c.surface;
-    colors[ImGuiCol_Border]                = c.cardBorder;
-    colors[ImGuiCol_BorderShadow]          = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
-    colors[ImGuiCol_FrameBg]               = c.inputBg;
-    colors[ImGuiCol_FrameBgHovered]        = c.controlHovered;
-    colors[ImGuiCol_FrameBgActive]         = c.controlActive;
+    colors[ImGuiCol_Border]                = lineCol;
+    colors[ImGuiCol_BorderShadow]          = ImVec4(0, 0, 0, 0);
+    colors[ImGuiCol_FrameBg]               = c.ct2;
+    colors[ImGuiCol_FrameBgHovered]        = c.ct;
+    colors[ImGuiCol_FrameBgActive]         = c.ct;
     colors[ImGuiCol_TitleBg]               = c.surface;
     colors[ImGuiCol_TitleBgActive]         = c.surface;
     colors[ImGuiCol_TitleBgCollapsed]      = c.surface;
     colors[ImGuiCol_MenuBarBg]             = c.surface;
-    colors[ImGuiCol_ScrollbarBg]           = c.surfaceContainerLow;
-    colors[ImGuiCol_ScrollbarGrab]         = c.secondary;
-    colors[ImGuiCol_ScrollbarGrabHovered]  = c.primary;
-    colors[ImGuiCol_ScrollbarGrabActive]   = (mode == ThemeMode::Light) ? MintPalette::ForestGreen : MintPalette::PixelMint;
-    colors[ImGuiCol_CheckMark]             = c.primary;
-    colors[ImGuiCol_SliderGrab]            = c.primary;
-    colors[ImGuiCol_SliderGrabActive]      = (mode == ThemeMode::Light) ? MintPalette::ForestGreen : MintPalette::FreshMint;
-    colors[ImGuiCol_Button]                = c.controlBg;
-    colors[ImGuiCol_ButtonHovered]         = c.controlHovered;
-    colors[ImGuiCol_ButtonActive]          = c.controlActive;
-    colors[ImGuiCol_Header]                = c.surfaceContainerHigh;
-    colors[ImGuiCol_HeaderHovered]         = c.controlHovered;
-    colors[ImGuiCol_HeaderActive]          = c.controlActive;
-    colors[ImGuiCol_Separator]             = c.outlineVariant;
-    colors[ImGuiCol_SeparatorHovered]      = c.primary;
-    colors[ImGuiCol_SeparatorActive]       = c.primary;
-    colors[ImGuiCol_ResizeGrip]            = c.controlBg;
-    colors[ImGuiCol_ResizeGripHovered]     = c.controlHovered;
-    colors[ImGuiCol_ResizeGripActive]      = c.controlActive;
-    colors[ImGuiCol_Tab]                   = c.surfaceContainerHigh;
-    colors[ImGuiCol_TabHovered]            = c.controlHovered;
-    colors[ImGuiCol_TabActive]             = c.primaryContainer;
+    colors[ImGuiCol_ScrollbarBg]           = c.ct2;
+    colors[ImGuiCol_ScrollbarGrab]         = c.mute;
+    colors[ImGuiCol_ScrollbarGrabHovered]  = c.acc;
+    colors[ImGuiCol_ScrollbarGrabActive]   = c.mint;
+    colors[ImGuiCol_CheckMark]             = c.acc;
+    colors[ImGuiCol_SliderGrab]            = c.acc;
+    colors[ImGuiCol_SliderGrabActive]      = c.mint;
+    colors[ImGuiCol_Button]                = c.ct2;
+    colors[ImGuiCol_ButtonHovered]         = c.ct;
+    colors[ImGuiCol_ButtonActive]          = c.mint;
+    colors[ImGuiCol_Header]                = c.ct;
+    colors[ImGuiCol_HeaderHovered]         = c.ct;
+    colors[ImGuiCol_HeaderActive]          = c.mint;
+    colors[ImGuiCol_Separator]             = lineCol;
+    colors[ImGuiCol_SeparatorHovered]      = c.acc;
+    colors[ImGuiCol_SeparatorActive]       = c.acc;
+    colors[ImGuiCol_ResizeGrip]            = c.ct;
+    colors[ImGuiCol_ResizeGripHovered]     = c.mint;
+    colors[ImGuiCol_ResizeGripActive]      = c.acc;
+    colors[ImGuiCol_Tab]                   = c.ct2;
+    colors[ImGuiCol_TabHovered]            = c.ct;
+    colors[ImGuiCol_TabActive]             = c.ct;
     colors[ImGuiCol_TabUnfocused]          = c.surface;
-    colors[ImGuiCol_TabUnfocusedActive]    = c.surfaceContainerHigh;
-    colors[ImGuiCol_TableHeaderBg]         = c.surfaceContainerHigh;
-    colors[ImGuiCol_TableBorderStrong]     = c.outline;
-    colors[ImGuiCol_TableBorderLight]      = c.outlineVariant;
+    colors[ImGuiCol_TabUnfocusedActive]    = c.ct2;
+    colors[ImGuiCol_TableHeaderBg]         = c.ct2;
+    colors[ImGuiCol_TableBorderStrong]     = lineCol;
+    colors[ImGuiCol_TableBorderLight]      = lineCol;
     colors[ImGuiCol_TableRowBg]            = ImVec4(c.surface.x, c.surface.y, c.surface.z, 0.0f);
-    colors[ImGuiCol_TableRowBgAlt]         = ImVec4(c.surfaceContainerLow.x, c.surfaceContainerLow.y, c.surfaceContainerLow.z, 0.45f);
-    colors[ImGuiCol_TextSelectedBg]        = c.primaryContainer;
-    colors[ImGuiCol_NavHighlight]          = c.primary;
+    colors[ImGuiCol_TableRowBgAlt]         = ImVec4(c.ct2.x, c.ct2.y, c.ct2.z, 0.5f);
+    colors[ImGuiCol_TextSelectedBg]        = c.ct;
+    colors[ImGuiCol_NavHighlight]          = c.acc;
 }
 
 } // namespace mist::desktop::tokens

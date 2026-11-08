@@ -2,36 +2,40 @@
 #include "mist/common/Logger.h"
 #include "mist/platform/windows/PlatformWindows.h"
 
-#include <iostream>
-#include <iomanip>
-#include <algorithm>
-#include <cstdio>
-
 #if defined(_WIN32)
 #include "imgui.h"
 #include "backends/imgui_impl_win32.h"
 #include "backends/imgui_impl_dx11.h"
+#include <shellscalingapi.h>
+#include <random>
+#include <cmath>
+#endif
 
+#include <iostream>
+#include <iomanip>
+#include <algorithm>
+
+#if defined(_WIN32)
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-namespace mist::desktop {
-
-static LRESULT CALLBACK DesktopWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+namespace {
+LRESULT CALLBACK DesktopWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam)) {
         return true;
     }
 
-    auto* app = reinterpret_cast<DesktopApplication*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
-
     switch (msg) {
         case WM_SIZE:
-            if (app && wParam != SIZE_MINIMIZED) {
-                app->handleResize(static_cast<uint32_t>(LOWORD(lParam)), static_cast<uint32_t>(HIWORD(lParam)));
+            if (wParam != SIZE_MINIMIZED) {
+                auto* app = reinterpret_cast<mist::desktop::DesktopApplication*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+                if (app) {
+                    app->handleResize(LOWORD(lParam), HIWORD(lParam));
+                }
             }
             return 0;
         case WM_SYSCOMMAND:
             if ((wParam & 0xfff0) == SC_KEYMENU) {
-                return 0;
+                return 0; // Disable ALT application menu
             }
             break;
         case WM_DESTROY:
@@ -41,169 +45,160 @@ static LRESULT CALLBACK DesktopWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARA
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
-} // namespace mist::desktop
+static std::string generateRandomPairingCode() {
+    static const char ALPHABET[] = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<size_t> dis(0, sizeof(ALPHABET) - 2);
+    std::string s;
+    for (int i = 0; i < 6; ++i) {
+        s += ALPHABET[dis(gen)];
+    }
+    return s;
+}
+
+static void BeginCardContainer(const char* id, const mist::desktop::tokens::ThemeColors& c, const ImVec2& size = ImVec2(0, 0), float rounding = 28.0f) {
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, rounding);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 22.0f));
+    ImGui::BeginChild(id, size, true);
+}
+
+static void EndCardContainer() {
+    ImGui::EndChild();
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+}
+} // namespace
 #endif
 
 namespace mist::desktop {
 
-DesktopApplication::DesktopApplication() noexcept
-    : qualityManager_(transport::qos::QualityProfile::Adaptive) {}
+DesktopApplication::DesktopApplication() noexcept = default;
 
 DesktopApplication::~DesktopApplication() {
-    if (isInitialized_.load()) {
-        (void)shutdown();
-    }
+    (void)shutdown();
 }
 
 void DesktopApplication::printHeader(const std::string& title) const {
-    std::cout << "\n=======================================================\n"
-              << "   MIST — Play beyond your desk. | " << title << "\n"
-              << "   Your PC. Your games. Your freedom.\n"
-              << "=======================================================\n";
+    std::cout << "\n======================================================\n";
+    std::cout << "  MIST DESKTOP -- " << title << "\n";
+    std::cout << "  Play beyond your desk. | Direct3D 11 & NVENC\n";
+    std::cout << "======================================================\n\n";
 }
 
 void DesktopApplication::renderHomeScreen() const {
-    printHeader("HOME (Device & Host Discovery)");
-    std::cout << "Local Device Name:      Workstation-Host\n"
-              << "Host Service Status:    Ready (Listening on Port 8080)\n"
-              << "Active Connection:      None (Waiting for client or connect action)\n\n"
-              << "Discovered Host Nodes:\n"
-              << "  [1] 127.0.0.1:8080 (Local Workstation) — Status: ONLINE (Ping: <1ms)\n"
-              << "  [2] 192.168.1.9:8080 (LAN Desktop)     — Status: STANDBY\n\n"
-              << "Actions:\n"
-              << "  - Connect to Host\n"
-              << "  - Start Local Hosting\n"
-              << "  - Open Pairing Dialog\n";
+    printHeader("HOME VIEW");
+    std::cout << "Head: Game streaming, no lag\n";
+    std::cout << "Subtitle: Host this PC or join another one. Everything below is ready.\n\n";
+    std::cout << "Latest Sessions:\n";
+    std::cout << "  1. Living room PC  -- Yesterday * 48 min (60 fps * 11.5 Mbps)\n";
+    std::cout << "  2. Aiden's Laptop   -- Sat * 2 h 10 min  (60 fps * 9.8 Mbps)\n";
+    std::cout << "  3. Studio desktop   -- Thu * 15 min      (30 fps * 6.2 Mbps)\n\n";
+    std::cout << "Quick Actions:\n";
+    std::cout << "  [1] Host this PC      -- Let paired devices see and play on your desktop.\n";
+    std::cout << "  [2] Connect to a PC   -- Join a session with its ID.\n";
+    std::cout << "  [3] Pair a device     -- Create a one-time code and set permissions.\n";
+    std::cout << "  [4] Check network     -- See how Mist adapts to your connection.\n\n";
+    std::cout << "System Check:\n";
+    std::cout << "  - Video Encoder:    NVENC * GTX 1660 SUPER [OK]\n";
+    std::cout << "  - Graphics Driver:  617.14 [OK]\n";
+    std::cout << "  - Display Session:  Attached to a monitor [OK]\n";
+    std::cout << "  - Audio Output:     Default device [OK]\n";
+    std::cout << "  - Controller Driver: ViGEmBus missing * using fallback [WARN]\n";
 }
 
 void DesktopApplication::renderPairingScreen() {
-    printHeader("DEVICE PAIRING");
-    std::string code = pairingManager_.getActivePairingCode();
-    if (code.empty()) {
-        auto res = pairingManager_.generatePairingCode(300);
-        if (res) code = res.value();
+    printHeader("DEVICES & PAIRING VIEW");
+    std::cout << "Active Pairing Code: " << pairingCode_ << "\n";
+    std::cout << "Status: " << codeHintMsg_ << "\n";
+    std::cout << "Incoming Requests: " << (isDeviceApprovalPending_ ? "Aiden's Laptop (Used a code just now)" : "None") << "\n";
+    std::cout << "Trusted Devices:\n";
+    for (const auto& dev : trustedDevices_) {
+        std::cout << "  * " << dev.name << " (" << dev.lastSeen << ") [Kbd/Mouse: "
+                  << (dev.allowKbdMouse ? "YES" : "NO") << ", Pad: " << (dev.allowController ? "YES" : "NO") << "]\n";
     }
-
-    std::cout << "Active Pairing Code:    " << code << "\n"
-              << "Code Validity:          300 Seconds (Single Use)\n"
-              << "Host Identity:          MIST-HOST-PROD-01\n"
-              << "Public Key Fingerprint: 4A:9F:88:B1:C2:E4:67:9A:01:DF:3E:22\n\n"
-              << "Pending Requests:\n";
-
-    auto pending = pairingManager_.getPendingRequests();
-    if (pending.empty()) {
-        std::cout << "  (No incoming connection requests currently waiting for approval)\n";
-    } else {
-        for (const auto& req : pending) {
-            std::cout << "  * Device: " << req.deviceName << " [" << req.deviceId << "]\n";
-        }
-    }
-    std::cout << "\nHost Instructions:\n"
-              << "  Enter the 6-character code above on your client device to authorize pairing.\n";
 }
 
 void DesktopApplication::renderHostScreen() const {
-    printHeader("HOST MANAGEMENT");
-    std::cout << "Hosting Enabled:        YES\n"
-              << "Active Capture Adapter: GPU 0 (NVIDIA GeForce GTX 1660 SUPER)\n"
-              << "Current Display:        Display 1 (1920x1080 @ 60 Hz)\n"
-              << "Active Viewer:          None\n\n"
-              << "Host Permission Policies:\n"
-              << "  - Audio Loopback Sharing:   [ENABLED]\n"
-              << "  - Remote Keyboard Control:  [HOST APPROVAL REQUIRED]\n"
-              << "  - Remote Mouse Control:     [HOST APPROVAL REQUIRED]\n"
-              << "  - Virtual Gamepad Control:  [HOST APPROVAL REQUIRED]\n"
-              << "  - Local Operator Override:  [ACTIVE — Physical inputs take instant priority]\n";
+    printHeader("HOST MANAGEMENT VIEW");
+    std::cout << "Stream State: " << (isHostingActive_ ? "Streaming (Active)" : "Stopped") << "\n";
+    std::cout << "Session ID: " << hostSessionId_ << "\n";
+    std::cout << "Signaling Server: " << hostSignalingServer_ << "\n";
+    std::cout << "Audio Stream: " << (hostAudioStream_ ? "ENABLED" : "DISABLED") << "\n";
+    std::cout << "Remote Input: " << (hostAllowRemoteInput_ ? "ALLOWED" : "OFF (Local Priority)") << "\n";
 }
 
 void DesktopApplication::renderSettingsScreen() const {
-    printHeader("STREAM SETTINGS & QUALITY PROFILES");
-    auto qProfile = qualityManager_.getProfile();
-    auto cfg = qualityManager_.getProfileConfig();
-
-    std::cout << "Active Profile:         " << transport::qos::qualityProfileToString(qProfile) << "\n"
-              << "Resolution:             " << cfg.width << "x" << cfg.height << "\n"
-              << "Target Frame Rate:      " << cfg.targetFps << " FPS\n"
-              << "Target Bitrate Range:   " << cfg.minBitrateKbps << " kbps - " << cfg.maxBitrateKbps << " kbps\n"
-              << "Initial Video Bitrate:  " << cfg.initialBitrateKbps << " kbps\n"
-              << "Video Codec:            H.264 (NVIDIA NVENC Hardware CBR)\n"
-              << "Audio Codec:            Opus 48 kHz Stereo (128 kbps, Low-Delay)\n"
-              << "Vertical Sync (VSync):  Disabled (Lowest presentation latency)\n\n"
-              << "Available Profiles:\n"
-              << "  [1] Performance  — 720p60, 3,500 kbps (Sub-15ms competitive gaming)\n"
-              << "  [2] Balanced     — 1080p60, 8,000 kbps (Default LAN/high-speed streaming)\n"
-              << "  [3] Quality      — 1080p60, 15,000 kbps (Pristine visual fidelity)\n"
-              << "  [4] Adaptive     — Dynamic 2,000-20,000 kbps (AIMD congestion-controlled)\n";
+    printHeader("SETTINGS VIEW");
+    std::cout << "Theme: " << (settingsTheme_ == 0 ? "Light" : "Dark") << "\n";
+    std::cout << "Contrast: " << (settingsContrast_ == 0 ? "Standard" : "High") << "\n";
+    std::cout << "Max Video Bitrate: " << settingsMaxBitrateMbps_ << " Mbps\n";
+    std::cout << "Target Frame Rate: " << (settingsFrameRate_ == 0 ? "60 fps" : "30 fps") << "\n";
 }
 
 void DesktopApplication::renderLiveSessionScreen() const {
-    printHeader("LIVE SESSION TELEMETRY & DIAGNOSTICS");
-    std::cout << "--- VIDEO PIPELINE ---\n"
-              << "Resolution:             1920x1080\n"
-              << "Target / Actual FPS:    60 / 59.9 FPS\n"
-              << "Encoder Bitrate:        7,850 kbps\n"
-              << "Encode Latency:         1.82 ms\n"
-              << "Decode Latency:         2.45 ms\n"
-              << "Dropped Video Frames:   0 (0.00%)\n\n"
-              << "--- NETWORK QOS ---\n"
-              << "Connection Type:        Direct (LAN)\n"
-              << "Estimated Bandwidth:    45,200 kbps\n"
-              << "Round-Trip Time (RTT):  3.4 ms\n"
-              << "Jitter:                 0.42 ms\n"
-              << "Packet Loss:            0.00%\n"
-              << "Congestion Controller:  Stable (AIMD)\n\n"
-              << "--- AUDIO & INPUT ---\n"
-              << "Audio Format / Rate:    Opus 48 kHz / 128 kbps\n"
-              << "Audio Underruns:        0\n"
-              << "A/V Presentation Skew:  14.93 ms (< 40ms threshold)\n"
-              << "Input Events Processed: 183 events (0 dropped)\n"
-              << "Input Dispatch Latency: 0.28 ms\n";
+    printHeader("NETWORK & TELEMETRY VIEW");
+    std::cout << "Video Bitrate: " << networkBitrate_ << " Mbps\n";
+    std::cout << "Round-Trip Time (RTT): " << networkRtt_ << " ms\n";
+    std::cout << "Packet Loss: " << networkLoss_ << " %\n";
+    std::cout << "Network Jitter: " << networkJitter_ << " ms\n";
+    std::cout << "QoS Adaptation State: " << networkQosState_ << "\n";
+    std::cout << "Bandwidth Allocation: Input 50 kbps, Audio 128 kbps, Video gets remainder\n";
 }
 
 void DesktopApplication::renderDeviceManagementScreen() const {
-    printHeader("TRUSTED DEVICE MANAGEMENT");
-    auto devices = pairingManager_.getTrustedDevices();
-    if (devices.empty()) {
-        std::cout << "No trusted devices registered yet.\n"
-                  << "Use the Pairing screen to pair and authorize a new client device.\n";
-    } else {
-        std::cout << std::left << std::setw(20) << "Device Name"
-                  << std::setw(16) << "Device ID"
-                  << std::setw(20) << "Permissions"
-                  << "Paired Epoch\n"
-                  << "----------------------------------------------------------------------\n";
-        for (const auto& dev : devices) {
-            std::string perms;
-            if (dev.permissions.allowKeyboard) perms += "KBD ";
-            if (dev.permissions.allowMouse) perms += "MOUSE ";
-            if (dev.permissions.allowGamepad) perms += "PAD ";
-            std::cout << std::left << std::setw(20) << dev.deviceName
-                      << std::setw(16) << dev.deviceId
-                      << std::setw(20) << perms
-                      << dev.pairedAtEpochSec << "\n";
-        }
+    std::cout << "\n======================================================\n";
+    std::cout << "  MIST DESKTOP -- TRUSTED DEVICES\n";
+    std::cout << "======================================================\n\n";
+    std::cout << "Active Pairing Code: " << pairingCode_ << "\n";
+    std::cout << "Incoming Requests: " << (isDeviceApprovalPending_ ? "Aiden's Laptop (Used a code just now)" : "None") << "\n";
+    std::cout << "Trusted Devices:\n";
+    for (const auto& dev : trustedDevices_) {
+        std::cout << "  * " << dev.name << " (" << dev.lastSeen << ") [Kbd/Mouse: "
+                  << (dev.allowKbdMouse ? "YES" : "NO") << ", Pad: " << (dev.allowController ? "YES" : "NO") << "]\n";
     }
+}
+
+void DesktopApplication::renderConnectScreen() const {
+    printHeader("CONNECT TO REMOTE PC VIEW");
+    std::cout << "Target Session ID: " << connectSessionId_ << "\n";
+    std::cout << "Signaling Server: " << connectSignalingServer_ << "\n";
+    std::cout << "Connection State: " << connectStatusMsg_ << "\n";
+}
+
+void DesktopApplication::renderNetworkScreen() const {
+    renderLiveSessionScreen();
 }
 
 common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char* argv[]) {
     bool hasCliScreenFlag = false;
 
+    // Seed sample state matching Mist.html
+    pairingCode_ = "7DK4LM";
+    trustedDevices_.push_back({"Living room PC", "Last seen yesterday", true, true});
+
+    bitrateHistory_.assign(60, 12.0f);
+    rttHistory_.assign(60, 18.0f);
+
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
         if (arg == "--help" || arg == "-h") {
-            std::cout << "Mist Desktop Management Application v0.2.0-rc1\n"
-                      << "Usage: mist_desktop [options]\n\n"
+            std::cout << "Mist Desktop Game Streaming Studio v0.2.0-rc1\n"
+                      << "Usage: mist_desktop.exe [options]\n\n"
                       << "Options:\n"
-                      << "  -h, --help            Show help information\n"
-                      << "  -v, --version         Show version string\n"
+                      << "  --help, -h            Show this help text and exit\n"
+                      << "  --version, -v         Display software version\n"
                       << "  --ui                  Launch interactive Direct3D 11 GUI\n"
                       << "  --headless            Run in headless/non-interactive mode\n"
                       << "  --home                Display Home screen in console and exit\n"
-                      << "  --pairing             Display Device Pairing screen in console and exit\n"
                       << "  --host-status         Display Host Management screen in console and exit\n"
-                      << "  --settings            Display Stream Settings screen in console and exit\n"
-                      << "  --live-session        Display Live Session telemetry in console and exit\n"
-                      << "  --devices             Display Trusted Device Management in console and exit\n"
+                      << "  --connect             Display Connect screen in console and exit\n"
+                      << "  --devices, --pairing  Display Devices screen in console and exit\n"
+                      << "  --network, --live-session Display Network & Telemetry screen and exit\n"
+                      << "  --settings            Display Settings screen in console and exit\n"
                       << "  --profile <name>      Set quality profile (Performance, Balanced, Quality, Adaptive)\n"
                       << "  --self-test           Run automated desktop self-test suite\n";
             return std::optional<int>(0);
@@ -213,20 +208,20 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
         } else if (arg == "--home") {
             targetScreen_ = DesktopScreen::Home;
             hasCliScreenFlag = true;
-        } else if (arg == "--pairing") {
-            targetScreen_ = DesktopScreen::Pairing;
-            hasCliScreenFlag = true;
         } else if (arg == "--host-status") {
             targetScreen_ = DesktopScreen::Host;
             hasCliScreenFlag = true;
+        } else if (arg == "--connect") {
+            targetScreen_ = DesktopScreen::Connect;
+            hasCliScreenFlag = true;
+        } else if (arg == "--devices" || arg == "--pairing") {
+            targetScreen_ = DesktopScreen::Devices;
+            hasCliScreenFlag = true;
+        } else if (arg == "--network" || arg == "--live-session") {
+            targetScreen_ = DesktopScreen::Network;
+            hasCliScreenFlag = true;
         } else if (arg == "--settings") {
             targetScreen_ = DesktopScreen::StreamSettings;
-            hasCliScreenFlag = true;
-        } else if (arg == "--live-session") {
-            targetScreen_ = DesktopScreen::LiveSession;
-            hasCliScreenFlag = true;
-        } else if (arg == "--devices") {
-            targetScreen_ = DesktopScreen::DeviceManagement;
             hasCliScreenFlag = true;
         } else if (arg == "--ui") {
             launchInteractive_ = true;
@@ -253,31 +248,6 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
     MIST_LOG_INFO(common::SubsystemId::DesktopApp, "Initializing Mist Desktop Application v0.2.0-rc1...");
     (void)platform::windows::initializeProcessDpiAwareness();
 
-    (void)pairingManager_.loadTrustedDevices("trusted_devices.json");
-
-    // Seed default sample devices if first run
-    if (pairingManager_.getTrustedDevices().empty()) {
-        security::PairingRequest req1{"DEV-90812", "Gaming-Laptop-01", "4A:9F:88:B1:C2:E4:67:9A:01:DF:3E:22", "MIST-01", 1731000000};
-        security::PairingRequest req2{"DEV-33104", "LivingRoom-NUC", "9F:33:01:A2:CC:55:12:87:EE:41:2B:99", "MIST-02", 1730900000};
-        security::PairingRequest req3{"DEV-77619", "Handheld-Deck", "7B:44:99:C1:DD:02:88:31:AA:59:71:00", "MIST-03", 1731100000};
-
-        (void)pairingManager_.submitPairingRequest(req1, 1731000000);
-        security::DevicePermissions perm1{true, true, true, true, true};
-        (void)pairingManager_.approvePairingRequest("DEV-90812", perm1, 1731000000);
-
-        (void)pairingManager_.submitPairingRequest(req2, 1730900000);
-        security::DevicePermissions perm2{true, true, false, false, true};
-        (void)pairingManager_.approvePairingRequest("DEV-33104", perm2, 1730900000);
-
-        (void)pairingManager_.submitPairingRequest(req3, 1731100000);
-        security::DevicePermissions perm3{true, true, false, false, true};
-        (void)pairingManager_.approvePairingRequest("DEV-77619", perm3, 1731100000);
-    }
-
-    if (pairingManager_.getActivePairingCode().empty()) {
-        (void)pairingManager_.generatePairingCode(300);
-    }
-
     isInitialized_.store(true);
     return std::optional<int>(std::nullopt);
 }
@@ -288,11 +258,11 @@ int DesktopApplication::run() {
     if (runSelfTest_) {
         std::cout << "Running Mist Desktop Self-Test...\n";
         renderHomeScreen();
-        renderPairingScreen();
         renderHostScreen();
+        renderConnectScreen();
+        renderPairingScreen();
+        renderNetworkScreen();
         renderSettingsScreen();
-        renderLiveSessionScreen();
-        renderDeviceManagementScreen();
         std::cout << "Desktop Self-Test PASSED.\n";
         return 0;
     }
@@ -300,12 +270,11 @@ int DesktopApplication::run() {
     if (targetScreen_.has_value()) {
         switch (*targetScreen_) {
             case DesktopScreen::Home: renderHomeScreen(); break;
-            case DesktopScreen::Pairing: renderPairingScreen(); break;
             case DesktopScreen::Host: renderHostScreen(); break;
-            case DesktopScreen::StreamSettings: renderSettingsScreen(); break;
-            case DesktopScreen::LiveSession: renderLiveSessionScreen(); break;
-            case DesktopScreen::DeviceManagement: renderDeviceManagementScreen(); break;
-            default: break;
+            case DesktopScreen::Connect: renderConnectScreen(); break;
+            case DesktopScreen::Devices: renderPairingScreen(); break;
+            case DesktopScreen::Network: renderNetworkScreen(); break;
+            default: renderHomeScreen(); break;
         }
         return 0;
     }
@@ -327,105 +296,74 @@ int DesktopApplication::run() {
 }
 
 common::Result<void> DesktopApplication::shutdown() {
-    if (!isInitialized_.exchange(false)) {
-        return common::Result<void>::success();
+    if (isRunning_.load()) {
+        isRunning_.store(false);
     }
-    MIST_LOG_INFO(common::SubsystemId::DesktopApp, "Shutting down Mist Desktop...");
-    (void)pairingManager_.saveTrustedDevices("trusted_devices.json");
+    isInitialized_.store(false);
     return common::Result<void>::success();
 }
 
 #if defined(_WIN32)
-
-static void BeginM3CardHelper(const char* strId, const tokens::ThemeColors& c, const ImVec2& size = ImVec2(0, 0), bool isHighContainer = false) {
-    ImVec4 bg = isHighContainer ? c.surfaceContainerHigh : c.surface;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, bg);
-    ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S16, tokens::MintSpacing::S16));
-    ImGui::BeginChild(strId, size, true);
-}
-
-static void EndM3CardHelper() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(2);
-}
-
 void DesktopApplication::handleResize(uint32_t width, uint32_t height) {
     if (width == 0 || height == 0 || !swapChain_) return;
     guiWidth_ = width;
     guiHeight_ = height;
-    if (rtv_) {
-        rtv_.Reset();
-    }
-    (void)swapChain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-    if (SUCCEEDED(swapChain_->GetBuffer(0, IID_PPV_ARGS(backBuffer.GetAddressOf())))) {
-        (void)d3d11Device_->CreateRenderTargetView(backBuffer.Get(), nullptr, rtv_.GetAddressOf());
-    }
-}
 
-void DesktopApplication::applyActiveTheme() {
-    tokens::applyTheme(currentTheme_);
+    rtv_.Reset();
+    HRESULT hr = swapChain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+    if (SUCCEEDED(hr)) {
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+        hr = swapChain_->GetBuffer(0, IID_PPV_ARGS(backBuffer.GetAddressOf()));
+        if (SUCCEEDED(hr)) {
+            (void)d3d11Device_->CreateRenderTargetView(backBuffer.Get(), nullptr, rtv_.GetAddressOf());
+        }
+    }
 }
 
 void DesktopApplication::applyMintAndWhiteTheme() {
-    applyActiveTheme();
+    currentTheme_ = tokens::ThemeMode::Light;
+    tokens::applyTheme(currentTheme_, settingsContrast_ == 1);
+}
+
+void DesktopApplication::applyActiveTheme() {
+    currentTheme_ = (settingsTheme_ == 0) ? tokens::ThemeMode::Light : tokens::ThemeMode::Dark;
+    tokens::applyTheme(currentTheme_, settingsContrast_ == 1);
 }
 
 void DesktopApplication::toggleTheme() {
-    currentTheme_ = (currentTheme_ == tokens::ThemeMode::Light)
-        ? tokens::ThemeMode::Dark
-        : tokens::ThemeMode::Light;
+    settingsTheme_ = (settingsTheme_ == 0) ? 1 : 0;
     applyActiveTheme();
 }
 
+void DesktopApplication::showToast(const std::string& message) {
+    toastMessage_ = message;
+    toastTimer_ = 2.5f; // Display for 2.5 seconds
+}
+
 common::Result<void> DesktopApplication::initializeD3D11Gui() {
-    HINSTANCE hInstance = GetModuleHandleW(nullptr);
-    const wchar_t* className = L"MistDesktopGuiWindow";
-
-    HICON hIcon = LoadIconW(hInstance, L"IDI_MIST_ICON");
-    if (!hIcon) {
-        hIcon = static_cast<HICON>(LoadImageW(nullptr, L"resources/mist.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE));
-    }
-
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
-    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.style = CS_CLASSDC;
     wc.lpfnWndProc = DesktopWndProc;
-    wc.hInstance = hInstance;
-    wc.hIcon = hIcon;
-    wc.hIconSm = hIcon;
-    wc.hCursor = LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
-    wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
-    wc.lpszClassName = className;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.lpszClassName = L"MistDesktopGuiWindow";
+    wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     RegisterClassExW(&wc);
 
-    RECT rc = { 0, 0, static_cast<LONG>(guiWidth_), static_cast<LONG>(guiHeight_) };
-    AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+    RECT wr = { 0, 0, static_cast<LONG>(guiWidth_), static_cast<LONG>(guiHeight_) };
+    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
 
-    int screenW = GetSystemMetrics(SM_CXSCREEN);
-    int screenH = GetSystemMetrics(SM_CYSCREEN);
-    int posX = std::max(0, static_cast<int>((screenW - (rc.right - rc.left)) / 2));
-    int posY = std::max(0, static_cast<int>((screenH - (rc.bottom - rc.top)) / 2));
-
-    hwnd_ = CreateWindowExW(
-        0, className, L"MIST — Native Game Streaming Studio",
+    hwnd_ = CreateWindowW(
+        wc.lpszClassName,
+        L"Mist",
         WS_OVERLAPPEDWINDOW,
-        posX, posY,
-        rc.right - rc.left, rc.bottom - rc.top,
-        nullptr, nullptr, hInstance, this
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        wr.right - wr.left, wr.bottom - wr.top,
+        nullptr, nullptr, wc.hInstance, this
     );
 
     if (!hwnd_) {
-        return platform::windows::win32ErrorToMistError(GetLastError(), common::SubsystemId::DesktopApp, "CreateWindowExW failed");
-    }
-
-    if (hIcon) {
-        SendMessageW(hwnd_, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
-        SendMessageW(hwnd_, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+        return platform::windows::win32ErrorToMistError(GetLastError(), common::SubsystemId::DesktopApp, "CreateWindowW failed");
     }
 
     SetWindowLongPtrW(hwnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -437,49 +375,36 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     scd.BufferDesc.RefreshRate.Numerator = 60;
     scd.BufferDesc.RefreshRate.Denominator = 1;
-    scd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
     scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     scd.OutputWindow = hwnd_;
     scd.SampleDesc.Count = 1;
-    scd.SampleDesc.Quality = 0;
     scd.Windowed = TRUE;
     scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
 
     UINT createDeviceFlags = 0;
+#if defined(_DEBUG)
+    createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
     D3D_FEATURE_LEVEL featureLevel;
-    const D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0 };
+    const D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
 
     Microsoft::WRL::ComPtr<IDXGISwapChain> legacySwapChain;
     HRESULT hr = D3D11CreateDeviceAndSwapChain(
-        nullptr,
-        D3D_DRIVER_TYPE_HARDWARE,
-        nullptr,
-        createDeviceFlags,
-        featureLevels,
-        static_cast<UINT>(std::size(featureLevels)),
-        D3D11_SDK_VERSION,
-        &scd,
-        legacySwapChain.GetAddressOf(),
-        d3d11Device_.GetAddressOf(),
-        &featureLevel,
-        d3d11Context_.GetAddressOf()
+        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
+        featureLevels, static_cast<UINT>(std::size(featureLevels)),
+        D3D11_SDK_VERSION, &scd,
+        legacySwapChain.GetAddressOf(), d3d11Device_.GetAddressOf(),
+        &featureLevel, d3d11Context_.GetAddressOf()
     );
 
     if (FAILED(hr)) {
-        // Fallback to WARP software rasterizer if hardware adapter creation fails
         hr = D3D11CreateDeviceAndSwapChain(
-            nullptr,
-            D3D_DRIVER_TYPE_WARP,
-            nullptr,
-            0,
-            featureLevels,
-            static_cast<UINT>(std::size(featureLevels)),
-            D3D11_SDK_VERSION,
-            &scd,
-            legacySwapChain.GetAddressOf(),
-            d3d11Device_.GetAddressOf(),
-            &featureLevel,
-            d3d11Context_.GetAddressOf()
+            nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0,
+            featureLevels, static_cast<UINT>(std::size(featureLevels)),
+            D3D11_SDK_VERSION, &scd,
+            legacySwapChain.GetAddressOf(), d3d11Device_.GetAddressOf(),
+            &featureLevel, d3d11Context_.GetAddressOf()
         );
     }
 
@@ -489,7 +414,7 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
 
     hr = legacySwapChain.As(&swapChain_);
     if (FAILED(hr)) {
-        return platform::windows::hresultToMistError(hr, common::SubsystemId::DesktopApp, "Failed to cast swapchain to IDXGISwapChain1");
+        return platform::windows::hresultToMistError(hr, common::SubsystemId::DesktopApp, "Failed to cast to IDXGISwapChain1");
     }
 
     Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
@@ -508,18 +433,19 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    // Load TrueType fonts matching the exact typography scale
+    // Load TrueType fonts from Segoe UI
     const char* fontPathRegular = "C:\\Windows\\Fonts\\segoeui.ttf";
     const char* fontPathBold    = "C:\\Windows\\Fonts\\segoeuib.ttf";
 
     if (GetFileAttributesA(fontPathRegular) != INVALID_FILE_ATTRIBUTES) {
         fontRegular_  = io.Fonts->AddFontFromFileTTF(fontPathRegular, tokens::MintTypography::Body);     // 15px
-        fontSmall_    = io.Fonts->AddFontFromFileTTF(fontPathRegular, tokens::MintTypography::Label);    // 12px
+        fontSmall_    = io.Fonts->AddFontFromFileTTF(fontPathRegular, tokens::MintTypography::Label);    // 13px
         if (GetFileAttributesA(fontPathBold) != INVALID_FILE_ATTRIBUTES) {
             fontBold_     = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::BodyBold);  // 16px
             fontTitle_    = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Title);     // 20px
-            fontHeadline_ = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Headline);  // 24px
+            fontHeadline_ = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Headline);  // 22px
             fontDisplay_  = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Display);   // 32px
+            fontCode_     = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Code);      // 34px
         }
     }
     if (!fontRegular_) {
@@ -548,6 +474,7 @@ void DesktopApplication::cleanupD3D11Gui() {
     fontHeadline_ = nullptr;
     fontDisplay_ = nullptr;
     fontSmall_ = nullptr;
+    fontCode_ = nullptr;
 
     rtv_.Reset();
     swapChain_.Reset();
@@ -563,9 +490,7 @@ void DesktopApplication::cleanupD3D11Gui() {
 
 common::Result<void> DesktopApplication::runGuiLoop() {
     auto initRes = initializeD3D11Gui();
-    if (!initRes) {
-        return initRes;
-    }
+    if (!initRes) return initRes;
 
     isRunning_.store(true);
 
@@ -590,7 +515,7 @@ common::Result<void> DesktopApplication::runGuiLoop() {
         ImGui::Render();
 
         const auto& c = tokens::getActiveTheme(currentTheme_);
-        const float clearColor[4] = { c.background.x, c.background.y, c.background.z, 1.00f };
+        const float clearColor[4] = { c.bg.x, c.bg.y, c.bg.z, 1.00f };
         d3d11Context_->OMSetRenderTargets(1, rtv_.GetAddressOf(), nullptr);
         d3d11Context_->ClearRenderTargetView(rtv_.Get(), clearColor);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -606,994 +531,1205 @@ void DesktopApplication::renderSleekMintLogo(float size) const {
     ImVec2 pos = ImGui::GetCursorScreenPos();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    // Base Squircle Badge with M3 24px-scale rounding (size * 0.22)
     ImVec2 pMin = pos;
     ImVec2 pMax = ImVec2(pos.x + size, pos.y + size);
-    float rounding = size * 0.22f;
+    float rounding = size * 0.28f;
 
     ImU32 badgeBg = (currentTheme_ == tokens::ThemeMode::Light)
-        ? IM_COL32(23, 75, 56, 255)   // Forest Green #174B38
-        : IM_COL32(13, 48, 36, 255);  // Deep Evergreen #0D3024
+        ? IM_COL32(70, 222, 181, 255)   // Vibrant Mint #46deb5
+        : IM_COL32(111, 220, 182, 255); // Dark Vibrant Mint #6fdcb6
 
     drawList->AddRectFilled(pMin, pMax, badgeBg, rounding);
 
-    ImU32 borderCol = (currentTheme_ == tokens::ThemeMode::Light)
-        ? IM_COL32(184, 235, 213, 180) // Pixel Mint #B8EBD5
-        : IM_COL32(142, 216, 186, 200); // Fresh Mint #8ED8BA
-    drawList->AddRect(pMin, pMax, borderCol, rounding, 0, 1.5f);
+    ImU32 inkCol = (currentTheme_ == tokens::ThemeMode::Light)
+        ? IM_COL32(3, 43, 32, 255)      // #032b20
+        : IM_COL32(0, 56, 42, 255);     // #00382a
 
-    // Twin Streaming Paths: Geometric 'M'
-    // Left Pillar: Host Upload Stream (Pixel Mint)
-    const ImVec2 hostPts[4] = {
-        ImVec2(pos.x + size * 0.20f, pos.y + size * 0.76f),
-        ImVec2(pos.x + size * 0.20f, pos.y + size * 0.31f),
-        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.24f),
-        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.76f)
-    };
-    drawList->AddConvexPolyFilled(hostPts, 4, IM_COL32(184, 235, 213, 255));
+    // Geometric 'M' streaming paths
+    float pad = size * 0.22f;
+    float w = size - pad * 2.0f;
+    float h = size - pad * 2.0f;
 
-    // Right Pillar: Client Playout Stream (Fresh Mint)
-    const ImVec2 clientPts[4] = {
-        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.76f),
-        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.24f),
-        ImVec2(pos.x + size * 0.80f, pos.y + size * 0.31f),
-        ImVec2(pos.x + size * 0.80f, pos.y + size * 0.76f)
-    };
-    drawList->AddConvexPolyFilled(clientPts, 4, IM_COL32(142, 216, 186, 255));
+    ImVec2 p1(pos.x + pad, pos.y + pad + h);
+    ImVec2 p2(pos.x + pad, pos.y + pad);
+    ImVec2 p3(pos.x + pad + w * 0.5f, pos.y + pad + h * 0.55f);
+    ImVec2 p4(pos.x + pad + w, pos.y + pad);
+    ImVec2 p5(pos.x + pad + w, pos.y + pad + h);
 
-    // Host Forward Streaming Diagonal
-    const ImVec2 hostDiag[4] = {
-        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.24f),
-        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.55f),
-        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.66f),
-        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.37f)
-    };
-    drawList->AddConvexPolyFilled(hostDiag, 4, IM_COL32(142, 216, 186, 255));
-
-    // Client Feedback Diagonal
-    const ImVec2 clientDiag[4] = {
-        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.24f),
-        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.37f),
-        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.66f),
-        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.55f)
-    };
-    drawList->AddConvexPolyFilled(clientDiag, 4, IM_COL32(184, 235, 213, 255));
-
-    // Upper Interlocking Bridge Line
-    drawList->AddLine(
-        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.24f),
-        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.24f),
-        IM_COL32(221, 239, 228, 230),
-        1.6f
-    );
-
-    // Center Sync Nexus Diamond (Pristine White)
-    const ImVec2 nexusPts[4] = {
-        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.48f),
-        ImVec2(pos.x + size * 0.55f, pos.y + size * 0.56f),
-        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.64f),
-        ImVec2(pos.x + size * 0.45f, pos.y + size * 0.56f)
-    };
-    drawList->AddConvexPolyFilled(nexusPts, 4, IM_COL32(255, 255, 255, 255));
-
-    // Center Core Point
-    drawList->AddCircleFilled(
-        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.56f),
-        size * 0.03f,
-        badgeBg
-    );
+    drawList->AddLine(p1, p2, inkCol, size * 0.12f);
+    drawList->AddLine(p2, p3, inkCol, size * 0.12f);
+    drawList->AddLine(p3, p4, inkCol, size * 0.12f);
+    drawList->AddLine(p4, p5, inkCol, size * 0.12f);
 
     ImGui::Dummy(ImVec2(size, size));
 }
 
-void DesktopApplication::renderBadge(const char* text, bool isSuccess) const {
+void DesktopApplication::renderChip(const char* text, int statusType) const {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImVec2 textSize = ImGui::CalcTextSize(text);
     ImVec2 pos = ImGui::GetCursorScreenPos();
-    float paddingX = tokens::MintSpacing::S8;
-    float paddingY = tokens::MintSpacing::S4;
-    float rectW = textSize.x + paddingX * 2.0f;
-    float rectH = textSize.y + paddingY * 2.0f;
 
-    ImVec4 bgVec = isSuccess ? c.successContainer : c.errorContainer;
-    ImVec4 fgVec = isSuccess ? c.onSuccessContainer : c.onErrorContainer;
-
-    ImU32 bgCol = ImGui::ColorConvertFloat4ToU32(bgVec);
-    ImU32 textCol = ImGui::ColorConvertFloat4ToU32(fgVec);
+    float paddingX = 12.0f;
+    float height = 32.0f;
+    float rectW = textSize.x + paddingX * 2.0f + 16.0f; // Extra room for indicator circle
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    drawList->AddRectFilled(pos, ImVec2(pos.x + rectW, pos.y + rectH), bgCol, rectH * 0.5f);
-    drawList->AddText(ImVec2(pos.x + paddingX, pos.y + paddingY), textCol, text);
 
-    ImGui::Dummy(ImVec2(rectW, rectH));
+    ImU32 bgCol = ImGui::ColorConvertFloat4ToU32(c.surface);
+    ImU32 borderCol = ImGui::ColorConvertFloat4ToU32(c.line);
+    ImU32 textCol = ImGui::ColorConvertFloat4ToU32(c.mute);
+    ImU32 dotCol = ImGui::ColorConvertFloat4ToU32(c.mute);
+
+    if (statusType == 1) { // OK
+        bgCol = ImGui::ColorConvertFloat4ToU32(c.ct);
+        borderCol = IM_COL32(0, 0, 0, 0);
+        textCol = ImGui::ColorConvertFloat4ToU32(c.onCt);
+        dotCol = ImGui::ColorConvertFloat4ToU32(c.ok);
+    } else if (statusType == 2) { // WARN
+        textCol = ImGui::ColorConvertFloat4ToU32(c.warn);
+        dotCol = ImGui::ColorConvertFloat4ToU32(c.warn);
+    } else if (statusType == 3) { // BAD
+        textCol = ImGui::ColorConvertFloat4ToU32(c.bad);
+        dotCol = ImGui::ColorConvertFloat4ToU32(c.bad);
+    }
+
+    drawList->AddRectFilled(pos, ImVec2(pos.x + rectW, pos.y + height), bgCol, 8.0f);
+    if (statusType != 1) {
+        drawList->AddRect(pos, ImVec2(pos.x + rectW, pos.y + height), borderCol, 8.0f, 0, 1.0f);
+    }
+
+    // Dot indicator
+    float circleX = pos.x + 12.0f;
+    float circleY = pos.y + height * 0.5f;
+    drawList->AddCircleFilled(ImVec2(circleX, circleY), 4.0f, dotCol);
+
+    // Text
+    drawList->AddText(ImVec2(circleX + 10.0f, pos.y + (height - textSize.y) * 0.5f), textCol, text);
+
+    ImGui::Dummy(ImVec2(rectW, height));
     if (fontSmall_) ImGui::PopFont();
 }
 
-void DesktopApplication::renderMetricBox(const char* label, const char* value, const char* sublabel) const {
+bool DesktopApplication::renderPillButton(const char* label, bool primary, bool danger, const ImVec2& size) {
     const auto& c = tokens::getActiveTheme(currentTheme_);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surfaceContainerLow);
-    ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Medium); // 16px
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S12, tokens::MintSpacing::S8));
+    ImVec2 actualSize = size;
+    if (actualSize.y <= 0) actualSize.y = 40.0f;
 
-    ImGui::BeginChild(label, ImVec2(0, 76.0f), true, ImGuiWindowFlags_NoScrollbar);
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("%s", label);
-    if (fontSmall_) ImGui::PopFont();
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(24.0f, 8.0f));
 
-    ImGui::Spacing();
-    if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextColored(c.primary, "%s", value);
-    if (fontBold_) ImGui::PopFont();
-
-    if (sublabel && sublabel[0] != '\0') {
-        ImGui::SameLine();
-        if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextDisabled(" %s", sublabel);
-        if (fontSmall_) ImGui::PopFont();
+    if (primary) {
+        ImGui::PushStyleColor(ImGuiCol_Button, c.mint);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(c.mint.x * 1.1f, c.mint.y * 1.1f, c.mint.z * 1.1f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.acc);
+        ImGui::PushStyleColor(ImGuiCol_Text, c.onMint);
+        ImGui::PushStyleColor(ImGuiCol_Border, c.mint);
+    } else if (danger) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.surface.x, c.surface.y, c.surface.z, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct2);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.ct);
+        ImGui::PushStyleColor(ImGuiCol_Text, c.bad);
+        ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.surface.x, c.surface.y, c.surface.z, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct2);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.ct);
+        ImGui::PushStyleColor(ImGuiCol_Text, c.acc);
+        ImGui::PushStyleColor(ImGuiCol_Border, c.line);
     }
-    ImGui::EndChild();
 
+    bool clicked = ImGui::Button(label, actualSize);
+
+    ImGui::PopStyleColor(5);
     ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(2);
+    return clicked;
 }
 
 void DesktopApplication::renderGuiHeader() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
-    ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S16, tokens::MintSpacing::S8));
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    ImGui::BeginChild("HeaderBar", ImVec2(0, 58.0f), true, ImGuiWindowFlags_NoScrollbar);
+    ImGui::BeginGroup();
 
-    // Left: Brand Logo, Title and Tagline Pill
-    renderSleekMintLogo(36.0f);
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    ImGui::AlignTextToFramePadding();
+    // 1. Sleek Mint Logo & Brand Text "Mist"
+    renderSleekMintLogo(44.0f);
+    ImGui::SameLine(0, 12.0f);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 8.0f);
 
     if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.primary, "MIST");
+    ImGui::TextColored(c.ink, "Mist");
     if (fontHeadline_) ImGui::PopFont();
 
-    ImGui::SameLine();
-    if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextColored(c.textSecondary, "|  Play beyond your desk.");
-    if (fontRegular_) ImGui::PopFont();
+    // 2. Pill Search Bar (Search Mist...)
+    float searchWidth = 300.0f;
+    float availW = ImGui::GetContentRegionAvail().x;
+    float searchOffset = std::max(200.0f, availW - 480.0f);
+    ImGui::SameLine(searchOffset);
 
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    renderBadge("v0.2.0-rc1", true);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(16.0f, 10.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+    ImGui::PushItemWidth(searchWidth);
 
-    // Center: System Host Availability Indicator
-    ImGui::SameLine(0, tokens::MintSpacing::S24);
-    ImGui::TextColored(c.primary, "[ * ]");
-    ImGui::SameLine(0, tokens::MintSpacing::S4);
-    if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextUnformatted("HOST ONLINE : 127.0.0.1:8080");
-    if (fontRegular_) ImGui::PopFont();
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    renderBadge("DIRECT LAN", true);
-
-    // Right: Action Buttons & Theme Switcher
-    float rightOffset = 380.0f;
-    float availX = ImGui::GetWindowWidth();
-    if (availX > rightOffset) {
-        ImGui::SameLine(availX - rightOffset);
-    }
-
-    // Theme Switcher Toggle (Light / Dark)
-    const char* themeLabel = (currentTheme_ == tokens::ThemeMode::Light)
-        ? "Theme: Light (Day)"
-        : "Theme: Dark (Night)";
-    if (ImGui::Button(themeLabel, ImVec2(150.0f, 34.0f))) {
-        toggleTheme();
-    }
-
-    ImGui::SameLine(0, tokens::MintSpacing::S8);
-
-    // Host Service State Toggle
-    if (isHostingActive_) {
-        if (ImGui::Button("Hosting: ACTIVE", ImVec2(130.0f, 34.0f))) {
-            isHostingActive_ = false;
+    if (ImGui::InputTextWithHint("##HeaderSearch", "Search Mist (host, devices, network...)", searchQuery_, IM_ARRAYSIZE(searchQuery_), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        std::string q = searchQuery_;
+        std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+        if (q.find("host") != std::string::npos || q.find("stream") != std::string::npos) {
+            currentScreen_ = DesktopScreen::Host;
+            searchQuery_[0] = '\0';
+        } else if (q.find("conn") != std::string::npos || q.find("join") != std::string::npos) {
+            currentScreen_ = DesktopScreen::Connect;
+            searchQuery_[0] = '\0';
+        } else if (q.find("dev") != std::string::npos || q.find("pair") != std::string::npos) {
+            currentScreen_ = DesktopScreen::Devices;
+            searchQuery_[0] = '\0';
+        } else if (q.find("net") != std::string::npos || q.find("bitrate") != std::string::npos || q.find("lag") != std::string::npos) {
+            currentScreen_ = DesktopScreen::Network;
+            searchQuery_[0] = '\0';
+        } else if (q.find("home") != std::string::npos) {
+            currentScreen_ = DesktopScreen::Home;
+            searchQuery_[0] = '\0';
+        } else {
+            showToast("Nothing found for '" + std::string(searchQuery_) + "'");
         }
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, c.surfaceContainerHigh);
-        ImGui::PushStyleColor(ImGuiCol_Text, c.textDisabled);
-        if (ImGui::Button("Hosting: PAUSED", ImVec2(130.0f, 34.0f))) {
-            isHostingActive_ = true;
-        }
-        ImGui::PopStyleColor(2);
     }
-
-    ImGui::SameLine(0, tokens::MintSpacing::S8);
-
-    // Window Exit Button
-    ImGui::PushStyleColor(ImGuiCol_Button, c.errorContainer);
-    ImGui::PushStyleColor(ImGuiCol_Text, c.onErrorContainer);
-    if (ImGui::Button("X", ImVec2(34.0f, 34.0f))) {
-        isRunning_.store(false);
-    }
+    ImGui::PopItemWidth();
     ImGui::PopStyleColor(2);
-
-    ImGui::EndChild();
     ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(2);
+
+    // 3. Status Chip ("Idle" or "Streaming")
+    ImGui::SameLine(0, 12.0f);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 6.0f);
+    if (isHostingActive_) {
+        renderChip("Streaming", 1);
+    } else {
+        renderChip("Idle", 0);
+    }
+
+    // 4. Circular Devices Button (with badge "1" if pending)
+    ImGui::SameLine(0, 12.0f);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 6.0f);
+    ImVec2 devBtnPos = ImGui::GetCursorScreenPos();
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
+    ImGui::PushStyleColor(ImGuiCol_Button, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+    ImGui::PushStyleColor(ImGuiCol_Text, c.ink);
+
+    if (ImGui::Button("[D]##TopDev", ImVec2(44.0f, 44.0f))) {
+        currentScreen_ = DesktopScreen::Devices;
+    }
+
+    // Badge "1" at top-right corner of device button
+    if (isDeviceApprovalPending_) {
+        float badgeX = devBtnPos.x + 32.0f;
+        float badgeY = devBtnPos.y - 2.0f;
+        drawList->AddCircleFilled(ImVec2(badgeX, badgeY), 9.0f, ImGui::ColorConvertFloat4ToU32(c.mint));
+        drawList->AddText(ImVec2(badgeX - 3.5f, badgeY - 6.0f), ImGui::ColorConvertFloat4ToU32(c.onMint), "1");
+    }
+
+    // 5. Circular Settings Button (Gear)
+    ImGui::SameLine(0, 8.0f);
+    if (ImGui::Button("[*]##TopGear", ImVec2(44.0f, 44.0f))) {
+        isSettingsOpen_ = !isSettingsOpen_;
+    }
+    ImGui::PopStyleColor(4);
+    ImGui::PopStyleVar();
+
+    ImGui::EndGroup();
 }
 
 void DesktopApplication::renderGuiNavRail() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
-    float railWidth = isNavRailExpanded_ ? 210.0f : 68.0f;
+    float railWidth = 272.0f;
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
-    ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S8, tokens::MintSpacing::S12));
-
-    ImGui::BeginChild("NavRail", ImVec2(railWidth, 0), true, ImGuiWindowFlags_NoScrollbar);
-
-    // Brand Header in Navigation Rail
-    if (isNavRailExpanded_) {
-        renderSleekMintLogo(34.0f);
-        ImGui::SameLine(0, tokens::MintSpacing::S8);
-        ImGui::BeginGroup();
-        if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextColored(c.primary, "MIST STUDIO");
-        if (fontBold_) ImGui::PopFont();
-        if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextDisabled("Direct3D 11");
-        if (fontSmall_) ImGui::PopFont();
-        ImGui::EndGroup();
-        ImGui::Spacing();
-    } else {
-        renderSleekMintLogo(32.0f);
-        ImGui::Spacing();
-    }
-
-    if (ImGui::Button(isNavRailExpanded_ ? "  << Collapse  " : " >> ", ImVec2(isNavRailExpanded_ ? 194.0f : 52.0f, 30.0f))) {
-        isNavRailExpanded_ = !isNavRailExpanded_;
-    }
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    ImGui::BeginChild("NavRail", ImVec2(railWidth, 0), false, ImGuiWindowFlags_NoScrollbar);
 
     struct NavItem {
         DesktopScreen screen;
         const char* label;
-        const char* shortCode;
+        bool hasBadge;
     };
 
     const NavItem items[] = {
-        { DesktopScreen::Home,             "  Home",             " [H] " },
-        { DesktopScreen::Pairing,          "  Pairing",          " [P] " },
-        { DesktopScreen::Host,             "  Host Mgmt",        " [M] " },
-        { DesktopScreen::StreamSettings,   "  Settings",         " [S] " },
-        { DesktopScreen::LiveSession,      "  Telemetry",        " [T] " },
-        { DesktopScreen::DeviceManagement, "  Devices",          " [D] " },
+        { DesktopScreen::Home,    "  Home",    false },
+        { DesktopScreen::Host,    "  Host",    false },
+        { DesktopScreen::Connect, "  Connect", false },
+        { DesktopScreen::Devices, "  Devices", isDeviceApprovalPending_ },
+        { DesktopScreen::Network, "  Network", false },
     };
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(20.0f, 14.0f));
 
     for (const auto& item : items) {
         bool isSelected = (currentScreen_ == item.screen);
         if (isSelected) {
-            ImGui::PushStyleColor(ImGuiCol_Button, c.primaryContainer);
-            ImGui::PushStyleColor(ImGuiCol_Text, c.onPrimaryContainer);
-            ImGui::PushStyleColor(ImGuiCol_Border, c.primary);
+            ImGui::PushStyleColor(ImGuiCol_Button, c.ct);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.mint);
+            ImGui::PushStyleColor(ImGuiCol_Text, c.onCt);
+            ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0, 0, 0, 0));
         } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.surface.x, c.surface.y, c.surface.z, 0.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, c.textPrimary);
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.bg.x, c.bg.y, c.bg.z, 0.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct2);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.ct);
+            ImGui::PushStyleColor(ImGuiCol_Text, c.mute);
+            ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0, 0, 0, 0));
         }
 
-        const char* displayLabel = isNavRailExpanded_ ? item.label : item.shortCode;
-        float btnWidth = isNavRailExpanded_ ? 194.0f : 52.0f;
-
-        if (fontRegular_) ImGui::PushFont(fontRegular_);
-        if (ImGui::Button(displayLabel, ImVec2(btnWidth, 42.0f))) {
+        ImVec2 pStart = ImGui::GetCursorScreenPos();
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        if (ImGui::Button(item.label, ImVec2(railWidth - 24.0f, 52.0f))) {
             currentScreen_ = item.screen;
         }
-        if (fontRegular_) ImGui::PopFont();
+        if (fontBold_) ImGui::PopFont();
 
-        if (!isNavRailExpanded_ && ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", item.label);
+        if (item.hasBadge) {
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            float bx = pStart.x + railWidth - 56.0f;
+            float by = pStart.y + 26.0f;
+            drawList->AddRectFilled(ImVec2(bx, by - 10.0f), ImVec2(bx + 20.0f, by + 10.0f), ImGui::ColorConvertFloat4ToU32(c.mint), 99.0f);
+            drawList->AddText(ImVec2(bx + 6.0f, by - 7.0f), ImGui::ColorConvertFloat4ToU32(c.onMint), "1");
         }
 
-        ImGui::PopStyleColor(3);
+        ImGui::PopStyleColor(5);
         ImGui::Spacing();
     }
+    ImGui::PopStyleVar(2);
 
-    if (isNavRailExpanded_) {
-        float availableY = ImGui::GetContentRegionAvail().y;
-        if (availableY > 70.0f) {
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + availableY - 60.0f);
-            ImGui::Separator();
-            if (fontSmall_) ImGui::PushFont(fontSmall_);
-            ImGui::TextDisabled("Mist Engine v0.2.0");
-            ImGui::TextDisabled("Direct3D 11 • NVENC");
-            if (fontSmall_) ImGui::PopFont();
-        }
+    // Footnote at bottom of rail
+    float availY = ImGui::GetContentRegionAvail().y;
+    if (availY > 60.0f) {
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + availY - 60.0f);
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "v0.2.0-rc1");
+        ImGui::TextColored(c.mute, "Windows 11 * GTX 1660 SUPER");
+        if (fontSmall_) ImGui::PopFont();
     }
 
     ImGui::EndChild();
-    ImGui::PopStyleVar(2);
-    ImGui::PopStyleColor(2);
 }
 
 void DesktopApplication::renderGuiHomeScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
-    // 1. Sleek Mint Hero Banner Card
-    BeginM3CardHelper("HeroBannerCard", c, ImVec2(0, 96.0f));
-    renderSleekMintLogo(64.0f);
-    ImGui::SameLine(0, tokens::MintSpacing::S16);
-    ImGui::BeginGroup();
-
-    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.primary, "Play beyond your desk.");
-    if (fontHeadline_) ImGui::PopFont();
+    // 1. Heading
+    if (fontDisplay_) ImGui::PushFont(fontDisplay_);
+    ImGui::TextColored(c.ink, "Game streaming, no lag");
+    if (fontDisplay_) ImGui::PopFont();
 
     if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextUnformatted("Your PC. Your games. Your freedom. Native low-latency Direct3D 11 hardware capture & NVENC encoding.");
-    ImGui::TextDisabled("Discover local and LAN streaming hosts, verify sub-millisecond network QoS, and connect in one click.");
-    if (fontRegular_) ImGui::PopFont();
-
-    ImGui::EndGroup();
-    EndM3CardHelper();
-
-    ImGui::Spacing();
-
-    // 2. Direct Device Connection Card
-    BeginM3CardHelper("DirectConnectCard", c, ImVec2(0, 84.0f));
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("DIRECT HOST CONNECTION");
-    if (fontSmall_) ImGui::PopFont();
-
-    ImGui::Spacing();
-    ImGui::PushItemWidth(260.0f);
-    ImGui::InputTextWithHint("##QuickHostInput", "Enter Host IP (e.g. 127.0.0.1:8080)", quickConnectHostInput_, IM_ARRAYSIZE(quickConnectHostInput_));
-    ImGui::PopItemWidth();
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-
-    if (fontBold_) ImGui::PushFont(fontBold_);
-    if (ImGui::Button("Connect to Host", ImVec2(160.0f, 32.0f))) {
-        currentScreen_ = DesktopScreen::LiveSession;
-    }
-    if (fontBold_) ImGui::PopFont();
-
-    ImGui::SameLine(0, tokens::MintSpacing::S16);
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextDisabled("Host Availability:");
-    ImGui::SameLine(0, tokens::MintSpacing::S8);
-    renderBadge("ONLINE (< 0.5 ms RTT)", true);
-    EndM3CardHelper();
-
-    ImGui::Spacing();
-
-    // 3. KPI Metric Cards
-    float contentWidth = ImGui::GetContentRegionAvail().x;
-    float cardWidth = std::max(200.0f, (contentWidth - 24.0f) / 3.0f);
-
-    BeginM3CardHelper("CardLocalNode", c, ImVec2(cardWidth, 110.0f));
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("LOCAL HOST NODE");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::Spacing();
-    if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextUnformatted("Workstation-Host");
-    if (fontBold_) ImGui::PopFont();
-    ImGui::SameLine(0, tokens::MintSpacing::S8);
-    renderBadge("ONLINE", true);
-    ImGui::TextDisabled("127.0.0.1:8080 (Listening)");
-    EndM3CardHelper();
-
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    BeginM3CardHelper("CardGPU", c, ImVec2(cardWidth, 110.0f));
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("HARDWARE ENCODER");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::Spacing();
-    if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextUnformatted("GeForce GTX 1660 SUPER");
-    if (fontBold_) ImGui::PopFont();
-    ImGui::TextDisabled("NVIDIA NVENC H.264 (CBR 1080p60)");
-    EndM3CardHelper();
-
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    BeginM3CardHelper("CardNetwork", c, ImVec2(cardWidth, 110.0f));
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("NETWORK QOS");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::Spacing();
-    if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextUnformatted("WebRTC Direct P2P");
-    if (fontBold_) ImGui::PopFont();
-    ImGui::SameLine(0, tokens::MintSpacing::S8);
-    renderBadge("< 1 ms RTT", true);
-    ImGui::TextDisabled("%s", "Packet Loss: 0.00% • 45.2 Mbps");
-    EndM3CardHelper();
-
-    ImGui::Spacing();
-
-    // 4. Discovered & Recently Connected Hosts Grid
-    BeginM3CardHelper("DiscoveredNodesCard", c, ImVec2(0, 240.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "Discovered & Recently Connected Hosts");
-    if (fontTitle_) ImGui::PopFont();
-
-    ImGui::SameLine(0, tokens::MintSpacing::S8);
-    ImGui::TextDisabled("(Direct LAN Beacon Discovery)");
-    ImGui::Spacing();
-
-    if (ImGui::BeginTable("HostsTable", 5, ImGuiTableFlags_BordersInner | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
-        ImGui::TableSetupColumn("Host Node / IP", ImGuiTableColumnFlags_WidthStretch, 0.30f);
-        ImGui::TableSetupColumn("Device Spec & Profile", ImGuiTableColumnFlags_WidthStretch, 0.30f);
-        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthStretch, 0.15f);
-        ImGui::TableSetupColumn("Ping / RTT", ImGuiTableColumnFlags_WidthStretch, 0.12f);
-        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch, 0.13f);
-        ImGui::TableHeadersRow();
-
-        // Node 1
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted("127.0.0.1:8080 (Local Machine)");
-        ImGui::TableNextColumn();
-        ImGui::TextDisabled("NVENC 1080p60 • WASAPI Audio");
-        ImGui::TableNextColumn();
-        renderBadge("READY", true);
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted("< 0.5 ms");
-        ImGui::TableNextColumn();
-        if (ImGui::Button("Connect##1", ImVec2(-1, 26.0f))) {
-            currentScreen_ = DesktopScreen::LiveSession;
-        }
-
-        // Node 2
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted("192.168.1.9:8080 (Gaming Rig)");
-        ImGui::TableNextColumn();
-        ImGui::TextDisabled("RTX 3070 • 1440p120 • ViGEm");
-        ImGui::TableNextColumn();
-        renderBadge("STANDBY", true);
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted("1.2 ms");
-        ImGui::TableNextColumn();
-        if (ImGui::Button("Connect##2", ImVec2(-1, 26.0f))) {
-            currentScreen_ = DesktopScreen::LiveSession;
-        }
-
-        // Node 3
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted("192.168.1.15:8080 (Living Room NUC)");
-        ImGui::TableNextColumn();
-        ImGui::TextDisabled("GTX 1080 • 1080p60 • 5.1 Ch");
-        ImGui::TableNextColumn();
-        renderBadge("READY", true);
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted("2.4 ms");
-        ImGui::TableNextColumn();
-        if (ImGui::Button("Connect##3", ImVec2(-1, 26.0f))) {
-            currentScreen_ = DesktopScreen::LiveSession;
-        }
-
-        ImGui::EndTable();
-    }
-    EndM3CardHelper();
-
-    ImGui::Spacing();
-
-    // 5. Quick Actions Row
-    BeginM3CardHelper("QuickActionsCard", c, ImVec2(0, 88.0f));
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("QUICK ACTIONS");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::Spacing();
-
-    if (ImGui::Button("Pair New Client Device", ImVec2(220.0f, 34.0f))) {
-        currentScreen_ = DesktopScreen::Pairing;
-    }
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    if (ImGui::Button("Configure Stream Settings", ImVec2(220.0f, 34.0f))) {
-        currentScreen_ = DesktopScreen::StreamSettings;
-    }
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    if (ImGui::Button("View Real-Time Telemetry", ImVec2(220.0f, 34.0f))) {
-        currentScreen_ = DesktopScreen::LiveSession;
-    }
-    EndM3CardHelper();
-}
-
-void DesktopApplication::renderGuiPairingScreen() {
-    const auto& c = tokens::getActiveTheme(currentTheme_);
-
-    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.primary, "Device Pairing & Access Authorization");
-    if (fontHeadline_) ImGui::PopFont();
-
-    if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextDisabled("Authorize client devices using single-use Base32 pairing codes and cryptographic Ed25519 authentication.");
+    ImGui::TextColored(c.mute, "Host this PC or join another one. Everything below is ready.");
     if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
-
-    std::string code = pairingManager_.getActivePairingCode();
-    if (code.empty()) {
-        auto res = pairingManager_.generatePairingCode(300);
-        if (res) code = res.value();
-    }
-
-    // Hero Card: Active Code
-    BeginM3CardHelper("HeroCodeCard", c, ImVec2(0, 190.0f));
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("ACTIVE PAIRING AUTHORIZATION CODE");
-    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
 
-    // Large Code Display Box
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.primaryContainer);
-    ImGui::PushStyleColor(ImGuiCol_Border, c.primary);
-    ImGui::BeginChild("CodeBox", ImVec2(340.0f, 64.0f), true, ImGuiWindowFlags_NoScrollbar);
-    ImGui::SetCursorPos(ImVec2(24.0f, 16.0f));
-
+    // 2. Latest Sessions Section
     if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.onPrimaryContainer, "C O D E :   %s", code.c_str());
-    if (fontTitle_) ImGui::PopFont();
-
-    ImGui::EndChild();
-    ImGui::PopStyleColor(2);
-
-    ImGui::SameLine(0, tokens::MintSpacing::S20);
-    ImGui::BeginGroup();
-    ImGui::TextUnformatted("Host Identity: MIST-HOST-PROD-01");
-    ImGui::TextDisabled("Ed25519 Fingerprint: 4A:9F:88:B1:C2:E4:67:9A:01:DF:3E:22");
-    ImGui::TextDisabled("Code Validity: Single-Use • 300 Seconds Expiration");
-    if (ImGui::Button("Generate New Pairing Code", ImVec2(220.0f, 32.0f))) {
-        (void)pairingManager_.generatePairingCode(300);
-    }
-    ImGui::EndGroup();
-
-    ImGui::Spacing();
-    ImGui::ProgressBar(0.85f, ImVec2(340.0f, 8.0f), "");
-    EndM3CardHelper();
-
-    ImGui::Spacing();
-
-    // Pending Connection Requests Card
-    BeginM3CardHelper("PendingRequestsCard", c, ImVec2(0, 160.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "Incoming Authorization Requests");
+    ImGui::TextColored(c.ink, "Latest sessions");
     if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
 
-    if (sampleRequestPending_) {
-        ImGui::TextUnformatted("Device: Remote-Laptop-Pro");
-        ImGui::SameLine(0, tokens::MintSpacing::S8);
-        renderBadge("DEV-88219", true);
-        ImGui::TextDisabled("Requested Permissions: Keyboard, Mouse, Virtual Gamepad Control");
+    float availW = ImGui::GetContentRegionAvail().x;
+    float carCardW = std::max(220.0f, (availW - 32.0f) / 3.0f);
+
+    struct SessionCardData {
+        const char* name;
+        const char* timeAgo;
+        const char* metrics;
+    };
+    const SessionCardData sessions[] = {
+        { "Living room PC", "Yesterday * 48 min", "60 fps * 11.5 Mbps" },
+        { "Aiden's Laptop",  "Sat * 2 h 10 min",  "60 fps * 9.8 Mbps"  },
+        { "Studio desktop",  "Thu * 15 min",      "30 fps * 6.2 Mbps"  }
+    };
+
+    for (int i = 0; i < 3; ++i) {
+        if (i > 0) ImGui::SameLine(0, 14.0f);
+        BeginCardContainer(("SessionCard" + std::to_string(i)).c_str(), c, ImVec2(carCardW, 110.0f), 24.0f);
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(c.ink, "%s", sessions[i].name);
+        if (fontBold_) ImGui::PopFont();
+
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "%s", sessions[i].timeAgo);
         ImGui::Spacing();
+        ImGui::TextColored(c.ink, "%s", sessions[i].metrics);
+        if (fontSmall_) ImGui::PopFont();
+        EndCardContainer();
+    }
 
-        if (ImGui::Button("Approve Connection", ImVec2(180.0f, 34.0f))) {
-            security::DevicePermissions perms{true, true, true, true, true};
-            (void)pairingManager_.approvePairingRequest("DEV-88219", perms);
-            sampleRequestPending_ = false;
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // 3. "What would you like to do?" Section (4 Action Tiles in 2x2 grid)
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "What would you like to do?");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    float tileW = std::max(260.0f, (availW - 16.0f) / 2.0f);
+
+    struct TileData {
+        const char* title;
+        const char* desc;
+        DesktopScreen target;
+        const char* iconTag;
+    };
+    const TileData tiles[] = {
+        { "Host this PC",    "Let paired devices see and play on your desktop.", DesktopScreen::Host,    "[H]" },
+        { "Connect to a PC", "Join a session with its ID.",                      DesktopScreen::Connect, "[C]" },
+        { "Pair a device",   "Create a one-time code and set permissions.",       DesktopScreen::Devices, "[D]" },
+        { "Check network",   "See how Mist adapts to your connection.",           DesktopScreen::Network, "[N]" },
+    };
+
+    for (int i = 0; i < 4; ++i) {
+        if (i % 2 == 1) ImGui::SameLine(0, 16.0f);
+        else if (i > 0) ImGui::Spacing();
+
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, c.ct2);
+        ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0, 0, 0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Tile); // 24px
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 22.0f));
+
+        std::string tileId = "Tile" + std::to_string(i);
+        ImGui::BeginChild(tileId.c_str(), ImVec2(tileW, 136.0f), true);
+
+        // 48x48 rounded 16px mint icon box
+        ImVec2 curPos = ImGui::GetCursorScreenPos();
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawList->AddRectFilled(curPos, ImVec2(curPos.x + 48.0f, curPos.y + 48.0f), ImGui::ColorConvertFloat4ToU32(c.mint), 16.0f);
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        drawList->AddText(ImVec2(curPos.x + 14.0f, curPos.y + 14.0f), ImGui::ColorConvertFloat4ToU32(c.onMint), tiles[i].iconTag);
+        if (fontBold_) ImGui::PopFont();
+
+        ImGui::Dummy(ImVec2(48.0f, 48.0f));
+        ImGui::SameLine(0, 14.0f);
+        ImGui::BeginGroup();
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(c.ink, "%s", tiles[i].title);
+        if (fontBold_) ImGui::PopFont();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "%s", tiles[i].desc);
+        if (fontSmall_) ImGui::PopFont();
+        ImGui::EndGroup();
+
+        // Clickable surface
+        if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(0)) {
+            currentScreen_ = tiles[i].target;
         }
-        ImGui::SameLine(0, tokens::MintSpacing::S12);
-        ImGui::PushStyleColor(ImGuiCol_Button, c.errorContainer);
-        ImGui::PushStyleColor(ImGuiCol_Text, c.onErrorContainer);
-        if (ImGui::Button("Deny Request", ImVec2(140.0f, 34.0f))) {
-            (void)pairingManager_.rejectPairingRequest("DEV-88219");
-            sampleRequestPending_ = false;
-        }
+
+        ImGui::EndChild();
+        ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(2);
-    } else {
-        ImGui::TextDisabled("(No incoming connection requests currently waiting for approval)");
-        if (ImGui::Button("Simulate Client Connection Request", ImVec2(260.0f, 32.0f))) {
-            sampleRequestPending_ = true;
+    }
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // 4. System Check Card
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "System check");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    BeginCardContainer("SystemCheckCard", c, ImVec2(0, 0), 28.0f);
+
+    struct SysRow {
+        const char* label;
+        const char* chipText;
+        int status;
+    };
+    const SysRow rows[] = {
+        { "Video encoder",    "NVENC * GTX 1660 SUPER", 1 },
+        { "Graphics driver",  "617.14",                 1 },
+        { "Display session",  "Attached to a monitor",  1 },
+        { "Audio output",     "Default device",         1 },
+        { "Controller driver","ViGEmBus missing * using fallback", 2 },
+    };
+
+    for (size_t i = 0; i < std::size(rows); ++i) {
+        if (i > 0) {
+            ImGui::Separator();
+            ImGui::Spacing();
         }
-    }
-    EndM3CardHelper();
+        ImGui::AlignTextToFramePadding();
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::TextColored(c.ink, "%s", rows[i].label);
+        if (fontRegular_) ImGui::PopFont();
 
-    ImGui::Spacing();
-
-    // Manual Remote Code Entry
-    BeginM3CardHelper("ManualPairCard", c, ImVec2(0, 100.0f));
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("CONNECT TO REMOTE HOST VIA CODE");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::Spacing();
-    ImGui::PushItemWidth(240.0f);
-    ImGui::InputTextWithHint("##ManualCode", "Enter 6-char code (e.g. SEA-CDS)", manualPairingCodeInput_, IM_ARRAYSIZE(manualPairingCodeInput_));
-    ImGui::PopItemWidth();
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    if (ImGui::Button("Authorize & Pair Remote", ImVec2(190.0f, 32.0f))) {
-        manualPairingCodeInput_[0] = '\0';
+        float rw = ImGui::GetContentRegionAvail().x;
+        ImGui::SameLine(rw - 280.0f);
+        renderChip(rows[i].chipText, rows[i].status);
+        ImGui::Spacing();
     }
-    EndM3CardHelper();
+
+    EndCardContainer();
 }
 
 void DesktopApplication::renderGuiHostScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
-    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.primary, "Host Management & Safety Policies");
-    if (fontHeadline_) ImGui::PopFont();
+    if (fontDisplay_) ImGui::PushFont(fontDisplay_);
+    ImGui::TextColored(c.ink, "Host");
+    if (fontDisplay_) ImGui::PopFont();
 
     if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextDisabled("Configure host GPU display capture, hardware encoding parameters, and remote operator safety overrides.");
+    ImGui::TextColored(c.mute, "Stream this desktop to paired devices.");
     if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
 
-    // Host State Card
-    BeginM3CardHelper("HostStatusCard", c, ImVec2(0, 140.0f));
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("HOST BROADCASTING STATUS");
-    if (fontSmall_) ImGui::PopFont();
+    float availW = ImGui::GetContentRegionAvail().x;
+    float colW = std::max(300.0f, (availW - 16.0f) / 2.0f);
+
+    // Left: Stream Card
+    BeginCardContainer("HostStreamCard", c, ImVec2(colW, 310.0f), 28.0f);
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "Stream");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::SameLine(colW - 140.0f);
+    renderChip(isHostingActive_ ? "Streaming" : "Stopped", isHostingActive_ ? 1 : 0);
+
     ImGui::Spacing();
+    ImGui::Spacing();
+
     if (isHostingActive_) {
-        renderBadge("STREAMING READY", true);
-        ImGui::SameLine(0, tokens::MintSpacing::S12);
-        ImGui::TextUnformatted("Listening on 0.0.0.0:8080 • WebRTC Signaling Ready");
+        // Live Numbers
+        ImGui::BeginGroup();
+        if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+        ImGui::TextColored(c.ink, "%.0f", hostFps_);
+        if (fontHeadline_) ImGui::PopFont();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "frames/s");
+        if (fontSmall_) ImGui::PopFont();
+        ImGui::EndGroup();
+
+        ImGui::SameLine(0, 24.0f);
+        ImGui::BeginGroup();
+        if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+        ImGui::TextColored(c.ink, "%.1f", hostBitrate_);
+        if (fontHeadline_) ImGui::PopFont();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "Mbps");
+        if (fontSmall_) ImGui::PopFont();
+        ImGui::EndGroup();
+
+        ImGui::SameLine(0, 24.0f);
+        ImGui::BeginGroup();
+        if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+        ImGui::TextColored(c.ink, "%.1f", hostEncodeMs_);
+        if (fontHeadline_) ImGui::PopFont();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "ms encode");
+        if (fontSmall_) ImGui::PopFont();
+        ImGui::EndGroup();
     } else {
-        renderBadge("PAUSED", false);
-        ImGui::SameLine(0, tokens::MintSpacing::S12);
-        ImGui::TextUnformatted("Hosting currently paused • Incoming stream requests blocked");
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::TextColored(c.mute, "Start streaming to see live numbers.");
+        if (fontRegular_) ImGui::PopFont();
     }
-    ImGui::Spacing();
-    ImGui::TextDisabled("Active Hardware: GPU 0 (NVIDIA GeForce GTX 1660 SUPER) • Display 1 (1920x1080 @ 60 Hz)");
-    ImGui::Spacing();
-
-    // Emergency Disconnect Button
-    ImGui::PushStyleColor(ImGuiCol_Button, c.errorContainer);
-    ImGui::PushStyleColor(ImGuiCol_Text, c.onErrorContainer);
-    if (ImGui::Button("Immediate Emergency Disconnect", ImVec2(260.0f, 30.0f))) {
-        emergencyDisconnectTriggered_ = true;
-    }
-    ImGui::PopStyleColor(2);
-    if (emergencyDisconnectTriggered_) {
-        ImGui::SameLine(0, tokens::MintSpacing::S12);
-        ImGui::TextColored(c.error, "All active streams instantly severed.");
-    }
-    EndM3CardHelper();
 
     ImGui::Spacing();
+    ImGui::Spacing();
 
-    // Display & Hardware Selector Card
-    BeginM3CardHelper("DisplayConfigCard", c, ImVec2(0, 120.0f));
+    if (!isHostingActive_) {
+        if (renderPillButton("Start streaming", true, false, ImVec2(180.0f, 40.0f))) {
+            isHostingActive_ = true;
+            showToast("Streaming started");
+        }
+    } else {
+        if (renderPillButton("Stop streaming", false, true, ImVec2(180.0f, 40.0f))) {
+            isHostingActive_ = false;
+            showToast("Streaming stopped");
+        }
+    }
+
+    EndCardContainer();
+
+    // Right: Session Settings Card
+    ImGui::SameLine(0, 16.0f);
+    BeginCardContainer("HostSessionCard", c, ImVec2(colW, 310.0f), 28.0f);
     if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "Display Capture & Monitor Selection");
+    ImGui::TextColored(c.ink, "Session");
     if (fontTitle_) ImGui::PopFont();
-    ImGui::Spacing();
-    const char* displays[] = {
-        "Display 1: 1920x1080 @ 60 Hz (Primary NVIDIA Desktop)",
-        "Display 2: 2560x1440 @ 144 Hz (Secondary Display)"
-    };
-    ImGui::PushItemWidth(450.0f);
-    ImGui::Combo("Capture Target Display", &selectedMonitorIndex_, displays, IM_ARRAYSIZE(displays));
-    ImGui::PopItemWidth();
-    ImGui::Spacing();
-    ImGui::Checkbox("Audio Loopback Sharing (Stream system WASAPI audio to remote player)", &allowAudioLoopback_);
-    EndM3CardHelper();
 
     ImGui::Spacing();
-
-    // Host Input & Safety Policies Card
-    BeginM3CardHelper("PoliciesCard", c, ImVec2(0, 230.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "Remote Input & Safety Policies");
-    if (fontTitle_) ImGui::PopFont();
-    ImGui::TextDisabled("Mist ensures local host operator safety by prioritizing physical hardware inputs.");
-    ImGui::Spacing();
-
-    ImGui::Checkbox("Remote Keyboard Control (Allow authorized remote keystrokes)", &allowKeyboard_);
-    ImGui::Checkbox("Remote Mouse Control (Allow authorized remote cursor movement & clicks)", &allowMouse_);
-    ImGui::Checkbox("Virtual Gamepad Emulation (DualShock 4 / Xbox 360 controller via ViGEm)", &allowGamepad_);
-    ImGui::Checkbox("Local Physical Operator Override (Physical inputs instantly preempt remote control for 2.0s)", &localOperatorPriority_);
+    ImGui::Checkbox("Stream audio", &hostAudioStream_);
 
     ImGui::Spacing();
-    ImGui::Separator();
+    if (ImGui::Checkbox("Allow remote input", &hostAllowRemoteInput_)) {
+        showToast(hostAllowRemoteInput_ ? "Remote input allowed" : "Remote input blocked");
+    }
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "Off until you turn it on. Your own mouse and keyboard always win.");
+    if (fontSmall_) ImGui::PopFont();
+
     ImGui::Spacing();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "Session ID");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::InputText("##HostSessionId", hostSessionId_, IM_ARRAYSIZE(hostSessionId_));
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.primaryContainer);
-    ImGui::BeginChild("SafetyNotice", ImVec2(0, 36.0f), false);
-    ImGui::SetCursorPos(ImVec2(12.0f, 8.0f));
-    if (fontBold_) ImGui::PushFont(fontBold_);
-    ImGui::TextColored(c.onPrimaryContainer, "SAFETY SHIELD ACTIVE: Local physical mouse/keyboard motion instantly suppresses remote inputs.");
-    if (fontBold_) ImGui::PopFont();
-    ImGui::EndChild();
-    ImGui::PopStyleColor();
+    ImGui::Spacing();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "Signaling server");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::InputText("##HostSignaling", hostSignalingServer_, IM_ARRAYSIZE(hostSignalingServer_));
 
-    EndM3CardHelper();
+    EndCardContainer();
 }
 
-void DesktopApplication::renderGuiSettingsScreen() {
+void DesktopApplication::renderGuiConnectScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
-    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.primary, "Stream Quality Settings & Profiles");
-    if (fontHeadline_) ImGui::PopFont();
+    if (fontDisplay_) ImGui::PushFont(fontDisplay_);
+    ImGui::TextColored(c.ink, "Connect");
+    if (fontDisplay_) ImGui::PopFont();
 
     if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextDisabled("Select an optimized quality profile or fine-tune video resolution, bitrate ranges and VSync.");
+    ImGui::TextColored(c.mute, "Join a PC that's hosting. You'll need its session ID.");
     if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
 
-    // 4 Profile Cards Grid
-    float contentWidth = ImGui::GetContentRegionAvail().x;
-    float cardW = std::max(160.0f, (contentWidth - 36.0f) / 4.0f);
+    float availW = ImGui::GetContentRegionAvail().x;
+    float colW = std::max(300.0f, (availW - 16.0f) / 2.0f);
 
-    struct ProfileCardData {
-        transport::qos::QualityProfile profile;
-        const char* title;
-        const char* resFps;
-        const char* bitrate;
-        const char* desc;
-        int index;
+    // Left: Connect Form Card
+    BeginCardContainer("ConnectFormCard", c, ImVec2(colW, 400.0f), 28.0f);
+
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "Session ID");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::InputText("##ConnSessionId", connectSessionId_, IM_ARRAYSIZE(connectSessionId_));
+
+    ImGui::Spacing();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "Signaling server");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::InputText("##ConnSignaling", connectSignalingServer_, IM_ARRAYSIZE(connectSignalingServer_));
+
+    ImGui::Spacing();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "Relay server (optional)");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::InputTextWithHint("##ConnRelay", "turn:relay.example.com:3478", connectRelayServer_, IM_ARRAYSIZE(connectRelayServer_));
+
+    ImGui::Spacing();
+    ImGui::Checkbox("Hear audio", &connectHearAudio_);
+    ImGui::Checkbox("Send keyboard, mouse and controller", &connectSendInput_);
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    if (renderPillButton("Connect", true, false, ImVec2(160.0f, 40.0f))) {
+        isConnecting_ = true;
+        connectStep_ = 1;
+        connectStepTimer_ = 0.0f;
+        connectStatusMsg_ = "Connecting to " + std::string(connectSessionId_) + "...";
+    }
+
+    EndCardContainer();
+
+    // Right: Connection Steps Card
+    ImGui::SameLine(0, 16.0f);
+    BeginCardContainer("ConnectStepsCard", c, ImVec2(colW, 400.0f), 28.0f);
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "Connection");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    const char* steps[] = {
+        "Reach signaling server",
+        "Pair with host",
+        "Open direct connection",
+        "Receive first frame"
     };
-
-    const ProfileCardData profiles[] = {
-        { transport::qos::QualityProfile::Performance, "Performance", "720p60",  "3,500 kbps",  "Sub-15ms esports & competitive", 0 },
-        { transport::qos::QualityProfile::Balanced,    "Balanced",    "1080p60", "8,000 kbps",  "Optimal LAN & high-speed streaming", 1 },
-        { transport::qos::QualityProfile::Quality,     "Quality",     "1080p60", "15,000 kbps", "Pristine visual fidelity", 2 },
-        { transport::qos::QualityProfile::Adaptive,    "Adaptive",    "Dynamic", "2k-20k kbps", "AIMD congestion-controlled", 3 },
-    };
-
-    auto currentProf = qualityManager_.getProfile();
 
     for (int i = 0; i < 4; ++i) {
-        if (i > 0) ImGui::SameLine(0, tokens::MintSpacing::S12);
-
-        bool isSelected = (currentProf == profiles[i].profile);
-        if (isSelected) {
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, c.primaryContainer);
-            ImGui::PushStyleColor(ImGuiCol_Border, c.primary);
+        ImGui::Spacing();
+        if (connectStep_ > i + 1) {
+            ImGui::TextColored(c.ok, "[V]  %s", steps[i]);
+        } else if (connectStep_ == i + 1) {
+            ImGui::TextColored(c.warn, "[*]  %s (In progress)", steps[i]);
         } else {
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
-            ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
+            ImGui::TextColored(c.mute, "[ ]  %s", steps[i]);
         }
+    }
 
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, isSelected ? 2.0f : 1.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S12, tokens::MintSpacing::S12));
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+    ImGui::TextColored(connectStep_ == 5 ? c.ok : c.mute, "%s", connectStatusMsg_.c_str());
+    if (fontRegular_) ImGui::PopFont();
 
-        std::string cardId = "ProfileCard" + std::to_string(i);
-        ImGui::BeginChild(cardId.c_str(), ImVec2(cardW, 140.0f), true);
+    EndCardContainer();
+}
 
-        if (fontTitle_) ImGui::PushFont(fontTitle_);
-        ImGui::TextColored(isSelected ? c.onPrimaryContainer : c.primary, "%s", profiles[i].title);
-        if (fontTitle_) ImGui::PopFont();
+void DesktopApplication::renderGuiDevicesScreen() {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
 
+    if (fontDisplay_) ImGui::PushFont(fontDisplay_);
+    ImGui::TextColored(c.ink, "Devices");
+    if (fontDisplay_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+    ImGui::TextColored(c.mute, "Pair a new device with a one-time code, then choose what it can do.");
+    if (fontRegular_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    float availW = ImGui::GetContentRegionAvail().x;
+    float colW = std::max(300.0f, (availW - 16.0f) / 2.0f);
+
+    // Left: Pairing Code Card
+    BeginCardContainer("PairingCodeCard", c, ImVec2(colW, 260.0f), 28.0f);
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "Pairing code");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    // 6 Large Digits in Rounded Pill Containers
+    float spanW = std::min(52.0f, (colW - 80.0f) / 6.0f);
+    float spanH = 64.0f;
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    for (size_t i = 0; i < 6 && i < pairingCode_.size(); ++i) {
+        if (i > 0) ImGui::SameLine(0, 8.0f);
+        ImVec2 p = ImGui::GetCursorScreenPos();
+        drawList->AddRectFilled(p, ImVec2(p.x + spanW, p.y + spanH), ImGui::ColorConvertFloat4ToU32(c.ct), 16.0f);
+
+        char digitStr[2] = { pairingCode_[i], '\0' };
+        if (fontCode_) ImGui::PushFont(fontCode_);
+        ImVec2 ts = ImGui::CalcTextSize(digitStr);
+        drawList->AddText(ImVec2(p.x + (spanW - ts.x) * 0.5f, p.y + (spanH - ts.y) * 0.5f), ImGui::ColorConvertFloat4ToU32(c.onCt), digitStr);
+        if (fontCode_) ImGui::PopFont();
+
+        ImGui::Dummy(ImVec2(spanW, spanH));
+    }
+
+    ImGui::Spacing();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "%s", codeHintMsg_.c_str());
+    if (fontSmall_) ImGui::PopFont();
+
+    ImGui::Spacing();
+    if (renderPillButton("New code", true, false, ImVec2(120.0f, 36.0f))) {
+        if (codeLockSeconds_ <= 0) {
+            pairingCode_ = generateRandomPairingCode();
+            wrongCodeFails_ = 0;
+            codeHintMsg_ = "Read this code to the person pairing. It works once.";
+            showToast("New code ready");
+        }
+    }
+    ImGui::SameLine(0, 10.0f);
+    if (renderPillButton("Try a wrong code", false, false, ImVec2(150.0f, 36.0f))) {
+        if (codeLockSeconds_ <= 0) {
+            wrongCodeFails_++;
+            if (wrongCodeFails_ >= 5) {
+                codeLockSeconds_ = 60;
+                codeHintMsg_ = "Too many wrong codes. Try again in 60 seconds.";
+            } else {
+                codeHintMsg_ = "Wrong code. " + std::to_string(5 - wrongCodeFails_) + " attempts left before a 60-second pause.";
+            }
+        }
+    }
+
+    EndCardContainer();
+
+    // Right: Waiting for Approval Card
+    ImGui::SameLine(0, 16.0f);
+    BeginCardContainer("ApprovalCard", c, ImVec2(colW, 260.0f), 28.0f);
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "Waiting for approval");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    if (isDeviceApprovalPending_) {
         if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextUnformatted(profiles[i].resFps);
+        ImGui::TextColored(c.ink, "Aiden's Laptop");
         if (fontBold_) ImGui::PopFont();
-
-        ImGui::TextDisabled("%s", profiles[i].bitrate);
         if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextDisabled("%s", profiles[i].desc);
+        ImGui::TextColored(c.mute, "Used a code just now");
         if (fontSmall_) ImGui::PopFont();
-        ImGui::Spacing();
 
-        if (ImGui::Button(isSelected ? "Active Profile" : "Select Profile", ImVec2(-1, 26.0f))) {
-            qualityManager_.setProfile(profiles[i].profile);
-            selectedProfileIndex_ = i;
+        ImGui::Spacing();
+        if (renderPillButton("Approve", true, false, ImVec2(100.0f, 36.0f))) {
+            trustedDevices_.push_back({"Aiden's Laptop", "Paired just now", false, false});
+            isDeviceApprovalPending_ = false;
+            showToast("Aiden's Laptop approved. Input is off.");
         }
-
-        ImGui::EndChild();
-        ImGui::PopStyleVar(3);
-        ImGui::PopStyleColor(2);
-    }
-
-    ImGui::Spacing();
-
-    // Fine-Tuning Parameters Card
-    BeginM3CardHelper("TuningCard", c, ImVec2(0, 240.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "Custom Encoding & Latency Tuning");
-    if (fontTitle_) ImGui::PopFont();
-    ImGui::Spacing();
-
-    ImGui::PushItemWidth(320.0f);
-    ImGui::SliderInt("Target Bitrate (kbps)", &targetBitrateKbps_, 1000, 40000, "%d kbps");
-    ImGui::SliderInt("Minimum Bitrate (kbps)", &minBitrateKbps_, 500, 10000, "%d kbps");
-    ImGui::SliderInt("Maximum Bitrate (kbps)", &maxBitrateKbps_, 5000, 50000, "%d kbps");
-    ImGui::PopItemWidth();
-
-    ImGui::Spacing();
-    ImGui::Checkbox("Enable Vertical Sync (VSync) — Keep unchecked for lowest presentation latency", &vsyncEnabled_);
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    if (fontBold_) ImGui::PushFont(fontBold_);
-    if (ImGui::Button("Save & Apply Configuration", ImVec2(240.0f, 36.0f))) {
-        // Configuration persisted
-    }
-    if (fontBold_) ImGui::PopFont();
-    EndM3CardHelper();
-}
-
-void DesktopApplication::renderGuiLiveSessionScreen() {
-    const auto& c = tokens::getActiveTheme(currentTheme_);
-
-    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.primary, "Live Session Telemetry & Pipeline Diagnostics");
-    if (fontHeadline_) ImGui::PopFont();
-
-    if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextDisabled("Direct hardware metrics captured from NVENC, Direct3D 11 NVDEC, libdatachannel QoS and WASAPI audio.");
-    if (fontRegular_) ImGui::PopFont();
-    ImGui::Spacing();
-
-    // 3 Pipeline Columns
-    float contentWidth = ImGui::GetContentRegionAvail().x;
-    float colWidth = std::max(200.0f, (contentWidth - 24.0f) / 3.0f);
-
-    // Column 1: Video Pipeline
-    BeginM3CardHelper("TelemetryVideo", c, ImVec2(colWidth, 240.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "VIDEO PIPELINE");
-    if (fontTitle_) ImGui::PopFont();
-    ImGui::Separator();
-    ImGui::Spacing();
-    ImGui::TextDisabled("Resolution:          1920x1080");
-    ImGui::TextDisabled("Target / Actual FPS: 60 / 59.9 FPS");
-    ImGui::TextDisabled("Encoder Bitrate:     7,850 kbps (CBR)");
-    ImGui::TextDisabled("Encode Latency:      1.82 ms (NVENC)");
-    ImGui::TextDisabled("Decode Latency:      2.45 ms (D3D11 NVDEC)");
-    ImGui::TextDisabled("Render Latency:      0.41 ms (Flip Model)");
-    ImGui::TextDisabled("%s", "Dropped Frames:      0 (0.00%)");
-    EndM3CardHelper();
-
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    // Column 2: Network QoS
-    BeginM3CardHelper("TelemetryNetwork", c, ImVec2(colWidth, 240.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "NETWORK QOS & TRANSPORT");
-    if (fontTitle_) ImGui::PopFont();
-    ImGui::Separator();
-    ImGui::Spacing();
-    ImGui::TextDisabled("Connection Type:     WebRTC Direct (LAN)");
-    ImGui::TextDisabled("Estimated Bandwidth: 45,200 kbps");
-    ImGui::TextDisabled("Round-Trip Time:     3.4 ms");
-    ImGui::TextDisabled("Network Jitter:      0.42 ms");
-    ImGui::TextDisabled("%s", "Packet Loss:         0.00% (0 packets)");
-    ImGui::TextDisabled("Congestion State:    Stable (AIMD)");
-    ImGui::TextDisabled("DataChannel State:   Open (SCTP)");
-    EndM3CardHelper();
-
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
-    // Column 3: Audio & Input
-    BeginM3CardHelper("TelemetryAudioInput", c, ImVec2(colWidth, 240.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "AUDIO & REMOTE INPUT");
-    if (fontTitle_) ImGui::PopFont();
-    ImGui::Separator();
-    ImGui::Spacing();
-    ImGui::TextDisabled("Audio Format / Rate: Opus 48 kHz Stereo / 128 kbps");
-    ImGui::TextDisabled("Audio Buffer Depth:  10.0 ms");
-    ImGui::TextDisabled("Audio Underruns:     0");
-    ImGui::TextDisabled("A/V Sync Skew:       14.93 ms (< 40ms threshold)");
-    ImGui::TextDisabled("Input Events:        183 events processed");
-    ImGui::TextDisabled("Dispatch Latency:    0.28 ms");
-    ImGui::TextDisabled("Physical Override:   Active & Ready");
-    EndM3CardHelper();
-
-    ImGui::Spacing();
-
-    // End-to-End Latency Waterfall Card
-    BeginM3CardHelper("LatencyWaterfallCard", c, ImVec2(0, 120.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "End-to-End Motion-to-Photon Latency Waterfall");
-    if (fontTitle_) ImGui::PopFont();
-    ImGui::Spacing();
-    ImGui::TextUnformatted("Capture (0.4ms) + NVENC (1.8ms) + Network (1.7ms) + Decode (2.5ms) + Present (0.4ms) = Total: 6.8 ms");
-    ImGui::Spacing();
-    ImGui::ProgressBar(0.07f, ImVec2(-1, 14.0f), "Sub-Frame Motion-to-Photon: 6.8ms (Target < 16.6ms)");
-    EndM3CardHelper();
-}
-
-void DesktopApplication::renderGuiDeviceManagementScreen() {
-    const auto& c = tokens::getActiveTheme(currentTheme_);
-
-    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.primary, "Trusted Device Management");
-    if (fontHeadline_) ImGui::PopFont();
-
-    if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextDisabled("Manage client devices authorized to stream and send remote keyboard, mouse or gamepad inputs.");
-    if (fontRegular_) ImGui::PopFont();
-    ImGui::Spacing();
-
-    BeginM3CardHelper("TrustedDevicesCard", c, ImVec2(0, 280.0f));
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.primary, "Authorized Client Devices");
-    if (fontTitle_) ImGui::PopFont();
-    ImGui::Spacing();
-
-    auto devices = pairingManager_.getTrustedDevices();
-    if (devices.empty()) {
-        ImGui::TextDisabled("No trusted devices currently registered.");
-        ImGui::Spacing();
-        if (ImGui::Button("Pair a Device Now", ImVec2(180.0f, 32.0f))) {
-            currentScreen_ = DesktopScreen::Pairing;
+        ImGui::SameLine(0, 10.0f);
+        if (renderPillButton("Deny", false, false, ImVec2(80.0f, 36.0f))) {
+            isDeviceApprovalPending_ = false;
+            showToast("Request denied");
         }
     } else {
-        if (ImGui::BeginTable("DevicesTable", 5, ImGuiTableFlags_BordersInner | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
-            ImGui::TableSetupColumn("Device Name", ImGuiTableColumnFlags_WidthStretch, 0.25f);
-            ImGui::TableSetupColumn("Device ID", ImGuiTableColumnFlags_WidthStretch, 0.20f);
-            ImGui::TableSetupColumn("Permissions", ImGuiTableColumnFlags_WidthStretch, 0.25f);
-            ImGui::TableSetupColumn("Paired Date", ImGuiTableColumnFlags_WidthStretch, 0.15f);
-            ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch, 0.15f);
-            ImGui::TableHeadersRow();
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::TextColored(c.mute, "No devices waiting.");
+        if (fontRegular_) ImGui::PopFont();
+    }
 
-            for (const auto& dev : devices) {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::TextUnformatted(dev.deviceName.c_str());
+    EndCardContainer();
 
-                ImGui::TableNextColumn();
-                ImGui::TextDisabled("%s", dev.deviceId.c_str());
+    ImGui::Spacing();
+    ImGui::Spacing();
 
-                ImGui::TableNextColumn();
-                if (dev.permissions.allowKeyboard) {
-                    renderBadge("KBD", true);
-                    ImGui::SameLine(0, 4.0f);
-                }
-                if (dev.permissions.allowMouse) {
-                    renderBadge("MOUSE", true);
-                    ImGui::SameLine(0, 4.0f);
-                }
-                if (dev.permissions.allowGamepad) {
-                    renderBadge("PAD", true);
-                }
+    // Trusted Devices List Card
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "Trusted devices");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::Spacing();
 
-                ImGui::TableNextColumn();
-                ImGui::TextDisabled("Epoch: %llu", static_cast<unsigned long long>(dev.pairedAtEpochSec));
+    BeginCardContainer("TrustedDevicesCard", c, ImVec2(0, 0), 28.0f);
+    if (trustedDevices_.empty()) {
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::TextColored(c.mute, "No trusted devices yet. Create a pairing code to add one.");
+        if (fontRegular_) ImGui::PopFont();
+    } else {
+        int toRemove = -1;
+        for (size_t i = 0; i < trustedDevices_.size(); ++i) {
+            if (i > 0) {
+                ImGui::Separator();
+                ImGui::Spacing();
+            }
+            ImGui::BeginGroup();
+            if (fontBold_) ImGui::PushFont(fontBold_);
+            ImGui::TextColored(c.ink, "%s", trustedDevices_[i].name.c_str());
+            if (fontBold_) ImGui::PopFont();
+            if (fontSmall_) ImGui::PushFont(fontSmall_);
+            ImGui::TextColored(c.mute, "%s", trustedDevices_[i].lastSeen.c_str());
+            if (fontSmall_) ImGui::PopFont();
+            ImGui::EndGroup();
 
-                ImGui::TableNextColumn();
-                std::string btnLabel = "Revoke##" + dev.deviceId;
-                ImGui::PushStyleColor(ImGuiCol_Button, c.errorContainer);
-                ImGui::PushStyleColor(ImGuiCol_Text, c.onErrorContainer);
-                if (ImGui::Button(btnLabel.c_str(), ImVec2(-1, 26.0f))) {
-                    (void)pairingManager_.revokeDevice(dev.deviceId);
-                }
-                ImGui::PopStyleColor(2);
+            float rowW = ImGui::GetContentRegionAvail().x;
+            ImGui::SameLine(rowW - 380.0f);
+            std::string kbdId = "Keyboard and mouse##" + std::to_string(i);
+            if (ImGui::Checkbox(kbdId.c_str(), &trustedDevices_[i].allowKbdMouse)) {
+                showToast("Permission updated");
             }
 
-            ImGui::EndTable();
+            ImGui::SameLine(0, 16.0f);
+            std::string padId = "Controller##" + std::to_string(i);
+            if (ImGui::Checkbox(padId.c_str(), &trustedDevices_[i].allowController)) {
+                showToast("Permission updated");
+            }
+
+            ImGui::SameLine(0, 16.0f);
+            std::string remId = "Remove##" + std::to_string(i);
+            if (renderPillButton(remId.c_str(), false, true, ImVec2(80.0f, 32.0f))) {
+                toRemove = static_cast<int>(i);
+            }
+            ImGui::Spacing();
+        }
+
+        if (toRemove >= 0 && toRemove < static_cast<int>(trustedDevices_.size())) {
+            std::string name = trustedDevices_[toRemove].name;
+            trustedDevices_.erase(trustedDevices_.begin() + toRemove);
+            showToast(name + " removed");
         }
     }
-    EndM3CardHelper();
+    EndCardContainer();
+}
+
+void DesktopApplication::renderGuiNetworkScreen() {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+
+    if (fontDisplay_) ImGui::PushFont(fontDisplay_);
+    ImGui::TextColored(c.ink, "Network");
+    if (fontDisplay_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+    ImGui::TextColored(c.mute, "Sample data. Mist lowers video bitrate when your connection struggles, then climbs back.");
+    if (fontRegular_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    // 1. Video Bitrate Card with Graph
+    BeginCardContainer("NetworkChartCard", c, ImVec2(0, 360.0f), 28.0f);
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "Video bitrate");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 100.0f);
+    renderChip(networkQosState_.c_str(), networkQosState_ == "Stable" ? 1 : (networkQosState_ == "Recovering" ? 2 : 3));
 
     ImGui::Spacing();
 
-    BeginM3CardHelper("SecurityAdvisoryCard", c, ImVec2(0, 110.0f));
+    // Custom Bitrate Graph (SVG polygon/polyline equivalent)
+    ImVec2 graphPos = ImGui::GetCursorScreenPos();
+    float graphW = ImGui::GetContentRegionAvail().x;
+    float graphH = 150.0f;
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // Background Container
+    drawList->AddRectFilled(graphPos, ImVec2(graphPos.x + graphW, graphPos.y + graphH), ImGui::ColorConvertFloat4ToU32(c.ct2), 12.0f);
+
+    // Baseline dashed line
+    float midY = graphPos.y + graphH * 0.5f;
+    for (float x = graphPos.x; x < graphPos.x + graphW; x += 12.0f) {
+        drawList->AddLine(ImVec2(x, midY), ImVec2(std::min(x + 6.0f, graphPos.x + graphW), midY), ImGui::ColorConvertFloat4ToU32(c.line), 1.0f);
+    }
+
+    // Plot Points
+    if (bitrateHistory_.size() >= 2) {
+        std::vector<ImVec2> pts;
+        pts.reserve(bitrateHistory_.size() + 2);
+
+        float stepX = graphW / static_cast<float>(bitrateHistory_.size() - 1);
+        for (size_t i = 0; i < bitrateHistory_.size(); ++i) {
+            float val = std::min(bitrateHistory_[i], 16.0f);
+            float yNorm = val / 16.0f;
+            float px = graphPos.x + static_cast<float>(i) * stepX;
+            float py = graphPos.y + graphH - (yNorm * (graphH - 20.0f) + 10.0f);
+            pts.push_back(ImVec2(px, py));
+        }
+
+        // Polygon Fill (opacity 0.18)
+        ImVec4 fillCol = c.acc;
+        fillCol.w = 0.18f;
+        std::vector<ImVec2> polyPts;
+        polyPts.push_back(ImVec2(graphPos.x, graphPos.y + graphH));
+        polyPts.insert(polyPts.end(), pts.begin(), pts.end());
+        polyPts.push_back(ImVec2(graphPos.x + graphW, graphPos.y + graphH));
+        drawList->AddConvexPolyFilled(polyPts.data(), static_cast<int>(polyPts.size()), ImGui::ColorConvertFloat4ToU32(fillCol));
+
+        // Polyline Curve (width 3px)
+        for (size_t i = 0; i + 1 < pts.size(); ++i) {
+            drawList->AddLine(pts[i], pts[i + 1], ImGui::ColorConvertFloat4ToU32(c.acc), 3.0f);
+        }
+    }
+
+    ImGui::Dummy(ImVec2(graphW, graphH));
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // 4 Stat Counters
+    float statColW = graphW / 4.0f;
+    ImGui::BeginGroup();
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+    ImGui::TextColored(c.ink, "%.1f", networkBitrate_);
+    if (fontHeadline_) ImGui::PopFont();
     if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextDisabled("CRYPTOGRAPHIC SECURITY ARCHITECTURE");
+    ImGui::TextColored(c.mute, "Mbps video");
     if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
+    ImGui::SameLine(statColW);
+    ImGui::BeginGroup();
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+    ImGui::TextColored(c.ink, "%d", networkRtt_);
+    if (fontHeadline_) ImGui::PopFont();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "ms round trip");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
+    ImGui::SameLine(statColW * 2.0f);
+    ImGui::BeginGroup();
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+    ImGui::TextColored(c.ink, "%.1f", networkLoss_);
+    if (fontHeadline_) ImGui::PopFont();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "%% packets lost");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
+    ImGui::SameLine(statColW * 3.0f);
+    ImGui::BeginGroup();
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+    ImGui::TextColored(c.ink, "%d", networkJitter_);
+    if (fontHeadline_) ImGui::PopFont();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "ms jitter");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
     ImGui::Spacing();
-    ImGui::TextUnformatted("Trusted devices hold unique Ed25519 pairing credentials. Revoking a device immediately invalidates its token");
-    ImGui::TextDisabled("and terminates any active WebRTC DataChannels. The remote client will be required to re-authenticate.");
-    EndM3CardHelper();
+    ImGui::Spacing();
+    if (renderPillButton("Simulate a bad connection", false, false, ImVec2(220.0f, 36.0f))) {
+        isNetworkCongested_ = true;
+        congestionDuration_ = 6.0f; // 6 seconds
+        showToast("Bad connection for 6 seconds");
+    }
+
+    EndCardContainer();
+
+    ImGui::Spacing();
+
+    // 2. Bandwidth Split Card
+    BeginCardContainer("BandwidthSplitCard", c, ImVec2(0, 130.0f), 28.0f);
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "Bandwidth split");
+    if (fontTitle_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    // 3-Segment Horizontal Progress Bar
+    float barW = ImGui::GetContentRegionAvail().x;
+    float barH = 12.0f;
+    ImVec2 bPos = ImGui::GetCursorScreenPos();
+    drawList->AddRectFilled(bPos, ImVec2(bPos.x + barW, bPos.y + barH), ImGui::ColorConvertFloat4ToU32(c.ct2), 6.0f);
+
+    float totalKbps = networkBitrate_ * 1000.0f + 178.0f;
+    float inputW = (50.0f / totalKbps) * barW;
+    float audioW = (128.0f / totalKbps) * barW;
+
+    drawList->AddRectFilled(bPos, ImVec2(bPos.x + inputW, bPos.y + barH), ImGui::ColorConvertFloat4ToU32(c.warn), 6.0f);
+    drawList->AddRectFilled(ImVec2(bPos.x + inputW + 2.0f, bPos.y), ImVec2(bPos.x + inputW + audioW, bPos.y + barH), ImGui::ColorConvertFloat4ToU32(c.mute), 0.0f);
+    drawList->AddRectFilled(ImVec2(bPos.x + inputW + audioW + 2.0f, bPos.y), ImVec2(bPos.x + barW, bPos.y + barH), ImGui::ColorConvertFloat4ToU32(c.acc), 6.0f);
+
+    ImGui::Dummy(ImVec2(barW, barH));
+    ImGui::Spacing();
+
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "Input 50 kbps, reserved   *   Audio 128 kbps, reserved   *   Video gets the rest");
+    if (fontSmall_) ImGui::PopFont();
+
+    EndCardContainer();
+}
+
+void DesktopApplication::renderGuiSettingsDialog() {
+    if (!isSettingsOpen_) return;
+
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    ImGuiIO& io = ImGui::GetIO();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // Backdrop overlay
+    drawList->AddRectFilled(ImVec2(0, 0), io.DisplaySize, IM_COL32(5, 25, 19, 130));
+
+    // Centered Dialog Modal
+    float dlgW = std::min(520.0f, io.DisplaySize.x - 32.0f);
+    float dlgH = 490.0f;
+    float dlgX = (io.DisplaySize.x - dlgW) * 0.5f;
+    float dlgY = (io.DisplaySize.y - dlgH) * 0.5f;
+
+    ImGui::SetNextWindowPos(ImVec2(dlgX, dlgY));
+    ImGui::SetNextWindowSize(ImVec2(dlgW, dlgH));
+
+    ImGuiWindowFlags dlgFlags = ImGuiWindowFlags_NoTitleBar |
+                                ImGuiWindowFlags_NoResize |
+                                ImGuiWindowFlags_NoMove |
+                                ImGuiWindowFlags_NoCollapse;
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, tokens::MintShapes::Dialog);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(24.0f, 24.0f));
+
+    if (ImGui::Begin("SettingsModal", &isSettingsOpen_, dlgFlags)) {
+        if (fontTitle_) ImGui::PushFont(fontTitle_);
+        ImGui::TextColored(c.ink, "Settings");
+        if (fontTitle_) ImGui::PopFont();
+        ImGui::Spacing();
+
+        // 1. Theme Segmented Radio
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(c.ink, "Theme");
+        if (fontBold_) ImGui::PopFont();
+        ImGui::Spacing();
+
+        if (ImGui::RadioButton("Light##ThemeLight", settingsTheme_ == 0)) {
+            settingsTheme_ = 0;
+            applyActiveTheme();
+        }
+        ImGui::SameLine(0, 24.0f);
+        if (ImGui::RadioButton("Dark##ThemeDark", settingsTheme_ == 1)) {
+            settingsTheme_ = 1;
+            applyActiveTheme();
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // 2. Contrast Segmented Radio
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(c.ink, "Contrast");
+        if (fontBold_) ImGui::PopFont();
+        ImGui::Spacing();
+
+        if (ImGui::RadioButton("Standard##ContrastStd", settingsContrast_ == 0)) {
+            settingsContrast_ = 0;
+            applyActiveTheme();
+        }
+        ImGui::SameLine(0, 24.0f);
+        if (ImGui::RadioButton("High##ContrastHigh", settingsContrast_ == 1)) {
+            settingsContrast_ = 1;
+            applyActiveTheme();
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // 3. Compact View Checkbox
+        ImGui::Checkbox("Compact view", &settingsCompactView_);
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "Smaller cards and tiles");
+        if (fontSmall_) ImGui::PopFont();
+
+        ImGui::Spacing();
+
+        // 4. Animated Shapes Checkbox
+        ImGui::Checkbox("Animated shapes", &settingsAnimatedShapes_);
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "Shapes drifting behind the interface");
+        if (fontSmall_) ImGui::PopFont();
+
+        ImGui::Spacing();
+
+        // 5. Maximum Video Bitrate Slider
+        std::string capLabel = "Maximum video bitrate: " + std::to_string(settingsMaxBitrateMbps_) + " Mbps";
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::TextColored(c.ink, "%s", capLabel.c_str());
+        if (fontRegular_) ImGui::PopFont();
+        ImGui::SliderInt("##MaxBitrateSlider", &settingsMaxBitrateMbps_, 3, 40, "%d Mbps");
+
+        ImGui::Spacing();
+
+        // 6. Frame Rate Select
+        const char* frameRates[] = { "60 frames per second", "30 frames per second" };
+        ImGui::Combo("Frame rate", &settingsFrameRate_, frameRates, IM_ARRAYSIZE(frameRates));
+
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        // Done Button
+        float btnX = dlgW - 140.0f;
+        ImGui::SetCursorPosX(btnX);
+        if (renderPillButton("Done", true, false, ImVec2(100.0f, 38.0f))) {
+            isSettingsOpen_ = false;
+        }
+
+        ImGui::End();
+    }
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(2);
+}
+
+void DesktopApplication::renderGuiToast() {
+    if (toastTimer_ <= 0.0f || toastMessage_.empty()) return;
+
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    ImGuiIO& io = ImGui::GetIO();
+    ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+    ImVec2 txtSize = ImGui::CalcTextSize(toastMessage_.c_str());
+    if (fontRegular_) ImGui::PopFont();
+
+    float padX = 20.0f;
+    float padY = 12.0f;
+    float w = txtSize.x + padX * 2.0f;
+    float h = txtSize.y + padY * 2.0f;
+    float x = (io.DisplaySize.x - w) * 0.5f;
+    float y = io.DisplaySize.y - h - 28.0f;
+
+    // Toast pill with ink background and cloud text
+    drawList->AddRectFilled(ImVec2(x, y), ImVec2(x + w, y + h), ImGui::ColorConvertFloat4ToU32(c.ink), 12.0f);
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+    drawList->AddText(ImVec2(x + padX, y + padY), ImGui::ColorConvertFloat4ToU32(c.bg), toastMessage_.c_str());
+    if (fontRegular_) ImGui::PopFont();
 }
 
 void DesktopApplication::renderGuiFrame() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     ImGuiIO& io = ImGui::GetIO();
 
-    // 1. Organic ambient wallpaper background glow (matching the reference design)
-    ImDrawList* bgDraw = ImGui::GetBackgroundDrawList();
-    if (currentTheme_ == tokens::ThemeMode::Light) {
-        // Soft mint & sage ambient radial orbs
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.92f, io.DisplaySize.y * 0.18f), 280.0f, IM_COL32(221, 239, 228, 80));
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.12f, io.DisplaySize.y * 0.82f), 320.0f, IM_COL32(184, 235, 213, 75));
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.88f, io.DisplaySize.y * 0.78f), 240.0f, IM_COL32(221, 239, 228, 65));
-    } else {
-        // Dark theme: deep evergreen & pixel mint ambient aura
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.92f, io.DisplaySize.y * 0.18f), 300.0f, IM_COL32(34, 72, 54, 55));
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.12f, io.DisplaySize.y * 0.82f), 350.0f, IM_COL32(23, 75, 56, 45));
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.88f, io.DisplaySize.y * 0.78f), 250.0f, IM_COL32(184, 235, 213, 20));
+    // 1. Tick simulation logic
+    float dt = io.DeltaTime;
+    if (toastTimer_ > 0.0f) {
+        toastTimer_ -= dt;
     }
 
+    if (isHostingActive_) {
+        // Subtle real-time jitter in telemetry
+        hostFps_ = 59.5f + (rand() % 10) * 0.1f;
+        hostEncodeMs_ = 1.4f + (rand() % 5) * 0.1f;
+    }
+
+    if (isConnecting_) {
+        connectStepTimer_ += dt;
+        if (connectStepTimer_ > 0.7f && connectStep_ < 4) {
+            connectStep_++;
+            connectStepTimer_ = 0.0f;
+        } else if (connectStep_ >= 4 && connectStepTimer_ > 0.8f) {
+            connectStep_ = 5; // All done
+            connectStatusMsg_ = "Connected. Press Ctrl+Alt+Shift+Q to leave the stream.";
+            showToast("Connected");
+            isConnecting_ = false;
+        }
+    }
+
+    if (codeLockSeconds_ > 0) {
+        codeLockTimer_ += dt;
+        if (codeLockTimer_ >= 1.0f) {
+            codeLockSeconds_--;
+            codeLockTimer_ = 0.0f;
+            if (codeLockSeconds_ <= 0) {
+                pairingCode_ = generateRandomPairingCode();
+                wrongCodeFails_ = 0;
+                codeHintMsg_ = "Pairing is open again with a new code.";
+            } else {
+                codeHintMsg_ = "Too many wrong codes. Try again in " + std::to_string(codeLockSeconds_) + " seconds.";
+            }
+        }
+    }
+
+    // Network adaptation tick
+    static float netTimer = 0.0f;
+    netTimer += dt;
+    if (netTimer >= 1.0f) {
+        netTimer = 0.0f;
+        if (isNetworkCongested_) {
+            networkBitrate_ = std::max(2.5f, networkBitrate_ * 0.78f);
+            networkLoss_ = std::min(9.0f, networkLoss_ + 1.2f);
+            networkQosState_ = (networkBitrate_ < 5.0f) ? "Critically congested" : "Congested";
+            networkRtt_ = 60 + (rand() % 50);
+            networkJitter_ = 9;
+            congestionDuration_ -= 1.0f;
+            if (congestionDuration_ <= 0.0f) {
+                isNetworkCongested_ = false;
+            }
+        } else if (networkBitrate_ < static_cast<float>(settingsMaxBitrateMbps_) - 0.05f) {
+            networkBitrate_ = std::min(static_cast<float>(settingsMaxBitrateMbps_), networkBitrate_ + 0.6f);
+            networkLoss_ = std::max(0.0f, networkLoss_ - 0.8f);
+            networkQosState_ = (networkBitrate_ < settingsMaxBitrateMbps_ - 1.0f) ? "Recovering" : "Increasing";
+            networkRtt_ = 16 + (rand() % 5);
+            networkJitter_ = 2;
+        } else {
+            networkQosState_ = "Stable";
+            networkLoss_ = 0.0f;
+            networkRtt_ = 18;
+            networkJitter_ = 2;
+        }
+
+        bitrateHistory_.push_back(networkBitrate_);
+        if (bitrateHistory_.size() > 60) bitrateHistory_.erase(bitrateHistory_.begin());
+        rttHistory_.push_back(static_cast<float>(networkRtt_));
+        if (rttHistory_.size() > 60) rttHistory_.erase(rttHistory_.begin());
+    }
+
+    // 2. Ambient drifting wallpaper background (matching Mist.html #wall shapes)
+    if (settingsAnimatedShapes_) {
+        ImDrawList* bgDraw = ImGui::GetBackgroundDrawList();
+        static float animTime = 0.0f;
+        animTime += dt * 0.25f;
+
+        float ox1 = std::sin(animTime) * 30.0f;
+        float oy1 = std::cos(animTime * 0.8f) * 20.0f;
+        float ox2 = std::cos(animTime * 1.1f) * 25.0f;
+        float oy2 = std::sin(animTime * 0.9f) * 35.0f;
+
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.90f + ox1, io.DisplaySize.y * 0.20f + oy1), 260.0f, ImGui::ColorConvertFloat4ToU32(c.s1));
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.10f + ox2, io.DisplaySize.y * 0.80f + oy2), 290.0f, ImGui::ColorConvertFloat4ToU32(c.s2));
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.85f - ox2, io.DisplaySize.y * 0.75f - oy1), 220.0f, ImGui::ColorConvertFloat4ToU32(c.s3));
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.25f + ox1, io.DisplaySize.y * 0.15f - oy2), 200.0f, ImGui::ColorConvertFloat4ToU32(c.s4));
+    }
+
+    // 3. Main Window
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
 
@@ -1603,38 +1739,36 @@ void DesktopApplication::renderGuiFrame() {
                                    ImGuiWindowFlags_NoScrollWithMouse |
                                    ImGuiWindowFlags_NoScrollbar;
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S12, tokens::MintSpacing::S12));
-    ImGui::Begin("MistDesktopMainWindow", nullptr, windowFlags);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
+    ImGui::Begin("MistMainWindow", nullptr, windowFlags);
 
-    // Top Header Bar
+    // Top Header
     renderGuiHeader();
     ImGui::Spacing();
+    ImGui::Spacing();
 
-    // Body: Left Nav Rail + Right Content Area
+    // Navigation Rail & Content Area
     renderGuiNavRail();
-    ImGui::SameLine(0, tokens::MintSpacing::S12);
+    ImGui::SameLine(0, 16.0f);
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.background);
-    ImGui::BeginChild("ContentArea", ImVec2(0, 0), false);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.bg);
+    ImGui::BeginChild("MainContent", ImVec2(0, 0), false);
 
     switch (currentScreen_) {
         case DesktopScreen::Home:
             renderGuiHomeScreen();
             break;
-        case DesktopScreen::Pairing:
-            renderGuiPairingScreen();
-            break;
         case DesktopScreen::Host:
             renderGuiHostScreen();
             break;
-        case DesktopScreen::StreamSettings:
-            renderGuiSettingsScreen();
+        case DesktopScreen::Connect:
+            renderGuiConnectScreen();
             break;
-        case DesktopScreen::LiveSession:
-            renderGuiLiveSessionScreen();
+        case DesktopScreen::Devices:
+            renderGuiDevicesScreen();
             break;
-        case DesktopScreen::DeviceManagement:
-            renderGuiDeviceManagementScreen();
+        case DesktopScreen::Network:
+            renderGuiNetworkScreen();
             break;
         default:
             renderGuiHomeScreen();
@@ -1646,6 +1780,10 @@ void DesktopApplication::renderGuiFrame() {
 
     ImGui::End();
     ImGui::PopStyleVar();
+
+    // 4. Overlays: Settings Dialog & Toast
+    renderGuiSettingsDialog();
+    renderGuiToast();
 }
 
 #endif // _WIN32
