@@ -26,6 +26,25 @@ struct NvencCapability {
     std::string driverVersion;
 };
 
+struct NvencRuntimeAudit {
+    bool isNvidiaGpu{false};
+    std::string gpuName;
+    std::string driverVersion;
+    std::string dllPath;
+    std::string dllFileVersion;
+    uint32_t compileTimeMajor{0};
+    uint32_t compileTimeMinor{0};
+    uint32_t runtimeMaxMajor{0};
+    uint32_t runtimeMaxMinor{0};
+    bool isCompatible{false};
+    std::string sessionInitStatus;
+    bool supportsH264{false};
+    bool supportsHevc{false};
+    std::string selectedCodec;
+    std::string selectedInputFormat;
+    std::string details;
+};
+
 class NvencVideoEncoder : public IVideoEncoder {
 public:
     NvencVideoEncoder() noexcept;
@@ -33,6 +52,7 @@ public:
 
     [[nodiscard]] static common::Result<std::unique_ptr<NvencVideoEncoder>> create();
     [[nodiscard]] static NvencCapability queryCapabilities(ID3D11Device* device = nullptr) noexcept;
+    [[nodiscard]] static NvencRuntimeAudit queryRuntimeAudit(ID3D11Device* device = nullptr) noexcept;
 
     [[nodiscard]] common::Result<void> initialize(const EncodeConfig& config) override;
 #if defined(_WIN32)

@@ -10,6 +10,8 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <mmsystem.h>
+#include <timeapi.h>
 #endif
 
 #include <sstream>
@@ -168,6 +170,96 @@ double HighResolutionTimer::elapsedMicroseconds() const noexcept {
 
 double HighResolutionTimer::elapsedMilliseconds() const noexcept {
     return static_cast<double>(elapsedNanoseconds()) / 1000000.0;
+}
+
+ScopedTimerResolution::ScopedTimerResolution(uint32_t periodMs) noexcept
+    : periodMs_(periodMs) {
+#if defined(_WIN32)
+    if (timeBeginPeriod(periodMs_) == TIMERR_NOERROR) {
+        active_ = true;
+    }
+#endif
+}
+
+ScopedTimerResolution::~ScopedTimerResolution() noexcept {
+#if defined(_WIN32)
+    if (active_) {
+        timeEndPeriod(periodMs_);
+        active_ = false;
+    }
+#endif
+}
+
+ScopedTimerResolution::ScopedTimerResolution(ScopedTimerResolution&& other) noexcept
+    : periodMs_(other.periodMs_), active_(other.active_) {
+    other.active_ = false;
+}
+
+ScopedTimerResolution& ScopedTimerResolution::operator=(ScopedTimerResolution&& other) noexcept {
+    if (this != &other) {
+#if defined(_WIN32)
+        if (active_) {
+            timeEndPeriod(periodMs_);
+        }
+#endif
+        periodMs_ = other.periodMs_;
+        active_ = other.active_;
+        other.active_ = false;
+    }
+    return *this;
+}
+
+FramePacer::FramePacer(uint32_t targetFps) noexcept
+    : targetFps_(targetFps > 0 ? targetFps : 60), timerRes_(1) {
+#if defined(_WIN32)
+    LARGE_INTEGER freq;
+    QueryPerformanceFrequency(&freq);
+    frequency_ = freq.QuadPart;
+    intervalTicks_ = (frequency_ > 0 && targetFps_ > 0) ? (frequency_ / static_cast<int64_t>(targetFps_)) : 0;
+    reset();
+#endif
+}
+
+void FramePacer::reset() noexcept {
+#if defined(_WIN32)
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+    nextFrameTicks_ = now.QuadPart + intervalTicks_;
+#endif
+}
+
+void FramePacer::waitNextFrame() noexcept {
+#if defined(_WIN32)
+    if (frequency_ <= 0 || intervalTicks_ <= 0) return;
+
+    LARGE_INTEGER now;
+    QueryPerformanceCounter(&now);
+
+    // If we fell significantly behind (more than 2 frame intervals), re-anchor
+    if (now.QuadPart > nextFrameTicks_ + (intervalTicks_ * 2)) {
+        nextFrameTicks_ = now.QuadPart + intervalTicks_;
+        return;
+    }
+
+    int64_t remainingTicks = nextFrameTicks_ - now.QuadPart;
+    if (remainingTicks <= 0) {
+        nextFrameTicks_ += intervalTicks_;
+        return;
+    }
+
+    // Coarse sleep if more than 2ms remain
+    int64_t remainingMs = (remainingTicks * 1000) / frequency_;
+    if (remainingMs > 2) {
+        Sleep(static_cast<DWORD>(remainingMs - 2));
+    }
+
+    // Fine-grained spin-wait for remaining sub-millisecond precision
+    do {
+        QueryPerformanceCounter(&now);
+    } while (now.QuadPart < nextFrameTicks_);
+
+    nextFrameTicks_ += intervalTicks_;
+#endif
 }
 
 } // namespace mist::platform::windows

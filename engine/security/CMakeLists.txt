@@ -9,5 +9,8 @@ target_include_directories(mist_security PUBLIC
 
 target_link_libraries(mist_security PUBLIC
     mist_common
+)
+
+target_link_libraries(mist_security PRIVATE
     mist_warnings
 )

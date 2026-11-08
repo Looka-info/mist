@@ -19,5 +19,6 @@ if(WIN32)
         kernel32
         d3d11
         dxgi
+        winmm
     )
 endif()

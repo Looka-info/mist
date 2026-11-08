@@ -38,5 +38,6 @@ if(WIN32)
     target_link_libraries(mist_encode PRIVATE
         d3d11
         dxgi
+        version
     )
 endif()

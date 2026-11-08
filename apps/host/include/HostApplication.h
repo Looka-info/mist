@@ -16,7 +16,11 @@ enum class HostCommandMode {
     ListDisplays,
     CaptureTest,
     EncodeTest,
-    CaptureEncodeTest
+    CaptureEncodeTest,
+    NvencAudit,
+    TransportInfo,
+    StreamTest,
+    StreamLive
 };
 
 struct HostCommandLineOptions {
@@ -30,6 +34,9 @@ struct HostCommandLineOptions {
     std::string codec{"h264"};
     std::string outputPath;
     std::string reportPath;
+    std::string signalingUrl{"ws://127.0.0.1:8080"};
+    std::string sessionId{"mist-session-1"};
+    std::string authToken{"mist-dev-token"};
 };
 
 class HostApplication {
@@ -50,6 +57,10 @@ private:
     [[nodiscard]] int executeCaptureTest();
     [[nodiscard]] int executeEncodeTest();
     [[nodiscard]] int executeCaptureEncodeTest();
+    [[nodiscard]] int executeNvencAudit();
+    [[nodiscard]] int executeTransportInfo();
+    [[nodiscard]] int executeStreamTest();
+    [[nodiscard]] int executeStreamLive();
 
     common::AppConfig config_;
     HostCommandLineOptions options_;

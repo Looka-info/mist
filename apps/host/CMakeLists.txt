@@ -15,5 +15,7 @@ target_link_libraries(mist_host PRIVATE
     mist_telemetry
     mist_security
     mist_platform_windows
+    mist_transport
+    mist_services
     mist_warnings
 )

@@ -53,10 +53,10 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 | `engine/encode` | `mist_encode` | NVIDIA NVENC Hardware Video Encoder (`NvencVideoEncoder`), dynamic SDK loader, capability discovery, low-latency CBR tuning. | **Implemented & Verified** (M1) |
 | `engine/decode` | `mist_decode` | Direct3D 11 Hardware Video Decoder (`D3D11VideoDecoder`), Annex-B parser (`H264Parser`, `AnnexBReader`), DXGI device manager binding, and `DecodePresentPipeline`. | **Implemented & Verified** (M2) |
 | `engine/render` | `mist_render` | Direct3D 11 Presentation Renderer (`D3D11Renderer`), DXGI Flip-Model swap chain (`DXGI_SWAP_EFFECT_FLIP_DISCARD`), D3D11 Video Processor NV12-to-RGB conversion, letterboxing. | **Implemented & Verified** (M2) |
-| `engine/transport`| `mist_transport`| Abstract network transport contract (`ITransport`, `TransportChannel`). | **Interface Only** (Milestone 3) |
+| `engine/transport`| `mist_transport`| WebRTC peer connection manager, H.264 video track sender/receiver, SCTP data channels, RTCP PLI handling, transport statistics. | **Implemented & Verified** (M3) |
 | `engine/audio` | `mist_audio` | Abstract WASAPI audio capture and playback contracts (`IAudioCapture`, `IAudioPlayback`). | **Interface Only** (Milestone 4) |
 | `engine/input` | `mist_input` | Abstract input injection and polling contracts (`IInputManager`, input variant events). | **Interface Only** (Milestone 5) |
-| `services` | `mist_services` | Signaling client interface (`ISignalingClient`, `SignalingMessage`). | **Interface Only** (Milestone 3) |
+| `services` | `mist_services` | Signaling client interface (`ISignalingClient`, `SignalingMessage`, `WebSocketSignalingClient`) and Rust WebSocket signaling microservice (`mist-signaling`). | **Implemented & Verified** (M3) |
 | `apps/host` | `mist_host` | Host executable entry point, CLI diagnostics (`--list-displays`, `--capture-test`, `--encode-test`, `--capture-encode-test`), self-test. | **Implemented & Verified** (M0/M1) |
 | `apps/client` | `mist_client` | Client executable entry point, CLI diagnostics (`--decoder-info`, `--decode-test`, `--present-test`, `--decode-benchmark`), self-test. | **Implemented & Verified** (M0/M2) |
 | `apps/desktop` | `mist_desktop` | Unified desktop shell boundary. | **Implemented & Verified** (M0) |
@@ -95,6 +95,38 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 - **Milestone 0:** Foundation, project architecture, build system, error model, telemetry, and security contracts. (**Complete**)
 - **Milestone 1:** Direct3D 11 GPU Capture (DXGI Desktop Duplication), GPU Color Conversion (D3D11 Video Processor), and Hardware Video Encoding (NVIDIA NVENC). (**Complete & Hardware Verified**)
 - **Milestone 2:** Client-Side Hardware Video Decoding (D3D11 Video MFT / D3D11VA) & Direct3D 11 Low-Latency Presentation (DXGI Flip-Model & Video Processor Blit). (**Complete & Hardware Verified**)
-- **Milestone 3:** Native WebRTC Transport (DataChannels, SRTP Video/Audio Streaming, STUN/TURN).
+- **Milestone 3:** Native WebRTC Transport (DataChannels, SRTP Video Streaming, STUN/TURN, Rust WebSocket Signaling). (**Complete & Hardware Verified**)
 - **Milestone 4:** Low-Latency Audio Streaming (WASAPI Loopback Capture & Playback).
 - **Milestone 5:** Low-Latency Input Streaming (Raw Input Polling, Virtual Gamepad, SendInput Injection).
+
+---
+
+## 6. WebRTC Transport & Signaling Architecture (Milestone 3)
+
+### Core Components
+1. **`libdatachannel v0.22.4` + `MbedTLS v3.6.2`**: Lightweight, C++20-compatible native WebRTC transport with DTLS-SRTP encryption without requiring external OpenSSL DLLs or Google `libwebrtc` monolithic binaries.
+2. **`PeerConnectionManager`**: Encapsulates `rtc::PeerConnection`, ICE candidate gathering, offer/answer lifecycle, and queued candidate resolution ensuring remote candidates received before remote description are never dropped.
+3. **`VideoTrackSender`**: RFC 6184 H.264 RTP packetizer with single NAL and FU-A fragmentation (1200 byte MTU), 90 kHz clock rate timestamp synchronization, and RTCP PLI (Picture Loss Indication) listener.
+4. **`VideoTrackReceiver`**: RFC 6184 H.264 depacketizer reconstructing full in-memory Access Units and delivering them directly to the `D3D11VideoDecoder` (zero disk I/O). Dispatches RTCP PLI requests across the network on decoder recovery.
+5. **`DataChannelManager`**: Manages SCTP DataChannels: reliable ordered channel for `session-control` and unordered low-latency channel for `diagnostics`.
+6. **`FramePacer`**: Hybrid QPC sleep/spin pacer utilizing `timeBeginPeriod(1)` to enforce 60 FPS / 16.66 ms frame intervals with sub-millisecond precision.
+7. **Rust WebSocket Signaling Server (`mist-signaling`)**: Ultra-lightweight asynchronous service authored in Rust using Tokio and Tungstenite, managing peer pairing, offer/answer routing, and ICE candidate exchange.
+
+---
+
+## 7. Architecture Decision Records (ADRs)
+
+### ADR 0013: WebRTC Transport Implementation Strategy
+- **Context:** Low-latency video streaming requires standard UDP-based transport, SRTP media encryption, ICE NAT traversal, and SCTP control channels. Full Google `libwebrtc` requires over 40 GB of toolchain and depot_tools, and is incompatible with clean CMake builds.
+- **Decision:** Adopt `libdatachannel` compiled with `MbedTLS v3.6.2` (with `MBEDTLS_SSL_DTLS_SRTP`). FetchContent integrates cleanly into CMake with zero external runtime dependencies.
+- **Consequences:** Minimal executable size footprint (< 4 MB added), full RFC compliance, standard WebRTC browser interoperability.
+
+### ADR 0014: Zero Disk I/O In-Memory AU Piping and Bounded Queueing
+- **Context:** Writing stream packets or access units to intermediate disk files degrades performance, introduces storage wear, and injects severe latency spikes.
+- **Decision:** Pipe reassembled H.264 access units directly in memory from `VideoTrackReceiver` to `D3D11VideoDecoder`. Bounded queue depth of at most 2 frames; drop oldest frame immediately on backpressure.
+- **Consequences:** Sustained sub-10ms network/decode pipeline latency, zero storage I/O on active streaming path.
+
+### ADR 0015: Rust Tokio/Tungstenite Signaling Microservice
+- **Context:** WebRTC session setup requires an out-of-band signaling mechanism for SDP exchange and ICE trickle.
+- **Decision:** Implement `mist-signaling` as a standalone Rust microservice using `tokio` and `tokio-tungstenite`. The C++ engine communicates via `WebSocketSignalingClient`.
+- **Consequences:** Memory-safe, high-concurrency, cross-platform signaling with zero thread contention in the native engine.

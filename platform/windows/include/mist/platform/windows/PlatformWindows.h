@@ -31,4 +31,34 @@ private:
     int64_t startTime_{0};
 };
 
+// RAII wrapper around timeBeginPeriod / timeEndPeriod for sub-millisecond scheduling precision
+class ScopedTimerResolution {
+public:
+    explicit ScopedTimerResolution(uint32_t periodMs = 1) noexcept;
+    ~ScopedTimerResolution() noexcept;
+    ScopedTimerResolution(const ScopedTimerResolution&) = delete;
+    ScopedTimerResolution& operator=(const ScopedTimerResolution&) = delete;
+    ScopedTimerResolution(ScopedTimerResolution&& other) noexcept;
+    ScopedTimerResolution& operator=(ScopedTimerResolution&& other) noexcept;
+
+private:
+    uint32_t periodMs_{0};
+    bool active_{false};
+};
+
+// High-precision frame pacer combining coarse sleep with fine-grained QPC spin-wait
+class FramePacer {
+public:
+    explicit FramePacer(uint32_t targetFps) noexcept;
+    void reset() noexcept;
+    void waitNextFrame() noexcept;
+
+private:
+    uint32_t targetFps_{60};
+    int64_t intervalTicks_{0};
+    int64_t nextFrameTicks_{0};
+    int64_t frequency_{0};
+    ScopedTimerResolution timerRes_{1};
+};
+
 } // namespace mist::platform::windows

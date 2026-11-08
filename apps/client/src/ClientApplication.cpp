@@ -3,6 +3,8 @@
 #include "mist/decode/D3D11VideoDecoder.h"
 #include "mist/render/D3D11Renderer.h"
 #include "mist/platform/windows/PlatformWindows.h"
+#include "mist/transport/WebRtcTransport.h"
+#include "mist/services/WebSocketSignalingClient.h"
 #include <iostream>
 #include <fstream>
 #include <thread>
@@ -34,6 +36,13 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
                       << "  --decode-test             Run video decoding test on an H.264 bitstream\n"
                       << "  --present-test            Run Direct3D 11 presentation engine test\n"
                       << "  --decode-benchmark        Run full decoding benchmark and emit report\n\n"
+                      << "Milestone 3 WebRTC Diagnostics:\n"
+                      << "  --transport-info          Query client WebRTC transport capabilities\n"
+                      << "  --receive-test            Receive and decode real-time stream over WebRTC\n"
+                      << "  --stream-receive          Alias for --receive-test\n"
+                      << "    --signaling-url <url>   WebSocket signaling URL (default: ws://127.0.0.1:8080)\n"
+                      << "    --session-id <id>       Session identifier (default: mist-session-1)\n"
+                      << "    --auth-token <token>    Session authentication token (default: mist-dev-token)\n\n"
                       << "Diagnostic Parameters:\n"
                       << "  --input <path>            Input H.264 bitstream file (e.g. artifacts/test.h264)\n"
                       << "  --report <path>           Output benchmark JSON file path\n"
@@ -57,6 +66,18 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
             options_.mode = ClientCommandMode::PresentTest;
         } else if (arg == "--decode-benchmark") {
             options_.mode = ClientCommandMode::DecodeBenchmark;
+        } else if (arg == "--transport-info") {
+            options_.mode = ClientCommandMode::TransportInfo;
+        } else if (arg == "--receive-test") {
+            options_.mode = ClientCommandMode::ReceiveTest;
+        } else if (arg == "--stream-receive") {
+            options_.mode = ClientCommandMode::StreamReceive;
+        } else if (arg == "--signaling-url" && i + 1 < argc) {
+            options_.signalingUrl = argv[++i];
+        } else if (arg == "--session-id" && i + 1 < argc) {
+            options_.sessionId = argv[++i];
+        } else if (arg == "--auth-token" && i + 1 < argc) {
+            options_.authToken = argv[++i];
         } else if (arg == "--input") {
             if (i + 1 < argc) {
                 options_.inputPath = argv[++i];
@@ -127,6 +148,11 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
             return std::optional<int>(executePresentTest());
         case ClientCommandMode::DecodeBenchmark:
             return std::optional<int>(executeDecodeBenchmark());
+        case ClientCommandMode::TransportInfo:
+            return std::optional<int>(executeTransportInfo());
+        case ClientCommandMode::ReceiveTest:
+        case ClientCommandMode::StreamReceive:
+            return std::optional<int>(executeReceiveStream());
         case ClientCommandMode::SelfTest:
             return std::optional<int>(runSelfTest().hasValue() ? 0 : 1);
         case ClientCommandMode::Normal:
@@ -389,6 +415,172 @@ common::Result<void> ClientApplication::runSelfTest() {
 
     MIST_LOG_INFO(common::SubsystemId::ClientApp, "Self-test completed successfully.");
     return common::Result<void>::success();
+}
+
+int ClientApplication::executeTransportInfo() {
+    std::cout << "=== Mist WebRTC Transport Client Subsystem Info ===\n"
+              << "Transport Implementation: libdatachannel v0.22.4 (MbedTLS 3.6.2)\n"
+              << "Protocol Standard:        WebRTC (RFC 8829, RFC 8831)\n"
+              << "Video Codec:              H.264 (RFC 6184 RTP Depacketization)\n"
+              << "Video Clock Rate:         90000 Hz\n"
+              << "Zero Disk I/O Pipeline:   Enabled (Direct In-Memory AU to MFT Video Decoder)\n"
+              << "RTCP Feedback:            PLI (Picture Loss Indication) for Instant Keyframe Recovery\n"
+              << "Default STUN Server:      stun:stun.l.google.com:19302\n"
+              << "DataChannel Support:      session-control (reliable), diagnostics (unordered)\n"
+              << "Signaling Backend:        mist-signaling (Rust Tokio/Tungstenite)\n";
+    return 0;
+}
+
+int ClientApplication::executeReceiveStream() {
+    auto cap = decode::D3D11VideoDecoder::queryCapabilities();
+    if (!cap.supportsH264) {
+        std::cout << "[SKIP] Hardware H.264 video decoder unavailable.\n";
+        return 0;
+    }
+
+    decode::DecodeConfig decConfig{
+        .codec = encode::VideoCodec::H264,
+        .preferHardwareDecoding = true,
+        .lowLatencyTuning = true
+    };
+
+    decode::D3D11VideoDecoder decoder;
+    auto decInit = decoder.initialize(decConfig);
+    if (!decInit) {
+        std::cerr << "Video decoder initialization failed: " << decInit.error().format() << "\n";
+        return 1;
+    }
+
+    std::unique_ptr<render::D3D11Renderer> renderer;
+    if (!options_.headless) {
+        render::RenderConfig rndConfig{
+            .nativeWindowHandle = nullptr,
+            .width = options_.width,
+            .height = options_.height,
+            .vsync = options_.vsync,
+            .enableHdr = false,
+            .headless = false
+        };
+        renderer = std::make_unique<render::D3D11Renderer>();
+        auto rendInit = renderer->initialize(rndConfig);
+        if (!rendInit) {
+            std::cerr << "Renderer initialization failed: " << rendInit.error().format() << "\n";
+            return 1;
+        }
+    }
+
+    auto signaling = std::make_shared<services::WebSocketSignalingClient>();
+    transport::WebRtcTransportConfig rtcConfig{};
+    rtcConfig.isHost = false;
+    rtcConfig.sessionId = options_.sessionId;
+    rtcConfig.authToken = options_.authToken;
+    rtcConfig.signalingUrl = options_.signalingUrl;
+    rtcConfig.videoClockRate = 90000;
+
+    transport::WebRtcTransport rtcTransport;
+    auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signaling);
+    if (!rtcRes) {
+        std::cerr << "WebRTC transport init failed: " << rtcRes.error().format() << "\n";
+        return 1;
+    }
+
+    std::atomic<uint64_t> framesReceived{0};
+    std::atomic<uint64_t> framesDecoded{0};
+    std::atomic<uint64_t> framesPresented{0};
+    std::atomic<uint64_t> totalBytesReceived{0};
+
+    rtcTransport.setFrameReceivedCallback([&](const std::vector<uint8_t>& accessUnit, uint64_t timestampNs) {
+        framesReceived.fetch_add(1, std::memory_order_relaxed);
+        totalBytesReceived.fetch_add(accessUnit.size(), std::memory_order_relaxed);
+
+        encode::EncodedPacket packet{};
+        packet.data = accessUnit;
+        packet.timestampNs = timestampNs;
+
+        auto subRes = decoder.submitPacket(packet);
+        if (subRes) {
+            auto frameRes = decoder.getNextFrame();
+            if (frameRes) {
+                framesDecoded.fetch_add(1, std::memory_order_relaxed);
+                auto frame = frameRes.value();
+                if (renderer) {
+                    auto presRes = renderer->present(frame);
+                    if (presRes) {
+                        framesPresented.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
+                (void)decoder.releaseFrame(frame);
+            }
+        } else {
+            auto receiver = rtcTransport.getVideoReceiver();
+            if (receiver) {
+                receiver->requestKeyframe();
+            }
+        }
+    });
+
+    auto connRes = rtcTransport.connect();
+    if (!connRes) {
+        std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
+        return 1;
+    }
+
+    std::cout << "Client stream receive started for " << options_.durationSeconds
+              << "s (Session: " << options_.sessionId << ", Signaling: " << options_.signalingUrl
+              << (options_.headless ? ", Headless" : ", GUI Window") << ")...\n";
+
+    auto startTime = std::chrono::steady_clock::now();
+    while (true) {
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - startTime).count();
+        if (elapsed >= options_.durationSeconds) {
+            break;
+        }
+
+        if (renderer && renderer->getHwnd()) {
+            MSG msg{};
+            while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+
+    auto actualDuration = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
+    uint64_t rec = framesReceived.load();
+    uint64_t dec = framesDecoded.load();
+    uint64_t rnd = framesPresented.load();
+    double fps = actualDuration > 0.0 ? static_cast<double>(dec) / actualDuration : 0.0;
+    double bitrateMbps = actualDuration > 0.0 ? ((static_cast<double>(totalBytesReceived.load()) * 8.0) / (actualDuration * 1000000.0)) : 0.0;
+
+    auto stats = rtcTransport.getStatsSnapshot();
+
+    std::cout << "=== Client Streaming Results ===\n"
+              << "Duration:        " << actualDuration << " s\n"
+              << "Frames Received: " << rec << "\n"
+              << "Frames Decoded:  " << dec << " (" << fps << " FPS)\n"
+              << "Frames Presented:" << rnd << "\n"
+              << "Bitrate:         " << bitrateMbps << " Mbps\n"
+              << "Packets Recv:    " << stats.packetsReceived << "\n"
+              << "Bytes Recv:      " << stats.bytesReceived << "\n";
+
+    if (!options_.reportPath.empty()) {
+        std::ofstream rep(options_.reportPath);
+        if (rep.is_open()) {
+            rep << "{\n"
+                << "  \"duration_sec\": " << actualDuration << ",\n"
+                << "  \"frames_received\": " << rec << ",\n"
+                << "  \"frames_decoded\": " << dec << ",\n"
+                << "  \"frames_presented\": " << rnd << ",\n"
+                << "  \"achieved_fps\": " << fps << ",\n"
+                << "  \"bitrate_mbps\": " << bitrateMbps << ",\n"
+                << "  \"packets_received\": " << stats.packetsReceived << ",\n"
+                << "  \"bytes_received\": " << stats.bytesReceived << "\n"
+                << "}\n";
+        }
+    }
+    return 0;
 }
 
 int ClientApplication::run() {

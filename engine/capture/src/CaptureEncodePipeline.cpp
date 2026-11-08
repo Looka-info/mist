@@ -237,6 +237,7 @@ common::Result<PipelineReport> CaptureEncodePipeline::runForDuration(
 
 void CaptureEncodePipeline::captureWorker() {
     platform::windows::HighResolutionTimer qpc;
+    platform::windows::FramePacer pacer(capConfig_.targetFps > 0 ? capConfig_.targetFps : 60);
     uint64_t frameSeq = 0;
 
     const uint32_t frameIntervalMs = 1000 / capConfig_.targetFps;
@@ -249,7 +250,7 @@ void CaptureEncodePipeline::captureWorker() {
                              : common::Error(common::SubsystemId::Capture, common::ErrorCode::NotInitialized, "No capture source"));
 
         if (syntheticGen_) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(frameIntervalMs));
+            pacer.waitNextFrame();
         }
 
         if (!frameRes) {
@@ -347,7 +348,17 @@ void CaptureEncodePipeline::encodeWorker(const std::string& outputH264Path) {
             if (bitstreamFile.is_open() && !packet.data.empty()) {
                 bitstreamFile.write(reinterpret_cast<const char*>(packet.data.data()), static_cast<std::streamsize>(packet.data.size()));
             }
+
+            if (packetCb_ && !packet.data.empty()) {
+                packetCb_(packet);
+            }
         }
+    }
+}
+
+void CaptureEncodePipeline::requestKeyframe() noexcept {
+    if (encoder_) {
+        (void)encoder_->requestKeyframe();
     }
 }
 

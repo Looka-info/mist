@@ -5,6 +5,7 @@
 #include "ColorConverter.h"
 #include "mist/encode/NvencVideoEncoder.h"
 #include "mist/telemetry/Metrics.h"
+#include <functional>
 #include <thread>
 #include <atomic>
 #include <condition_variable>
@@ -61,9 +62,15 @@ public:
     [[nodiscard]] PipelineReport generateReport() const;
     [[nodiscard]] bool isRunning() const noexcept { return isRunning_.load(); }
 
+    using EncodedPacketCallback = std::function<void(const encode::EncodedPacket&)>;
+    void setEncodedPacketCallback(EncodedPacketCallback cb) { packetCb_ = std::move(cb); }
+    void requestKeyframe() noexcept;
+
 private:
     void captureWorker();
     void encodeWorker(const std::string& outputH264Path);
+
+    EncodedPacketCallback packetCb_;
 
     capture::CaptureConfig capConfig_;
     encode::EncodeConfig encConfig_;

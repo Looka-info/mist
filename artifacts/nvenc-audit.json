@@ -1,0 +1,12 @@
+{
+  "gpu_name": "NVIDIA GeForce GTX 1660 SUPER",
+  "driver_version": "0.1714",
+  "loaded_dll_path": "C:\\WINDOWS\\SYSTEM32\\nvEncodeAPI64.dll",
+  "loaded_dll_version": "32.0.16.1714",
+  "compile_time_api": "13.1",
+  "runtime_max_api": "13.1",
+  "session_status": "SUCCESS (NV_ENC_SUCCESS)",
+  "is_compatible": true,
+  "selected_codec": "H.264 (NV_ENC_CODEC_H264_GUID)",
+  "input_format": "NV12 (Hardware Optimized)"
+}

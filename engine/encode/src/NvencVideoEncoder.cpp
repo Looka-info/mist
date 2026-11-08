@@ -5,11 +5,14 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <winver.h>
+#include <dxgi.h>
 #endif
 
 #if defined(MIST_HAS_NVENC_SDK) && defined(_WIN32)
 #include "nvEncodeAPI.h"
 typedef NVENCSTATUS(NVENCAPI* PNVENCODEAPICREATEINSTANCE)(NV_ENCODE_API_FUNCTION_LIST*);
+typedef NVENCSTATUS(NVENCAPI* PNVENCODEAPIGETMAXSUPPORTEDVERSION)(uint32_t*);
 #endif
 
 namespace mist::encode {
@@ -165,6 +168,135 @@ NvencCapability NvencVideoEncoder::queryCapabilities(ID3D11Device* device) noexc
     g_nvenc.nvEncDestroyEncoder(session);
 #endif
     return cap;
+}
+
+NvencRuntimeAudit NvencVideoEncoder::queryRuntimeAudit(ID3D11Device* device) noexcept {
+    NvencRuntimeAudit audit{};
+#if defined(MIST_HAS_NVENC_SDK) && defined(_WIN32)
+    audit.compileTimeMajor = NVENCAPI_MAJOR_VERSION;
+    audit.compileTimeMinor = NVENCAPI_MINOR_VERSION;
+
+    auto loadRes = ensureNvencLoaded();
+    if (!loadRes) {
+        audit.sessionInitStatus = "DRIVER_UNAVAILABLE: " + loadRes.error().message();
+        return audit;
+    }
+
+    if (g_hNvencDll) {
+        char pathBuf[MAX_PATH] = {0};
+        if (GetModuleFileNameA(g_hNvencDll, pathBuf, MAX_PATH) > 0) {
+            audit.dllPath = pathBuf;
+            DWORD dummy = 0;
+            DWORD verSize = GetFileVersionInfoSizeA(pathBuf, &dummy);
+            if (verSize > 0) {
+                std::vector<uint8_t> verData(verSize);
+                if (GetFileVersionInfoA(pathBuf, 0, verSize, verData.data())) {
+                    VS_FIXEDFILEINFO* fInfo = nullptr;
+                    UINT fLen = 0;
+                    if (VerQueryValueA(verData.data(), "\\", reinterpret_cast<LPVOID*>(&fInfo), &fLen) && fInfo) {
+                        uint32_t ms = fInfo->dwFileVersionMS;
+                        uint32_t ls = fInfo->dwFileVersionLS;
+                        audit.dllFileVersion = std::to_string(HIWORD(ms)) + "." +
+                                               std::to_string(LOWORD(ms)) + "." +
+                                               std::to_string(HIWORD(ls)) + "." +
+                                               std::to_string(LOWORD(ls));
+                        // NVIDIA driver version is typically reported as LOWORD(ms).LOWORD(ls)
+                        audit.driverVersion = std::to_string(LOWORD(ms)) + "." + std::to_string(LOWORD(ls));
+                    }
+                }
+            }
+        }
+
+        auto getMaxVersion = reinterpret_cast<PNVENCODEAPIGETMAXSUPPORTEDVERSION>(
+            reinterpret_cast<void*>(GetProcAddress(g_hNvencDll, "NvEncodeAPIGetMaxSupportedVersion"))
+        );
+        if (getMaxVersion) {
+            uint32_t maxVer = 0;
+            if (getMaxVersion(&maxVer) == NV_ENC_SUCCESS) {
+                audit.runtimeMaxMajor = (maxVer >> 4);
+                audit.runtimeMaxMinor = (maxVer & 0xF);
+            }
+        }
+    }
+
+    Microsoft::WRL::ComPtr<ID3D11Device> localDevice;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> localContext;
+    if (!device) {
+        auto devRes = platform::windows::D3D11DeviceManager::createDevice(0);
+        if (devRes) {
+            localDevice = devRes.value().first;
+            device = localDevice.Get();
+        }
+    }
+
+    if (device) {
+        Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
+        if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&dxgiDevice)))) {
+            Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+            if (SUCCEEDED(dxgiDevice->GetAdapter(&adapter))) {
+                DXGI_ADAPTER_DESC desc{};
+                if (SUCCEEDED(adapter->GetDesc(&desc))) {
+                    audit.isNvidiaGpu = (desc.VendorId == 0x10DE);
+                    char nameBuf[256] = {0};
+                    WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, nameBuf, sizeof(nameBuf), nullptr, nullptr);
+                    audit.gpuName = nameBuf;
+                }
+            }
+        }
+
+        // Test actual session initialization
+        NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS openParams{};
+        openParams.version = NV_ENC_OPEN_ENCODE_SESSION_EX_PARAMS_VER;
+        openParams.deviceType = NV_ENC_DEVICE_TYPE_DIRECTX;
+        openParams.device = device;
+        openParams.apiVersion = NVENCAPI_VERSION;
+
+        void* session = nullptr;
+        NVENCSTATUS status = g_nvenc.nvEncOpenEncodeSessionEx(&openParams, &session);
+        if (status == NV_ENC_SUCCESS && session) {
+            audit.sessionInitStatus = "SUCCESS (NV_ENC_SUCCESS)";
+
+            // Check H.264
+            uint32_t profileCount = 0;
+            if (g_nvenc.nvEncGetEncodeProfileGUIDCount(session, NV_ENC_CODEC_H264_GUID, &profileCount) == NV_ENC_SUCCESS && profileCount > 0) {
+                audit.supportsH264 = true;
+                audit.selectedCodec = "H.264 (NV_ENC_CODEC_H264_GUID)";
+            }
+            // Check HEVC
+            uint32_t hevcCount = 0;
+            if (g_nvenc.nvEncGetEncodeProfileGUIDCount(session, NV_ENC_CODEC_HEVC_GUID, &hevcCount) == NV_ENC_SUCCESS && hevcCount > 0) {
+                audit.supportsHevc = true;
+            }
+            // Check NV12 input
+            uint32_t formatCount = 0;
+            if (g_nvenc.nvEncGetInputFormatCount(session, NV_ENC_CODEC_H264_GUID, &formatCount) == NV_ENC_SUCCESS && formatCount > 0) {
+                std::vector<NV_ENC_BUFFER_FORMAT> formats(formatCount);
+                uint32_t formatsFilled = 0;
+                if (g_nvenc.nvEncGetInputFormats(session, NV_ENC_CODEC_H264_GUID, formats.data(), formatCount, &formatsFilled) == NV_ENC_SUCCESS) {
+                    for (uint32_t i = 0; i < formatsFilled; ++i) {
+                        if (formats[i] == NV_ENC_BUFFER_FORMAT_NV12) {
+                            audit.selectedInputFormat = "NV12 (Hardware Optimized)";
+                            break;
+                        }
+                    }
+                }
+            }
+            g_nvenc.nvEncDestroyEncoder(session);
+        } else {
+            audit.sessionInitStatus = "FAILED (" + std::to_string(status) + ")";
+        }
+    } else {
+        audit.sessionInitStatus = "D3D11_DEVICE_UNAVAILABLE";
+    }
+
+    audit.isCompatible = (audit.runtimeMaxMajor > audit.compileTimeMajor) ||
+                         (audit.runtimeMaxMajor == audit.compileTimeMajor && audit.runtimeMaxMinor >= audit.compileTimeMinor);
+
+    audit.details = "Compile: " + std::to_string(audit.compileTimeMajor) + "." + std::to_string(audit.compileTimeMinor) +
+                    ", RuntimeMax: " + std::to_string(audit.runtimeMaxMajor) + "." + std::to_string(audit.runtimeMaxMinor) +
+                    ", Status: " + (audit.isCompatible ? "COMPATIBLE" : "INCOMPATIBLE");
+#endif
+    return audit;
 }
 
 #if defined(_WIN32)

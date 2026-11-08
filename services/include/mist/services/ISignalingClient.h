@@ -11,7 +11,9 @@ enum class SignalingMessageType : uint8_t {
     Offer = 0,
     Answer,
     IceCandidate,
-    Disconnect
+    Disconnect,
+    PeerJoined,
+    Registered
 };
 
 struct SignalingMessage {

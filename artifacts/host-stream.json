@@ -1,0 +1,10 @@
+{
+  "hardware_gpu": "NVIDIA GeForce GTX 1660 SUPER",
+  "duration_sec": 10,
+  "frames_encoded": 607,
+  "frames_dropped": 0,
+  "actual_fps": 59.8232,
+  "bitrate_kbps": 1846.06,
+  "packets_sent": 607,
+  "bytes_sent": 2341395
+}

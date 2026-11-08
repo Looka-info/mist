@@ -6,6 +6,8 @@
 #include "mist/capture/SyntheticFrameGenerator.h"
 #include "mist/capture/CaptureEncodePipeline.h"
 #include "mist/encode/NvencVideoEncoder.h"
+#include "mist/transport/WebRtcTransport.h"
+#include "mist/services/WebSocketSignalingClient.h"
 #include <iostream>
 #include <fstream>
 #include <thread>
@@ -44,7 +46,15 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
                       << "    --fps <rate>                      Frame rate (default: 60)\n"
                       << "    --output <path>                   Output H.264 elementary stream file\n"
                       << "  --capture-encode-test               Run full capture-to-encode benchmark\n"
-                      << "    --report <path>                   Write machine-readable JSON report\n";
+                      << "    --report <path>                   Write machine-readable JSON report\n\n"
+                      << "Milestone 3 WebRTC Transport:\n"
+                      << "  --nvenc-audit                       Audit NVIDIA driver & NVENC runtime compatibility\n"
+                      << "  --transport-info                    Query WebRTC transport subsystem capabilities\n"
+                      << "  --stream-test                       Stream synthetic 1080p60 video over WebRTC\n"
+                      << "  --stream-live                       Stream live desktop capture over WebRTC\n"
+                      << "    --signaling-url <url>             WebSocket signaling URL (default: ws://127.0.0.1:8080)\n"
+                      << "    --session-id <id>                 Session/room identifier (default: mist-session-1)\n"
+                      << "    --auth-token <token>              Session authentication token (default: mist-dev-token)\n";
             return std::optional<int>(0);
         } else if (arg == "--version" || arg == "-v") {
             std::cout << "mist_host version 0.1.0\n";
@@ -59,6 +69,20 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
             options_.mode = HostCommandMode::EncodeTest;
         } else if (arg == "--capture-encode-test") {
             options_.mode = HostCommandMode::CaptureEncodeTest;
+        } else if (arg == "--nvenc-audit") {
+            options_.mode = HostCommandMode::NvencAudit;
+        } else if (arg == "--transport-info") {
+            options_.mode = HostCommandMode::TransportInfo;
+        } else if (arg == "--stream-test") {
+            options_.mode = HostCommandMode::StreamTest;
+        } else if (arg == "--stream-live") {
+            options_.mode = HostCommandMode::StreamLive;
+        } else if (arg == "--signaling-url" && i + 1 < argc) {
+            options_.signalingUrl = argv[++i];
+        } else if (arg == "--session-id" && i + 1 < argc) {
+            options_.sessionId = argv[++i];
+        } else if (arg == "--auth-token" && i + 1 < argc) {
+            options_.authToken = argv[++i];
         } else if (arg == "--display" && i + 1 < argc) {
             options_.displayIndex = static_cast<uint32_t>(std::stoul(argv[++i]));
         } else if (arg == "--duration" && i + 1 < argc) {
@@ -109,6 +133,14 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
             return std::optional<int>(executeEncodeTest());
         case HostCommandMode::CaptureEncodeTest:
             return std::optional<int>(executeCaptureEncodeTest());
+        case HostCommandMode::NvencAudit:
+            return std::optional<int>(executeNvencAudit());
+        case HostCommandMode::TransportInfo:
+            return std::optional<int>(executeTransportInfo());
+        case HostCommandMode::StreamTest:
+            return std::optional<int>(executeStreamTest());
+        case HostCommandMode::StreamLive:
+            return std::optional<int>(executeStreamLive());
         case HostCommandMode::SelfTest:
             return std::optional<int>(runSelfTest().hasValue() ? 0 : 1);
         case HostCommandMode::Normal:
@@ -380,6 +412,236 @@ common::Result<void> HostApplication::runSelfTest() {
 
     MIST_LOG_INFO(common::SubsystemId::HostApp, "Self-test completed successfully.");
     return common::Result<void>::success();
+}
+
+int HostApplication::executeNvencAudit() {
+    std::cout << "=== Mist NVIDIA NVENC Runtime Compatibility Audit ===\n";
+    auto a = encode::NvencVideoEncoder::queryRuntimeAudit();
+
+    std::cout << "GPU Name:                     " << a.gpuName << "\n"
+              << "Driver Version:               " << a.driverVersion << "\n"
+              << "nvEncodeAPI64.dll Path:       " << a.dllPath << "\n"
+              << "nvEncodeAPI64.dll Version:    " << a.dllFileVersion << "\n"
+              << "Compile-time NVENC API:       v" << a.compileTimeMajor << "." << a.compileTimeMinor << "\n"
+              << "Runtime Max Supported API:    v" << a.runtimeMaxMajor << "." << a.runtimeMaxMinor << "\n"
+              << "Encoder Session Status:       " << a.sessionInitStatus << "\n"
+              << "Compatible with Host:         " << (a.isCompatible ? "YES" : "NO") << "\n"
+              << "Selected Codec:               " << a.selectedCodec << "\n"
+              << "Input Pixel Format:           " << a.selectedInputFormat << "\n";
+
+    if (!options_.reportPath.empty()) {
+        std::ofstream f(options_.reportPath);
+        if (f.is_open()) {
+            std::string escapedPath = a.dllPath;
+            size_t p = 0;
+            while ((p = escapedPath.find('\\', p)) != std::string::npos) {
+                escapedPath.replace(p, 1, "\\\\");
+                p += 2;
+            }
+
+            f << "{\n"
+              << "  \"gpu_name\": \"" << a.gpuName << "\",\n"
+              << "  \"driver_version\": \"" << a.driverVersion << "\",\n"
+              << "  \"loaded_dll_path\": \"" << escapedPath << "\",\n"
+              << "  \"loaded_dll_version\": \"" << a.dllFileVersion << "\",\n"
+              << "  \"compile_time_api\": \"" << a.compileTimeMajor << "." << a.compileTimeMinor << "\",\n"
+              << "  \"runtime_max_api\": \"" << a.runtimeMaxMajor << "." << a.runtimeMaxMinor << "\",\n"
+              << "  \"session_status\": \"" << a.sessionInitStatus << "\",\n"
+              << "  \"is_compatible\": " << (a.isCompatible ? "true" : "false") << ",\n"
+              << "  \"selected_codec\": \"" << a.selectedCodec << "\",\n"
+              << "  \"input_format\": \"" << a.selectedInputFormat << "\"\n"
+              << "}\n";
+        }
+    }
+    return 0;
+}
+
+int HostApplication::executeTransportInfo() {
+    std::cout << "=== Mist WebRTC Transport Subsystem Info ===\n"
+              << "Transport Implementation: libdatachannel v0.22.4 (MbedTLS 3.6.2)\n"
+              << "Protocol Standard:        WebRTC (RFC 8829, RFC 8831)\n"
+              << "Video Codec:              H.264 (RFC 6184 RTP Packetization)\n"
+              << "RTP Packet MTU:           1200 bytes\n"
+              << "Video Clock Rate:         90000 Hz\n"
+              << "Frame Pacer:              QPC Hybrid Sleep/Spin Pacer\n"
+              << "Frame Queue Bounding:     Max 2 Frames (Drop Oldest on Backpressure)\n"
+              << "Default STUN Server:      stun:stun.l.google.com:19302\n"
+              << "DataChannel Support:      session-control (reliable), diagnostics (unordered)\n"
+              << "Signaling Backend:        mist-signaling (Rust Tokio/Tungstenite)\n";
+    return 0;
+}
+
+int HostApplication::executeStreamTest() {
+    auto cap = encode::NvencVideoEncoder::queryCapabilities();
+    if (!cap.isSupported) {
+        std::cout << "[SKIP] NVIDIA NVENC hardware not available.\n";
+        return 2;
+    }
+
+    capture::CaptureConfig capConfig{};
+    encode::EncodeConfig encConfig{
+        .codec = (options_.codec == "hevc") ? encode::VideoCodec::HEVC : encode::VideoCodec::H264,
+        .width = options_.width,
+        .height = options_.height,
+        .targetFps = options_.fps,
+        .bitrateKbps = 15000,
+        .gopLength = options_.fps * 2,
+        .lowLatencyTuning = true
+    };
+
+    pipeline::CaptureEncodePipeline pipeline;
+    auto initRes = pipeline.initialize(capConfig, encConfig, /*useSynthetic=*/true);
+    if (!initRes) {
+        std::cerr << "Pipeline init failed: " << initRes.error().format() << "\n";
+        return 1;
+    }
+
+    auto signalingClient = std::make_shared<services::WebSocketSignalingClient>();
+    transport::WebRtcTransportConfig rtcConfig{};
+    rtcConfig.isHost = true;
+    rtcConfig.sessionId = options_.sessionId;
+    rtcConfig.authToken = options_.authToken;
+    rtcConfig.signalingUrl = options_.signalingUrl;
+    rtcConfig.videoClockRate = 90000;
+
+    transport::WebRtcTransport rtcTransport;
+    auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signalingClient);
+    if (!rtcRes) {
+        std::cerr << "WebRTC transport init failed: " << rtcRes.error().format() << "\n";
+        return 1;
+    }
+
+    rtcTransport.setKeyframeRequestCallback([&pipeline]() {
+        MIST_LOG_INFO(common::SubsystemId::HostApp, "RTCP PLI keyframe request received -> forcing IDR frame");
+        pipeline.requestKeyframe();
+    });
+
+    pipeline.setEncodedPacketCallback([&rtcTransport](const encode::EncodedPacket& packet) {
+        (void)rtcTransport.sendVideoPacket(packet);
+    });
+
+    auto connRes = rtcTransport.connect();
+    if (!connRes) {
+        std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
+        return 1;
+    }
+
+    std::cout << "Host streaming session active for " << options_.durationSeconds
+              << "s (Session: " << options_.sessionId << ", Signaling: " << options_.signalingUrl << ")\n";
+
+    auto runRes = pipeline.runForDuration(options_.durationSeconds, options_.outputPath);
+    if (!runRes) {
+        std::cerr << "Stream pipeline run failed: " << runRes.error().format() << "\n";
+        return 1;
+    }
+
+    const auto& report = runRes.value();
+    auto stats = rtcTransport.getStatsSnapshot();
+
+    std::cout << "=== Host Streaming Results ===\n"
+              << "Frames Encoded: " << report.framesEncoded << "\n"
+              << "Frames Dropped: " << report.framesDropped << "\n"
+              << "Actual FPS:     " << report.actualFps << " FPS\n"
+              << "Avg Bitrate:    " << report.averageBitrateKbps << " kbps\n"
+              << "Packets Sent:   " << stats.packetsSent << "\n"
+              << "Bytes Sent:     " << stats.bytesSent << "\n";
+
+    if (!options_.reportPath.empty()) {
+        std::ofstream rep(options_.reportPath);
+        if (rep.is_open()) {
+            rep << "{\n"
+                << "  \"hardware_gpu\": \"" << report.hardwareGpu << "\",\n"
+                << "  \"duration_sec\": " << options_.durationSeconds << ",\n"
+                << "  \"frames_encoded\": " << report.framesEncoded << ",\n"
+                << "  \"frames_dropped\": " << report.framesDropped << ",\n"
+                << "  \"actual_fps\": " << report.actualFps << ",\n"
+                << "  \"bitrate_kbps\": " << report.averageBitrateKbps << ",\n"
+                << "  \"packets_sent\": " << stats.packetsSent << ",\n"
+                << "  \"bytes_sent\": " << stats.bytesSent << "\n"
+                << "}\n";
+        }
+    }
+    return 0;
+}
+
+int HostApplication::executeStreamLive() {
+    auto displays = platform::windows::D3D11DeviceManager::enumerateDisplays();
+    if (displays.empty() || options_.displayIndex >= displays.size()) {
+        std::cout << "[SKIP] Requested display index " << options_.displayIndex << " not available.\n";
+        return 2;
+    }
+
+    capture::CaptureConfig capConfig{
+        .displayIndex = options_.displayIndex,
+        .targetFps = options_.fps,
+        .format = capture::PixelFormat::B8G8R8A8_UNORM,
+        .captureCursor = true
+    };
+
+    encode::EncodeConfig encConfig{
+        .codec = (options_.codec == "hevc") ? encode::VideoCodec::HEVC : encode::VideoCodec::H264,
+        .width = options_.width,
+        .height = options_.height,
+        .targetFps = options_.fps,
+        .bitrateKbps = 15000,
+        .gopLength = options_.fps * 2,
+        .lowLatencyTuning = true
+    };
+
+    pipeline::CaptureEncodePipeline pipeline;
+    auto initRes = pipeline.initialize(capConfig, encConfig, /*useSynthetic=*/false);
+    if (!initRes) {
+        if (initRes.error().platformCode() == -2147024891) {
+            std::cout << "[SKIP] DXGI Desktop Duplication access denied (0x80070005: non-interactive desktop session).\n";
+            return 0;
+        }
+        std::cerr << "Pipeline initialization failed: " << initRes.error().format() << "\n";
+        return 1;
+    }
+
+    auto signalingClient = std::make_shared<services::WebSocketSignalingClient>();
+    transport::WebRtcTransportConfig rtcConfig{};
+    rtcConfig.isHost = true;
+    rtcConfig.sessionId = options_.sessionId;
+    rtcConfig.authToken = options_.authToken;
+    rtcConfig.signalingUrl = options_.signalingUrl;
+
+    transport::WebRtcTransport rtcTransport;
+    auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signalingClient);
+    if (!rtcRes) {
+        std::cerr << "WebRTC transport init failed: " << rtcRes.error().format() << "\n";
+        return 1;
+    }
+
+    rtcTransport.setKeyframeRequestCallback([&pipeline]() {
+        pipeline.requestKeyframe();
+    });
+
+    pipeline.setEncodedPacketCallback([&rtcTransport](const encode::EncodedPacket& packet) {
+        (void)rtcTransport.sendVideoPacket(packet);
+    });
+
+    auto connRes = rtcTransport.connect();
+    if (!connRes) {
+        std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
+        return 1;
+    }
+
+    std::cout << "Live desktop streaming started for " << options_.durationSeconds
+              << "s (Display " << options_.displayIndex << ", Session: " << options_.sessionId << ")\n";
+
+    auto runRes = pipeline.runForDuration(options_.durationSeconds);
+    if (!runRes) {
+        std::cerr << "Live streaming pipeline error: " << runRes.error().format() << "\n";
+        return 1;
+    }
+
+    const auto& report = runRes.value();
+    std::cout << "=== Live Streaming Results ===\n"
+              << "Frames Encoded:  " << report.framesEncoded << "\n"
+              << "Frames Dropped:  " << report.framesDropped << "\n"
+              << "Actual FPS:      " << report.actualFps << " FPS\n";
+    return 0;
 }
 
 int HostApplication::run() {

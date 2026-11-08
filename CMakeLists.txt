@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
 
+# Ensure legacy third-party dependencies with cmake_minimum_required < 3.5 configure on CMake 4.x+
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
+
 project(Mist
     VERSION 0.1.0
     DESCRIPTION "High-performance native Windows game-streaming platform"

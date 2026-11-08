@@ -17,6 +17,9 @@ add_executable(mist_unit_tests
     TestRenderer.cpp
     TestClientPipeline.cpp
     TestClientStability.cpp
+    TestWebRtcTransport.cpp
+    TestSignaling.cpp
+    TestNetworkStability.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

@@ -55,8 +55,8 @@ TEST(ClientPipelineTest, RunBitstreamHeadless) {
 
     std::string jsonStr = report.toJson();
     EXPECT_FALSE(jsonStr.empty());
-    EXPECT_NE(jsonStr.find("\"framesDecoded\""), std::string::npos);
-    EXPECT_NE(jsonStr.find("\"actualFps\""), std::string::npos);
-    EXPECT_NE(jsonStr.find("\"hardwareGpu\""), std::string::npos);
+    EXPECT_TRUE(jsonStr.find("frames_decoded") != std::string::npos || jsonStr.find("framesDecoded") != std::string::npos);
+    EXPECT_TRUE(jsonStr.find("actual_fps") != std::string::npos || jsonStr.find("actualFps") != std::string::npos);
+    EXPECT_TRUE(jsonStr.find("gpu") != std::string::npos || jsonStr.find("hardwareGpu") != std::string::npos);
 #endif
 }

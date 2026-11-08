@@ -34,6 +34,9 @@ Mist employs a multi-tiered automated testing strategy:
 | `RendererTest` | `TestRenderer.cpp` | `D3D11Renderer` headless initialization, synthetic frame presentation, dynamic viewport resize, vsync toggle, clean shutdown. |
 | `ClientPipelineTest` | `TestClientPipeline.cpp` | End-to-end paced decode and present pipeline on test bitstream, non-zero FPS, JSON report generation. |
 | `ClientStabilityTest` | `TestClientStability.cpp` | Repeated decoder, renderer, and client pipeline creation/teardown (5 iterations each) without GPU resource leaks. |
+| `TestWebRtcTransport` | `TestWebRtcTransport.cpp` | WebRTC transport configuration, statistics tracking, dual peer initialization, in-process direct loopback ICE negotiation, H.264 RTP packetization, and RTCP PLI keyframe request. |
+| `TestSignaling` | `TestSignaling.cpp` | Signaling message type encoding/decoding, session registration payloads, message serialization. |
+| `TestNetworkStability` | `TestNetworkStability.cpp` | Repeated WebRTC transport open/close cycles (3 iterations), frame queue backpressure drop policy (oldest dropped), lock-free statistics accumulation. |
 
 ### 2.2 Smoke Tests (CTest)
 
@@ -51,9 +54,29 @@ Mist employs a multi-tiered automated testing strategy:
 
 ## 3. Running Tests
 
+### Automated Milestone 3 Verification Suite
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-milestone-3.ps1 -BenchmarkSeconds 10
+```
+
 ### Automated Milestone 2 Verification Suite
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\verify-milestone-2.ps1
+```
+
+### Milestone 3 WebRTC CLI Diagnostic Commands
+```powershell
+# Query NVIDIA NVENC runtime driver & SDK 13.1 compatibility audit
+./build/apps/host/mist_host.exe --nvenc-audit --report artifacts/nvenc-audit.json
+
+# Query WebRTC transport capabilities
+./build/apps/host/mist_host.exe --transport-info
+./build/apps/client/mist_client.exe --transport-info
+
+# Run live WebRTC streaming session (1080p60 over signaling)
+./bin/mist-signaling.exe --port 8080
+./build/apps/client/mist_client.exe --receive-test --signaling-url ws://127.0.0.1:8080 --session-id m3-test --duration 10 --headless --report artifacts/client-stream.json
+./build/apps/host/mist_host.exe --stream-test --signaling-url ws://127.0.0.1:8080 --session-id m3-test --duration 10 --report artifacts/host-stream.json
 ```
 
 ### Client CLI Diagnostic Commands

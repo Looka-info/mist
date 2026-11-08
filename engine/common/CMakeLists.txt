@@ -9,6 +9,6 @@ target_include_directories(mist_common PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(mist_common PUBLIC
+target_link_libraries(mist_common PRIVATE
     mist_warnings
 )

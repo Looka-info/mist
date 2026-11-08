@@ -31,6 +31,16 @@ Mist handles desktop capture, input injection, and low-latency network streaming
   - *Mitigation:* Decoded frame queue is strictly bounded to a maximum of 2 pending frames. When downstream presentation lags, the oldest frame is dropped immediately, guaranteeing that unpresented textures are returned to the hardware decoder's allocator.
 - **Host / Client VRAM Isolation:** Direct3D 11 device contexts are private to each client process. Zero-copy hardware decoded DXGI surfaces are managed via `IMFDXGIDeviceManager` within the local GPU memory boundary without arbitrary memory exposure.
 
+### 2.4 WebRTC Transport & Signaling Attack Surfaces (Milestone 3)
+- **Man-in-the-Middle (MitM) & Media Eavesdropping:** Unauthorized packet inspection or tampering on public network paths.
+  - *Mitigation:* WebRTC mandates DTLS 1.2+ for key exchange and SRTP (AES-GCM / AES-CTR) for media encryption. Ephemeral ECDSA (P-256) certificates are generated per session. Fingerprints are exchanged out-of-band via signaling and verified prior to DTLS handshake completion.
+- **Signaling Hijacking & Unauthorized Registration:** Malicious clients registering to unassigned or arbitrary session IDs.
+  - *Mitigation:* `mist-signaling` verifies non-empty bearer tokens on all registration requests. Sessions are strictly scoped to pairs of exactly one `host` and one `client`. Role collisions or unauthorized peer registrations are immediately rejected with WebSocket close code 4003 (`Unauthorized`).
+- **Memory Bomb / RTP Packet Fragmentation Flooding:** Flooding the depacketizer with unbounded FU-A fragments.
+  - *Mitigation:* `VideoTrackReceiver` enforces maximum buffer size limits and drops corrupted or incomplete NALUs upon sequence number discontinuity.
+- **DLL Preloading / Hijacking Prevention:** Third-party cryptographic libraries dynamically loading vulnerable system DLLs.
+  - *Mitigation:* `MbedTLS v3.6.2` is compiled statically directly into `mist_transport` with `MBEDTLS_SSL_DTLS_SRTP`. No dynamic OpenSSL DLLs are loaded at runtime.
+
 ---
 
 ## 3. Cryptographic & Device Authorization Requirements

@@ -15,7 +15,10 @@ enum class ClientCommandMode {
     DecodeTest,
     PresentTest,
     DecodeBenchmark,
-    SelfTest
+    SelfTest,
+    TransportInfo,
+    ReceiveTest,
+    StreamReceive
 };
 
 struct ClientCliOptions {
@@ -23,6 +26,9 @@ struct ClientCliOptions {
     std::string configPath;
     std::string inputPath;
     std::string reportPath;
+    std::string signalingUrl{"ws://127.0.0.1:8080"};
+    std::string sessionId{"mist-session-1"};
+    std::string authToken{"mist-dev-token"};
     uint32_t width{1920};
     uint32_t height{1080};
     uint32_t fps{60};
@@ -49,6 +55,8 @@ private:
     [[nodiscard]] int executeDecodeTest();
     [[nodiscard]] int executePresentTest();
     [[nodiscard]] int executeDecodeBenchmark();
+    [[nodiscard]] int executeTransportInfo();
+    [[nodiscard]] int executeReceiveStream();
     [[nodiscard]] common::Result<void> runSelfTest();
 
     common::AppConfig config_;

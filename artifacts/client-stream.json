@@ -1,0 +1,10 @@
+{
+  "duration_sec": 10.013,
+  "frames_received": 585,
+  "frames_decoded": 585,
+  "frames_presented": 0,
+  "achieved_fps": 58.4243,
+  "bitrate_mbps": 1.76615,
+  "packets_received": 585,
+  "bytes_received": 2210542
+}
