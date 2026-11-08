@@ -24,46 +24,9 @@ common::Result<void> VideoTrackReceiver::initialize(
 
     try {
         pc->onTrack([this](std::shared_ptr<rtc::Track> track) {
-            {
-                std::lock_guard<std::mutex> innerLock(mutex_);
-                track_ = track;
+            if (track && track->description().type() != "audio") {
+                attachTrack(track);
             }
-            MIST_LOG_INFO(common::SubsystemId::Transport, "Incoming remote VideoTrack received (mid: " + track->mid() + ")");
-
-            auto depacketizer = std::make_shared<rtc::H264RtpDepacketizer>(rtc::NalUnit::Separator::StartSequence);
-            track->setMediaHandler(depacketizer);
-
-            track->onOpen([this]() {
-                isOpen_.store(true);
-                MIST_LOG_INFO(common::SubsystemId::Transport, "VideoTrackReceiver opened and ready.");
-            });
-
-            track->onClosed([this]() {
-                isOpen_.store(false);
-                MIST_LOG_INFO(common::SubsystemId::Transport, "VideoTrackReceiver closed.");
-            });
-
-            track->onError([](const std::string& error) {
-                MIST_LOG_ERROR(common::SubsystemId::Transport, "VideoTrackReceiver error: " + error);
-            });
-
-            track->onFrame([this](rtc::binary data, rtc::FrameInfo info) {
-                if (data.empty()) return;
-                framesReceived_.fetch_add(1, std::memory_order_relaxed);
-
-                // Reconstruct in-memory frame buffer (zero disk I/O)
-                std::vector<uint8_t> frameBytes(data.size());
-                std::memcpy(frameBytes.data(), data.data(), data.size());
-                uint64_t timestampNs = info.timestamp;
-                FrameReceivedCallback cb;
-                {
-                    std::lock_guard<std::mutex> innerLock(mutex_);
-                    cb = frameCb_;
-                }
-                if (cb) {
-                    cb(frameBytes, timestampNs);
-                }
-            });
         });
 
         return common::Result<void>::success();
@@ -71,6 +34,51 @@ common::Result<void> VideoTrackReceiver::initialize(
         return common::Error(common::SubsystemId::Transport, common::ErrorCode::InternalError,
                              "Failed to initialize VideoTrackReceiver: " + std::string(e.what()));
     }
+}
+
+void VideoTrackReceiver::attachTrack(std::shared_ptr<rtc::Track> track) {
+    {
+        std::lock_guard<std::mutex> innerLock(mutex_);
+        track_ = track;
+    }
+    if (!track) return;
+
+    MIST_LOG_INFO(common::SubsystemId::Transport, "Incoming remote VideoTrack received (mid: " + track->mid() + ")");
+
+    auto depacketizer = std::make_shared<rtc::H264RtpDepacketizer>(rtc::NalUnit::Separator::StartSequence);
+    track->setMediaHandler(depacketizer);
+
+    track->onOpen([this]() {
+        isOpen_.store(true);
+        MIST_LOG_INFO(common::SubsystemId::Transport, "VideoTrackReceiver opened and ready.");
+    });
+
+    track->onClosed([this]() {
+        isOpen_.store(false);
+        MIST_LOG_INFO(common::SubsystemId::Transport, "VideoTrackReceiver closed.");
+    });
+
+    track->onError([](const std::string& error) {
+        MIST_LOG_ERROR(common::SubsystemId::Transport, "VideoTrackReceiver error: " + error);
+    });
+
+    track->onFrame([this](rtc::binary data, rtc::FrameInfo info) {
+        if (data.empty()) return;
+        framesReceived_.fetch_add(1, std::memory_order_relaxed);
+
+        // Reconstruct in-memory frame buffer (zero disk I/O)
+        std::vector<uint8_t> frameBytes(data.size());
+        std::memcpy(frameBytes.data(), data.data(), data.size());
+        uint64_t timestampNs = info.timestamp;
+        FrameReceivedCallback cb;
+        {
+            std::lock_guard<std::mutex> innerLock(mutex_);
+            cb = frameCb_;
+        }
+        if (cb) {
+            cb(frameBytes, timestampNs);
+        }
+    });
 }
 
 void VideoTrackReceiver::requestKeyframe() noexcept {

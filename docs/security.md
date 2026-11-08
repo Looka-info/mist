@@ -41,6 +41,16 @@ Mist handles desktop capture, input injection, and low-latency network streaming
 - **DLL Preloading / Hijacking Prevention:** Third-party cryptographic libraries dynamically loading vulnerable system DLLs.
   - *Mitigation:* `MbedTLS v3.6.2` is compiled statically directly into `mist_transport` with `MBEDTLS_SSL_DTLS_SRTP`. No dynamic OpenSSL DLLs are loaded at runtime.
 
+### 2.5 Audio Subsystem & Privacy Boundaries (Milestone 4)
+- **Host Microphone Eavesdropping & Surveillance Risk:** Remote streaming applications capturing unintended ambient room audio via host microphones.
+  - *Mitigation:* `WasapiAudioCapture` is strictly constrained to render endpoints (`eRender`, `eMultimedia`) in `AUDCLNT_STREAMFLAGS_LOOPBACK` mode. Audio input endpoints (`eCapture` / microphones) are completely excluded from the capture interface. Audio capture is strictly opt-in via explicit `--audio` configuration.
+- **Malformed Opus Payloads & Memory Corruption:** Malicious peers transmitting malformed Opus bitstreams designed to exploit codec buffer overflows.
+  - *Mitigation:* Employs official reference `xiph/opus` v1.5.2 with strict packet bounds checking. The decoder validates maximum frame sizes (120 ms / 5760 samples per frame) before decoding. Memory allocations are static and bounded.
+- **Playout Buffer Bloat / Memory Exhaustion:** Flooding client with audio packets to exhaust client RAM.
+  - *Mitigation:* `WasapiAudioPlayback` bounds its jitter queue to a hard maximum of 80 ms (~8 packets / < 100 KB RAM). Excess packets are dropped unconditionally.
+- **Resampler Numerical Stability & NaN Injection:** Corrupted audio samples destabilizing floating-point math.
+  - *Mitigation:* `AudioResampler` validates input sample rates against sanity bounds (8,000 Hz to 192,000 Hz) and channel counts (1 to 8). Downmixing clamps floating-point values to `[-1.0, 1.0]`, preventing clipping and NaN propagation.
+
 ---
 
 ## 3. Cryptographic & Device Authorization Requirements

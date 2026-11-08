@@ -18,7 +18,10 @@ enum class ClientCommandMode {
     SelfTest,
     TransportInfo,
     ReceiveTest,
-    StreamReceive
+    StreamReceive,
+    AudioDevices,
+    AudioPlaybackTest,
+    AudioReceiveTest
 };
 
 struct ClientCliOptions {
@@ -35,6 +38,7 @@ struct ClientCliOptions {
     uint32_t durationSeconds{5};
     bool headless{false};
     bool vsync{false};
+    bool enableAudio{false};
 };
 
 class ClientApplication {
@@ -57,6 +61,9 @@ private:
     [[nodiscard]] int executeDecodeBenchmark();
     [[nodiscard]] int executeTransportInfo();
     [[nodiscard]] int executeReceiveStream();
+    [[nodiscard]] int executeAudioDevices();
+    [[nodiscard]] int executeAudioPlaybackTest();
+    [[nodiscard]] int executeAudioReceiveTest();
     [[nodiscard]] common::Result<void> runSelfTest();
 
     common::AppConfig config_;

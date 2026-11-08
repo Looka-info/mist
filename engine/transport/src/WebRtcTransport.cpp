@@ -1,6 +1,7 @@
 #include "mist/transport/WebRtcTransport.h"
 #include "mist/common/Logger.h"
 #include "mist/services/WebSocketSignalingClient.h"
+#include "rtc/rtc.hpp"
 
 namespace mist::transport {
 
@@ -50,13 +51,36 @@ common::Result<void> WebRtcTransport::initializeWebRtc(
         auto vRes = videoSender_->initialize(pc, config_);
         if (!vRes) return vRes;
 
+        if (config_.enableAudio) {
+            audioSender_ = std::make_shared<AudioTrackSender>();
+            auto aRes = audioSender_->initialize(pc, config_);
+            if (!aRes) return aRes;
+        }
+
         dcManager_ = std::make_shared<DataChannelManager>();
         auto dcRes = dcManager_->initialize(pc, /*isHost=*/true);
         if (!dcRes) return dcRes;
     } else {
         videoReceiver_ = std::make_shared<VideoTrackReceiver>();
-        auto vRes = videoReceiver_->initialize(pc, config_);
-        if (!vRes) return vRes;
+        audioReceiver_ = std::make_shared<AudioTrackReceiver>();
+        (void)audioReceiver_->initialize(config_);
+        if (audioFrameCb_) {
+            audioReceiver_->setFrameCallback(audioFrameCb_);
+        }
+
+        // Multiplex incoming remote tracks between video and audio
+        pc->onTrack([this](std::shared_ptr<rtc::Track> track) {
+            if (!track) return;
+            if (track->description().type() == "audio") {
+                if (audioReceiver_) {
+                    audioReceiver_->attachTrack(track);
+                }
+            } else {
+                if (videoReceiver_) {
+                    videoReceiver_->attachTrack(track);
+                }
+            }
+        });
 
         dcManager_ = std::make_shared<DataChannelManager>();
         auto dcRes = dcManager_->initialize(pc, /*isHost=*/false);
@@ -191,6 +215,12 @@ common::Result<void> WebRtcTransport::disconnect() {
     if (videoReceiver_) {
         videoReceiver_->close();
     }
+    if (audioSender_) {
+        audioSender_->close();
+    }
+    if (audioReceiver_) {
+        audioReceiver_->close();
+    }
     if (dcManager_) {
         dcManager_->close();
     }
@@ -208,6 +238,10 @@ common::Result<void> WebRtcTransport::send(TransportChannel channel, std::span<c
         encode::EncodedPacket packet{};
         packet.data.assign(data.begin(), data.end());
         return sendVideoPacket(packet);
+    }
+
+    if (channel == TransportChannel::Audio) {
+        return sendAudioFrame(data, 480);
     }
 
     if (dcManager_) {
@@ -231,6 +265,24 @@ common::Result<void> WebRtcTransport::sendVideoPacket(const encode::EncodedPacke
     return videoSender_->sendFrame(packet);
 }
 
+common::Result<void> WebRtcTransport::sendAudioFrame(std::span<const uint8_t> opusPayload, uint32_t sampleCount) {
+    std::shared_ptr<AudioTrackSender> sender;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        sender = audioSender_;
+    }
+    if (!sender) {
+        return common::Error(common::SubsystemId::Transport, common::ErrorCode::NotInitialized, "Host audio sender not initialized");
+    }
+
+    if (stats_) {
+        stats_->recordPacketSent();
+        stats_->recordBytesSent(opusPayload.size());
+    }
+
+    return sender->sendFrame(opusPayload, sampleCount);
+}
+
 void WebRtcTransport::setKeyframeRequestCallback(KeyframeRequestCallback cb) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (videoSender_) {
@@ -247,6 +299,22 @@ void WebRtcTransport::setFrameReceivedCallback(FrameReceivedCallback cb) {
                 stats_->recordBytesReceived(accessUnit.size());
             }
             cb(accessUnit, timestampNs);
+        });
+    }
+}
+
+void WebRtcTransport::setAudioFrameCallback(AudioFrameCallback cb) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    audioFrameCb_ = std::move(cb);
+    if (audioReceiver_) {
+        audioReceiver_->setFrameCallback([this](std::span<const uint8_t> payload, const AudioFrameInfo& info) {
+            if (stats_) {
+                stats_->recordPacketReceived();
+                stats_->recordBytesReceived(payload.size());
+            }
+            if (audioFrameCb_) {
+                audioFrameCb_(payload, info);
+            }
         });
     }
 }

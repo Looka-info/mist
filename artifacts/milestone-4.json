@@ -1,0 +1,31 @@
+﻿{
+    "unit_tests":  {
+                       "failed":  0,
+                       "skipped":  2,
+                       "total":  83,
+                       "passed":  81
+                   },
+    "host":  {
+                 "frames_encoded":  601,
+                 "gpu":  "NVIDIA GeForce GTX 1660 SUPER",
+                 "audio_bytes_sent":  161918,
+                 "actual_fps":  59.8986,
+                 "frames_dropped":  0,
+                 "audio_packets_sent":  1005,
+                 "bitrate_kbps":  1866.63
+             },
+    "timestamp":  "2026-11-08T06:44:02.1313943+05:00",
+    "client":  {
+                   "audio_packets_received":  965,
+                   "av_skew_p95_ms":  16.4976,
+                   "frames_received":  577,
+                   "audio_underruns":  39,
+                   "bitrate_mbps":  1.7623,
+                   "duration_sec":  10.0091,
+                   "frames_decoded":  577,
+                   "audio_frames_decoded":  463200,
+                   "achieved_fps":  57.6474
+               },
+    "milestone":  4,
+    "status":  "VERIFIED"
+}

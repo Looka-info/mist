@@ -27,6 +27,9 @@ struct WebRtcTransportConfig {
     uint32_t targetFps{60};
     uint32_t targetBitrateKbps{15000};
     bool enableDataChannels{true};
+    bool enableAudio{false};
+    uint32_t audioClockRate{48000};
+    uint32_t audioBitrateKbps{128};
 };
 
 enum class WebRtcState {

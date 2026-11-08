@@ -29,6 +29,8 @@ public:
         const WebRtcTransportConfig& config
     );
 
+    void attachTrack(std::shared_ptr<rtc::Track> track);
+
     void setFrameReceivedCallback(FrameReceivedCallback cb) { frameCb_ = std::move(cb); }
     void requestKeyframe() noexcept;
 

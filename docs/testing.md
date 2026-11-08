@@ -37,6 +37,10 @@ Mist employs a multi-tiered automated testing strategy:
 | `TestWebRtcTransport` | `TestWebRtcTransport.cpp` | WebRTC transport configuration, statistics tracking, dual peer initialization, in-process direct loopback ICE negotiation, H.264 RTP packetization, and RTCP PLI keyframe request. |
 | `TestSignaling` | `TestSignaling.cpp` | Signaling message type encoding/decoding, session registration payloads, message serialization. |
 | `TestNetworkStability` | `TestNetworkStability.cpp` | Repeated WebRTC transport open/close cycles (3 iterations), frame queue backpressure drop policy (oldest dropped), lock-free statistics accumulation. |
+| `AudioFormatTest` | `TestAudioFormat.cpp` | Format validation, mono duplicate downmixing, 5.1 and 7.1 surround downmixing matrices (ITU-R BS.775), fractional sample rate resampling (44.1k/96k/192k -> 48k), FIFO ring buffer framing. |
+| `OpusCodecTest` | `TestOpusCodec.cpp` | Opus encoder lifecycle, restricted low-delay configuration, 10 ms / 20 ms frame encoding, encode-decode round trip with RMS preservation, Packet Loss Concealment (PLC). |
+| `WasapiAudioTest` | `TestWasapiAudio.cpp` | Audio endpoint enumeration, default device resolution, WASAPI loopback capture lifecycle, silence handling, WASAPI playback client initialization and underrun tracking. |
+| `AudioWebRtcTest` | `TestAudioWebRtc.cpp` | `AudioTrackSender` and `AudioTrackReceiver` lifecycle, RFC 7587 Opus RTP packetization, unified WebRtcTransport audio/video track multiplexing. |
 
 ### 2.2 Smoke Tests (CTest)
 
@@ -53,6 +57,32 @@ Mist employs a multi-tiered automated testing strategy:
 ---
 
 ## 3. Running Tests
+
+### Automated Milestone 4 Verification Suite
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-milestone-4.ps1 -BenchmarkSeconds 10
+```
+
+### Milestone 4 Audio CLI Diagnostic Commands
+```powershell
+# Enumerate audio devices
+./build/apps/host/mist_host.exe --audio-devices
+./build/apps/client/mist_client.exe --audio-devices
+
+# Test WASAPI loopback audio capture (2 seconds)
+./build/apps/host/mist_host.exe --audio-test --duration 2
+
+# Test WASAPI capture and Opus real-time compression (2 seconds)
+./build/apps/host/mist_host.exe --audio-encode-test --duration 2
+
+# Test client WASAPI audio playback (synthesizes 440 Hz test tone for 2 seconds)
+./build/apps/client/mist_client.exe --audio-playback-test --duration 2
+
+# Test live synchronized 1080p60 video + 48kHz audio streaming over WebRTC
+./bin/mist-signaling.exe --port 8080
+./build/apps/client/mist_client.exe --receive-test --audio --signaling-url ws://127.0.0.1:8080 --session-id m4-test --duration 10 --headless --report artifacts/client-m4.json
+./build/apps/host/mist_host.exe --stream-test --audio --signaling-url ws://127.0.0.1:8080 --session-id m4-test --duration 10 --report artifacts/host-m4.json
+```
 
 ### Automated Milestone 3 Verification Suite
 ```powershell

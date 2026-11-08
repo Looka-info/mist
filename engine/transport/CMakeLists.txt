@@ -68,6 +68,8 @@ add_library(mist_transport STATIC
     src/PeerConnectionManager.cpp
     src/VideoTrackSender.cpp
     src/VideoTrackReceiver.cpp
+    src/AudioTrackSender.cpp
+    src/AudioTrackReceiver.cpp
     src/DataChannelManager.cpp
     src/TransportStatistics.cpp
     src/WebRtcTransport.cpp
@@ -92,6 +94,7 @@ target_link_libraries(mist_transport PUBLIC
     mist_common
     mist_encode
     mist_decode
+    mist_audio
     mist_services
 )
 

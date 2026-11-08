@@ -20,7 +20,10 @@ enum class HostCommandMode {
     NvencAudit,
     TransportInfo,
     StreamTest,
-    StreamLive
+    StreamLive,
+    AudioDevices,
+    AudioTest,
+    AudioEncodeTest
 };
 
 struct HostCommandLineOptions {
@@ -37,6 +40,8 @@ struct HostCommandLineOptions {
     std::string signalingUrl{"ws://127.0.0.1:8080"};
     std::string sessionId{"mist-session-1"};
     std::string authToken{"mist-dev-token"};
+    bool enableAudio{false};
+    std::string audioDevice;
 };
 
 class HostApplication {
@@ -61,6 +66,9 @@ private:
     [[nodiscard]] int executeTransportInfo();
     [[nodiscard]] int executeStreamTest();
     [[nodiscard]] int executeStreamLive();
+    [[nodiscard]] int executeAudioDevices();
+    [[nodiscard]] int executeAudioTest();
+    [[nodiscard]] int executeAudioEncodeTest();
 
     common::AppConfig config_;
     HostCommandLineOptions options_;

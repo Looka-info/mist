@@ -20,6 +20,10 @@ add_executable(mist_unit_tests
     TestWebRtcTransport.cpp
     TestSignaling.cpp
     TestNetworkStability.cpp
+    TestAudioFormat.cpp
+    TestOpusCodec.cpp
+    TestWasapiAudio.cpp
+    TestAudioWebRtc.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

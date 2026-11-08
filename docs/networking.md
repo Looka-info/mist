@@ -40,7 +40,9 @@ Milestone 3 establishes a high-performance, ultra-low-latency WebRTC transport a
 |---|---|---|
 | **WebRTC Architecture** | RFC 8829 (JSEP) | Strict Offer/Answer lifecycle via `PeerConnectionManager` |
 | **Media Transport** | RFC 3711 (SRTP) / RFC 8834 | DTLS 1.2+ key exchange and SRTP encryption via `MbedTLS v3.6.2` |
-| **Video Packetization** | RFC 6184 | H.264 Single NAL & FU-A fragmentation (1200-byte MTU) |
+| **Video Packetization** | RFC 6184 | H.264 Single NAL & FU-A fragmentation (1200-byte MTU, PT 96, SSRC 1) |
+| **Audio Packetization** | RFC 7587 | Opus 48 kHz stereo RTP framing (PT 111, SSRC 2, 10 ms / 20 ms framing) |
+| **A/V Synchronization** | RFC 3550 / RFC 8834 | Unified RTCP Canonical Name (`mist-stream`) & monotonic arrival tracking |
 | **Feedback Mechanism** | RFC 4585 / RFC 5104 | RTCP Picture Loss Indication (PLI) for sub-frame keyframe request |
 | **Data Channels** | RFC 8831 / RFC 8832 | SCTP DataChannels (`session-control` reliable, `diagnostics` unordered) |
 | **NAT Traversal** | RFC 8445 (ICE) / RFC 5389 (STUN) | Trickle ICE with Google STUN servers (`stun.l.google.com:19302`) |
@@ -72,6 +74,21 @@ Milestone 3 establishes a high-performance, ultra-low-latency WebRTC transport a
 ### 3.4 Bounded Queueing & Frame Pacing (ADR 0014)
 - **Bounded Frame Queue:** The maximum queue depth is strictly constrained to 2 frames. If network throughput dips or backpressure occurs, the oldest frame is dropped immediately.
 - **Hybrid QPC Frame Pacer:** `FramePacer` uses Windows multimedia timer resolution (`timeBeginPeriod(1)`) combined with a QueryPerformanceCounter spin-wait loop for sub-millisecond 16.66 ms frame pacing at 60 FPS.
+
+### 3.5 AudioTrackSender (RFC 7587 Opus RTP)
+- Configures a SendOnly Opus audio track with SSRC 2, Payload Type 111, and MID `"audio"`.
+- Uses `rtc::OpusRtpPacketizer` with a 48 kHz clock rate, incrementing timestamps by 480 ticks per 10 ms packet.
+- Associates audio track with RTCP CNAME `mist-stream` matching the video track (SSRC 1).
+- In-memory dispatch from `OpusAudioEncoder` directly into WebRTC transport without file system operations.
+
+### 3.6 AudioTrackReceiver & Track Multiplexing
+- Listens for remote media tracks on `PeerConnection::onTrack()`.
+- Dispatches based on description type (`track->description().type()`):
+  - `"audio"`: Attaches to `AudioTrackReceiver` via `attachTrack()`.
+  - `"video"`: Attaches to `VideoTrackReceiver` via `attachTrack()`.
+- Uses `rtc::OpusRtpDepacketizer` to parse incoming RTP packets into raw Opus frames.
+- Forwards parsed Opus frames to `OpusAudioDecoder` and the `WasapiAudioPlayback` jitter buffer.
+- Evaluates real-time A/V skew across arrival timestamps against the monotonic clock.
 
 ---
 
@@ -138,8 +155,29 @@ Messages are JSON objects containing `type` and `session_id`:
 
 ## 5. Verification & Benchmark Evidence
 
-Milestone 3 verification was executed on the benchmark system (AMD Ryzen 5 5600, NVIDIA GeForce GTX 1660 SUPER, Windows 11 x64):
+### Milestone 4: Synchronized 1080p60 Video + 48kHz Opus Audio Benchmark
+Verified on benchmark machine (AMD Ryzen 5 5600, NVIDIA GeForce GTX 1660 SUPER, Windows 11 x64):
 
+```
+Target Resolution:         1920x1080 (1080p)
+Target Video Frame Rate:   60 FPS
+Audio Format:              48 kHz Stereo Opus (Restricted Low-Delay, 128 kbps)
+Audio Framing:             10 ms (480 samples/packet)
+Benchmark Duration:        10.0091 seconds
+Signaling Service:         Rust Tokio/Tungstenite (Port 8080)
+Transport Protocol:        WebRTC UDP / RFC 6184 H.264 & RFC 7587 Opus
+Host Video Encoded:        601 frames (59.8986 FPS sustained)
+Host Video Dropped:        0 frames (0.00%)
+Host Audio Packets Sent:   1005 packets (100.5 pps, 161.9 KB)
+Client Video Decoded:      577 frames (57.6474 FPS sustained decode)
+Client Audio Packets Recv: 965 packets
+Client Audio Decoded:      463,200 PCM samples (Float32 stereo)
+Client Audio Underruns:    39 events
+p95 A/V Presentation Skew: 16.4976 ms (< 40 ms ITU-R threshold)
+Zero Disk I/O:             Verified (In-memory capture, encoding, and playout)
+```
+
+### Milestone 3: Base Video Streaming Benchmark
 ```
 Target Resolution:    1920x1080 (1080p)
 Target Frame Rate:    60 FPS

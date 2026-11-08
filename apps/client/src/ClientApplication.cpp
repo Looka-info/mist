@@ -5,10 +5,15 @@
 #include "mist/platform/windows/PlatformWindows.h"
 #include "mist/transport/WebRtcTransport.h"
 #include "mist/services/WebSocketSignalingClient.h"
+#include "mist/audio/WasapiAudioPlayback.h"
+#include "mist/audio/OpusAudioDecoder.h"
+#include "mist/audio/AudioDeviceEnumerator.h"
+#include "mist/telemetry/Metrics.h"
 #include <iostream>
 #include <fstream>
 #include <thread>
 #include <chrono>
+#include <cmath>
 
 namespace mist::client {
 
@@ -72,6 +77,14 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
             options_.mode = ClientCommandMode::ReceiveTest;
         } else if (arg == "--stream-receive") {
             options_.mode = ClientCommandMode::StreamReceive;
+        } else if (arg == "--audio-devices") {
+            options_.mode = ClientCommandMode::AudioDevices;
+        } else if (arg == "--audio-playback-test") {
+            options_.mode = ClientCommandMode::AudioPlaybackTest;
+        } else if (arg == "--audio-receive-test") {
+            options_.mode = ClientCommandMode::AudioReceiveTest;
+        } else if (arg == "--audio") {
+            options_.enableAudio = true;
         } else if (arg == "--signaling-url" && i + 1 < argc) {
             options_.signalingUrl = argv[++i];
         } else if (arg == "--session-id" && i + 1 < argc) {
@@ -153,6 +166,12 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
         case ClientCommandMode::ReceiveTest:
         case ClientCommandMode::StreamReceive:
             return std::optional<int>(executeReceiveStream());
+        case ClientCommandMode::AudioDevices:
+            return std::optional<int>(executeAudioDevices());
+        case ClientCommandMode::AudioPlaybackTest:
+            return std::optional<int>(executeAudioPlaybackTest());
+        case ClientCommandMode::AudioReceiveTest:
+            return std::optional<int>(executeAudioReceiveTest());
         case ClientCommandMode::SelfTest:
             return std::optional<int>(runSelfTest().hasValue() ? 0 : 1);
         case ClientCommandMode::Normal:
@@ -476,6 +495,7 @@ int ClientApplication::executeReceiveStream() {
     rtcConfig.authToken = options_.authToken;
     rtcConfig.signalingUrl = options_.signalingUrl;
     rtcConfig.videoClockRate = 90000;
+    rtcConfig.enableAudio = options_.enableAudio;
 
     transport::WebRtcTransport rtcTransport;
     auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signaling);
@@ -488,10 +508,20 @@ int ClientApplication::executeReceiveStream() {
     std::atomic<uint64_t> framesDecoded{0};
     std::atomic<uint64_t> framesPresented{0};
     std::atomic<uint64_t> totalBytesReceived{0};
+    std::atomic<uint64_t> lastVideoTimestampNs{0};
+
+    auto getSteadyNowNs = []() -> uint64_t {
+        return static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()
+            ).count()
+        );
+    };
 
     rtcTransport.setFrameReceivedCallback([&](const std::vector<uint8_t>& accessUnit, uint64_t timestampNs) {
         framesReceived.fetch_add(1, std::memory_order_relaxed);
         totalBytesReceived.fetch_add(accessUnit.size(), std::memory_order_relaxed);
+        lastVideoTimestampNs.store(getSteadyNowNs(), std::memory_order_relaxed);
 
         encode::EncodedPacket packet{};
         packet.data = accessUnit;
@@ -519,15 +549,70 @@ int ClientApplication::executeReceiveStream() {
         }
     });
 
+    // Audio setup if enabled
+    std::atomic<uint64_t> audioPacketsReceived{0};
+    std::atomic<uint64_t> audioBytesReceived{0};
+    std::atomic<uint64_t> audioFramesDecoded{0};
+    auto skewHistogram = telemetry::MetricRegistry::instance().getOrCreateHistogram("audio.sync.av_skew_us");
+
+    audio::OpusAudioDecoder audioDecoder;
+    audio::WasapiAudioPlayback audioPlayback;
+    std::vector<float> pcmBuffer(4800);
+
+    if (options_.enableAudio) {
+        (void)audioDecoder.initialize({});
+        audio::AudioConfig aCfg{
+            .sampleRate = 48000,
+            .channels = 2,
+            .format = audio::AudioSampleFormat::Float32,
+            .bufferFrameSize = 480
+        };
+        auto playInit = audioPlayback.initialize(aCfg);
+        if (playInit) {
+            (void)audioPlayback.start();
+        }
+
+        rtcTransport.setAudioFrameCallback([&](std::span<const uint8_t> payload, const transport::AudioFrameInfo& info) {
+            audioPacketsReceived.fetch_add(1, std::memory_order_relaxed);
+            audioBytesReceived.fetch_add(payload.size(), std::memory_order_relaxed);
+
+            auto decRes = audioDecoder.decode(payload, std::span<float>(pcmBuffer.data(), pcmBuffer.size()));
+            if (decRes) {
+                size_t frames = decRes.value();
+                audioFramesDecoded.fetch_add(frames, std::memory_order_relaxed);
+
+                audio::AudioPacket pkt;
+                pkt.frames = static_cast<uint32_t>(frames);
+                pkt.timestampNs = info.arrivalTimeNs;
+                pkt.data.resize(frames * 2 * sizeof(float));
+                std::memcpy(pkt.data.data(), pcmBuffer.data(), pkt.data.size());
+
+                (void)audioPlayback.writePacket(pkt);
+            }
+
+            uint64_t vTs = lastVideoTimestampNs.load(std::memory_order_relaxed);
+            if (vTs > 0) {
+                uint64_t nowNs = getSteadyNowNs();
+                int64_t diffNs = static_cast<int64_t>(nowNs) - static_cast<int64_t>(vTs);
+                double diffUs = static_cast<double>(std::abs(diffNs)) / 1000.0;
+                skewHistogram->record(diffUs);
+            }
+        });
+    }
+
     auto connRes = rtcTransport.connect();
     if (!connRes) {
         std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
+        if (options_.enableAudio) {
+            (void)audioPlayback.stop();
+        }
         return 1;
     }
 
     std::cout << "Client stream receive started for " << options_.durationSeconds
               << "s (Session: " << options_.sessionId << ", Signaling: " << options_.signalingUrl
-              << (options_.headless ? ", Headless" : ", GUI Window") << ")...\n";
+              << (options_.headless ? ", Headless" : ", GUI Window")
+              << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled") << ")...\n";
 
     auto startTime = std::chrono::steady_clock::now();
     while (true) {
@@ -547,6 +632,10 @@ int ClientApplication::executeReceiveStream() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 
+    if (options_.enableAudio) {
+        (void)audioPlayback.stop();
+    }
+
     auto actualDuration = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
     uint64_t rec = framesReceived.load();
     uint64_t dec = framesDecoded.load();
@@ -555,15 +644,25 @@ int ClientApplication::executeReceiveStream() {
     double bitrateMbps = actualDuration > 0.0 ? ((static_cast<double>(totalBytesReceived.load()) * 8.0) / (actualDuration * 1000000.0)) : 0.0;
 
     auto stats = rtcTransport.getStatsSnapshot();
+    auto pbStats = audioPlayback.getStats();
+    auto skewSnap = skewHistogram->snapshot();
+    double p95SkewMs = skewSnap.p95Us / 1000.0;
 
     std::cout << "=== Client Streaming Results ===\n"
-              << "Duration:        " << actualDuration << " s\n"
-              << "Frames Received: " << rec << "\n"
-              << "Frames Decoded:  " << dec << " (" << fps << " FPS)\n"
-              << "Frames Presented:" << rnd << "\n"
-              << "Bitrate:         " << bitrateMbps << " Mbps\n"
-              << "Packets Recv:    " << stats.packetsReceived << "\n"
-              << "Bytes Recv:      " << stats.bytesReceived << "\n";
+              << "Duration:            " << actualDuration << " s\n"
+              << "Frames Received:     " << rec << "\n"
+              << "Frames Decoded:      " << dec << " (" << fps << " FPS)\n"
+              << "Frames Presented:    " << rnd << "\n"
+              << "Bitrate:             " << bitrateMbps << " Mbps\n"
+              << "Packets Recv:        " << stats.packetsReceived << "\n"
+              << "Bytes Recv:          " << stats.bytesReceived << "\n";
+
+    if (options_.enableAudio) {
+        std::cout << "Audio Packets Recv:  " << audioPacketsReceived.load() << "\n"
+                  << "Audio Frames Decoded:" << audioFramesDecoded.load() << "\n"
+                  << "Audio Underruns:     " << pbStats.underrunCount << "\n"
+                  << "A/V Skew (p95):      " << p95SkewMs << " ms\n";
+    }
 
     if (!options_.reportPath.empty()) {
         std::ofstream rep(options_.reportPath);
@@ -576,10 +675,167 @@ int ClientApplication::executeReceiveStream() {
                 << "  \"achieved_fps\": " << fps << ",\n"
                 << "  \"bitrate_mbps\": " << bitrateMbps << ",\n"
                 << "  \"packets_received\": " << stats.packetsReceived << ",\n"
-                << "  \"bytes_received\": " << stats.bytesReceived << "\n"
+                << "  \"bytes_received\": " << stats.bytesReceived << ",\n"
+                << "  \"audio_packets_received\": " << audioPacketsReceived.load() << ",\n"
+                << "  \"audio_frames_decoded\": " << audioFramesDecoded.load() << ",\n"
+                << "  \"audio_underruns\": " << pbStats.underrunCount << ",\n"
+                << "  \"av_skew_p95_ms\": " << p95SkewMs << "\n"
                 << "}\n";
         }
     }
+    return 0;
+}
+
+int ClientApplication::executeAudioDevices() {
+    auto res = audio::AudioDeviceEnumerator::enumerateRenderDevices();
+    if (!res) {
+        std::cerr << "Failed to enumerate audio devices: " << res.error().format() << "\n";
+        return 1;
+    }
+
+    const auto& devices = res.value();
+    std::cout << "{\n  \"deviceCount\": " << devices.size() << ",\n  \"devices\": [\n";
+    for (size_t i = 0; i < devices.size(); ++i) {
+        const auto& d = devices[i];
+        std::cout << "    {\n"
+                  << "      \"name\": \"" << d.friendlyName << "\",\n"
+                  << "      \"isDefault\": " << (d.isDefault ? "true" : "false") << ",\n"
+                  << "      \"sampleRate\": " << d.sampleRate << ",\n"
+                  << "      \"channels\": " << d.channels << ",\n"
+                  << "      \"format\": \"" << ((d.format == audio::AudioSampleFormat::Float32) ? "Float32" : "Int16") << "\",\n"
+                  << "      \"bitsPerSample\": " << d.bitsPerSample << "\n"
+                  << "    }" << (i + 1 < devices.size() ? "," : "") << "\n";
+    }
+    std::cout << "  ]\n}\n";
+    return 0;
+}
+
+int ClientApplication::executeAudioPlaybackTest() {
+    audio::AudioConfig config{
+        .sampleRate = 48000,
+        .channels = 2,
+        .format = audio::AudioSampleFormat::Float32,
+        .bufferFrameSize = 480 // 10ms
+    };
+
+    audio::WasapiAudioPlayback playback;
+    auto initRes = playback.initialize(config);
+    if (!initRes) {
+        std::cerr << "Failed to initialize WASAPI playback: " << initRes.error().format() << "\n";
+        return 1;
+    }
+
+    auto startRes = playback.start();
+    if (!startRes) {
+        std::cerr << "Failed to start playback: " << startRes.error().format() << "\n";
+        return 1;
+    }
+
+    // Generate 440 Hz test sine wave for 2 seconds (48000 * 2 frames)
+    constexpr double freq = 440.0;
+    constexpr double twoPi = 6.283185307179586;
+    size_t totalPackets = (options_.durationSeconds > 0 ? options_.durationSeconds : 2) * 100; // 100 pps (10ms)
+    std::vector<float> sineTone(480 * 2);
+
+    for (size_t p = 0; p < totalPackets; ++p) {
+        for (size_t i = 0; i < 480; ++i) {
+            double t = static_cast<double>(p * 480 + i) / 48000.0;
+            float s = static_cast<float>(0.3 * std::sin(twoPi * freq * t)); // -10 dBFS level
+            sineTone[i * 2 + 0] = s;
+            sineTone[i * 2 + 1] = s;
+        }
+
+        audio::AudioPacket pkt;
+        pkt.frames = 480;
+        pkt.data.resize(sineTone.size() * sizeof(float));
+        std::memcpy(pkt.data.data(), sineTone.data(), pkt.data.size());
+
+        (void)playback.writePacket(pkt);
+        std::this_thread::sleep_for(std::chrono::milliseconds(9));
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    (void)playback.stop();
+
+    auto stats = playback.getStats();
+    std::cout << "{\n"
+              << "  \"status\": \"success\",\n"
+              << "  \"framesRendered\": " << stats.framesRendered << ",\n"
+              << "  \"underrunCount\": " << stats.underrunCount << ",\n"
+              << "  \"overflowCount\": " << stats.overflowCount << "\n"
+              << "}\n";
+    return 0;
+}
+
+int ClientApplication::executeAudioReceiveTest() {
+    auto signaling = std::make_shared<services::WebSocketSignalingClient>();
+    transport::WebRtcTransportConfig rtcConfig{};
+    rtcConfig.isHost = false;
+    rtcConfig.sessionId = options_.sessionId;
+    rtcConfig.authToken = options_.authToken;
+    rtcConfig.signalingUrl = options_.signalingUrl;
+    rtcConfig.enableAudio = true;
+
+    transport::WebRtcTransport rtcTransport;
+    auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signaling);
+    if (!rtcRes) {
+        std::cerr << "WebRTC transport init failed: " << rtcRes.error().format() << "\n";
+        return 1;
+    }
+
+    audio::OpusAudioDecoder audioDecoder;
+    (void)audioDecoder.initialize({});
+
+    audio::WasapiAudioPlayback audioPlayback;
+    audio::AudioConfig aCfg{
+        .sampleRate = 48000,
+        .channels = 2,
+        .format = audio::AudioSampleFormat::Float32,
+        .bufferFrameSize = 480
+    };
+    (void)audioPlayback.initialize(aCfg);
+    (void)audioPlayback.start();
+
+    std::atomic<uint64_t> audioPacketsReceived{0};
+    std::atomic<uint64_t> audioFramesDecoded{0};
+    std::vector<float> pcmBuffer(4800);
+
+    rtcTransport.setAudioFrameCallback([&](std::span<const uint8_t> payload, const transport::AudioFrameInfo& info) {
+        audioPacketsReceived.fetch_add(1, std::memory_order_relaxed);
+
+        auto decRes = audioDecoder.decode(payload, std::span<float>(pcmBuffer.data(), pcmBuffer.size()));
+        if (decRes) {
+            size_t frames = decRes.value();
+            audioFramesDecoded.fetch_add(frames, std::memory_order_relaxed);
+
+            audio::AudioPacket pkt;
+            pkt.frames = static_cast<uint32_t>(frames);
+            pkt.timestampNs = info.arrivalTimeNs;
+            pkt.data.resize(frames * 2 * sizeof(float));
+            std::memcpy(pkt.data.data(), pcmBuffer.data(), pkt.data.size());
+
+            (void)audioPlayback.writePacket(pkt);
+        }
+    });
+
+    auto connRes = rtcTransport.connect();
+    if (!connRes) {
+        std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
+        return 1;
+    }
+
+    std::cout << "Audio receive test running for " << options_.durationSeconds << "s...\n";
+    std::this_thread::sleep_for(std::chrono::seconds(options_.durationSeconds > 0 ? options_.durationSeconds : 3));
+
+    (void)audioPlayback.stop();
+    auto pbStats = audioPlayback.getStats();
+
+    std::cout << "{\n"
+              << "  \"status\": \"success\",\n"
+              << "  \"audioPacketsReceived\": " << audioPacketsReceived.load() << ",\n"
+              << "  \"audioFramesDecoded\": " << audioFramesDecoded.load() << ",\n"
+              << "  \"underruns\": " << pbStats.underrunCount << "\n"
+              << "}\n";
     return 0;
 }
 

@@ -12,6 +12,7 @@ target_link_libraries(mist_host PRIVATE
     mist_session
     mist_capture
     mist_encode
+    mist_audio
     mist_telemetry
     mist_security
     mist_platform_windows

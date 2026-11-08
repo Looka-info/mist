@@ -1,0 +1,14 @@
+{
+  "duration_sec": 10.0091,
+  "frames_received": 577,
+  "frames_decoded": 577,
+  "frames_presented": 0,
+  "achieved_fps": 57.6474,
+  "bitrate_mbps": 1.7623,
+  "packets_received": 1542,
+  "bytes_received": 2360329,
+  "audio_packets_received": 965,
+  "audio_frames_decoded": 463200,
+  "audio_underruns": 39,
+  "av_skew_p95_ms": 16.4976
+}
