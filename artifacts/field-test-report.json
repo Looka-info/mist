@@ -3,7 +3,7 @@
     "version":  "0.2.0-rc1",
     "milestone":  7,
     "qualification_status":  "QUALIFIED_RELEASE_CANDIDATE",
-    "timestamp":  "2026-11-08T10:41:13.7254435+05:00",
+    "timestamp":  "2026-11-08T22:41:03.7360448+05:00",
     "hardware_testbed":  {
                              "cpu":  "AMD Ryzen 5 5600 6-Core Processor @ 3.50 GHz",
                              "gpu":  "NVIDIA GeForce GTX 1660 SUPER (Driver 617.14, NVENC Turing Generation)",
@@ -22,7 +22,7 @@
                    },
     "distribution":  {
                          "release_archive":  "dist/mist-v0.2.0-rc1-windows-x64.zip",
-                         "archive_size_mb":  4.83,
+                         "archive_size_mb":  10.07,
                          "release_manifest":  "dist/mist-windows-x64/release-manifest.json",
                          "code_signing":  "AUTHENTICODE_VERIFIED",
                          "installer_lifecycle":  "PASSED"
@@ -31,11 +31,11 @@
                                       "video_decode_efficiency_pct":  100,
                                       "video_queue_loss_count":  0,
                                       "video_decoder_errors":  0,
-                                      "host_encoded_bitrate_kbps":  11541.9,
-                                      "client_received_bitrate_kbps":  10990.2,
-                                      "audio_packet_delivery_pct":  94.25,
-                                      "audio_pcm_samples_decoded":  739680,
-                                      "input_execution_efficiency_pct":  98.9
+                                      "host_encoded_bitrate_kbps":  11491.1,
+                                      "client_received_bitrate_kbps":  10899.4,
+                                      "audio_packet_delivery_pct":  94.21,
+                                      "audio_pcm_samples_decoded":  640800,
+                                      "input_execution_efficiency_pct":  98.91
                                   },
     "live_benchmark":  {
                            "duration_seconds":  10,
@@ -44,74 +44,74 @@
                                         "duration_sec":  10,
                                         "frames_encoded":  602,
                                         "frames_dropped":  0,
-                                        "actual_fps":  59.8989,
-                                        "bitrate_kbps":  11541.9,
-                                        "packets_sent":  2237,
-                                        "bytes_sent":  14504805,
-                                        "audio_packets_sent":  1635,
-                                        "audio_bytes_sent":  4905,
-                                        "input_packets_received":  182,
-                                        "input_events_processed":  180,
+                                        "actual_fps":  59.8987,
+                                        "bitrate_kbps":  11491.1,
+                                        "packets_sent":  2019,
+                                        "bytes_sent":  14664329,
+                                        "audio_packets_sent":  1417,
+                                        "audio_bytes_sent":  228137,
+                                        "input_packets_received":  183,
+                                        "input_events_processed":  181,
                                         "input_events_dropped":  0,
                                         "video":  {
                                                       "frames_acquired":  603,
                                                       "frames_encoded":  602,
                                                       "frames_dropped":  0,
-                                                      "actual_fps":  59.8989,
-                                                      "average_bitrate_kbps":  11541.9
+                                                      "actual_fps":  59.8987,
+                                                      "average_bitrate_kbps":  11491.1
                                                   },
                                         "audio":  {
-                                                      "opus_packets_generated":  1635,
-                                                      "rtp_packets_sent":  1635,
-                                                      "rtp_bytes_sent":  4905
+                                                      "opus_packets_generated":  1417,
+                                                      "rtp_packets_sent":  1417,
+                                                      "rtp_bytes_sent":  228137
                                                   },
                                         "input":  {
-                                                      "packets_received":  182,
-                                                      "events_processed":  180,
+                                                      "packets_received":  183,
+                                                      "events_processed":  181,
                                                       "events_dropped":  0
                                                   },
                                         "network":  {
-                                                        "total_packets_sent":  2237,
-                                                        "total_bytes_sent":  14504805,
+                                                        "total_packets_sent":  2019,
+                                                        "total_bytes_sent":  14664329,
                                                         "rtt_ms":  0,
                                                         "jitter_ms":  0
                                                     }
                                     },
                            "client":  {
-                                          "duration_sec":  10.0136,
-                                          "frames_received":  567,
-                                          "frames_submitted":  567,
-                                          "frames_decoded":  567,
+                                          "duration_sec":  10.0153,
+                                          "frames_received":  566,
+                                          "frames_submitted":  566,
+                                          "frames_decoded":  566,
                                           "frames_presented":  0,
                                           "frames_discarded":  0,
                                           "decoder_errors":  0,
-                                          "achieved_fps":  56.6228,
-                                          "bitrate_mbps":  10.9902,
-                                          "packets_received":  2108,
-                                          "bytes_received":  13761137,
-                                          "audio_packets_received":  1541,
-                                          "audio_frames_decoded":  739680,
+                                          "achieved_fps":  56.5134,
+                                          "bitrate_mbps":  10.8994,
+                                          "packets_received":  1901,
+                                          "bytes_received":  13859969,
+                                          "audio_packets_received":  1335,
+                                          "audio_frames_decoded":  640800,
                                           "audio_underruns":  57,
-                                          "av_skew_p95_ms":  15.459,
+                                          "av_skew_p95_ms":  15.1627,
                                           "input_enabled":  true,
-                                          "input_packets_sent":  194,
+                                          "input_packets_sent":  195,
                                           "video":  {
-                                                        "complete_access_units_received":  567,
-                                                        "frames_submitted_to_decoder":  567,
-                                                        "frames_decoded":  567,
+                                                        "complete_access_units_received":  566,
+                                                        "frames_submitted_to_decoder":  566,
+                                                        "frames_decoded":  566,
                                                         "frames_presented":  0,
                                                         "frames_queue_discarded":  0,
                                                         "decoder_errors":  0
                                                     },
                                           "audio":  {
-                                                        "rtp_packets_received":  1541,
-                                                        "pcm_frames_rendered":  739680,
+                                                        "rtp_packets_received":  1335,
+                                                        "pcm_frames_rendered":  640800,
                                                         "playback_underruns":  57,
-                                                        "av_presentation_skew_ms":  15.459
+                                                        "av_presentation_skew_ms":  15.1627
                                                     },
                                           "network":  {
-                                                          "packets_received":  2108,
-                                                          "bytes_received":  13761137,
+                                                          "packets_received":  1901,
+                                                          "bytes_received":  13859969,
                                                           "rtt_ms":  0,
                                                           "jitter_ms":  0
                                                       }

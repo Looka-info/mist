@@ -27,6 +27,8 @@ $binaries = @(
     "bin\mist-signaling.exe"
 )
 
+$installerBinary = "build\apps\installer\MistSetup.exe"
+
 foreach ($b in $binaries) {
     if (-not (Test-Path $b)) {
         Write-Error "Required binary missing: $b. Please build before packaging."
@@ -45,6 +47,17 @@ Write-Host "Staging release binaries..." -ForegroundColor Green
 foreach ($b in $binaries) {
     Copy-Item -Path $b -Destination "$DistDir\bin" -Force
     Write-Host "  -> Staged: $(Split-Path $b -Leaf)" -ForegroundColor Gray
+}
+
+if (Test-Path "resources\mist.ico") {
+    Copy-Item -Path "resources\mist.ico" -Destination "$DistDir\bin" -Force
+    Write-Host "  -> Staged: mist.ico" -ForegroundColor Gray
+}
+
+if (Test-Path $installerBinary) {
+    Copy-Item -Path $installerBinary -Destination "$DistDir\MistSetup.exe" -Force
+    Copy-Item -Path $installerBinary -Destination "dist\MistSetup-v0.2.0-rc1.exe" -Force
+    Write-Host "  -> Staged standalone installer: MistSetup-v0.2.0-rc1.exe" -ForegroundColor Green
 }
 
 # 3. Create default configuration
@@ -131,7 +144,13 @@ Set-Content -Path "$DistDir\uninstall.ps1" -Value $uninstallScript -Encoding UTF
 
 # 6. Execute Code Signing and Release Manifest generation
 Write-Host "Executing release code signing..." -ForegroundColor Yellow
-& powershell -ExecutionPolicy Bypass -File "scripts\sign-release.ps1" -DistPath "$DistDir\bin" -ManifestOutput "$DistDir\release-manifest.json"
+& powershell -ExecutionPolicy Bypass -File "scripts\sign-release.ps1" -DistPath "$DistDir" -ManifestOutput "$DistDir\release-manifest.json"
+if (Test-Path "dist\MistSetup-v0.2.0-rc1.exe") {
+    $certs = Get-ChildItem -Path Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue
+    if ($certs -and $certs.Count -gt 0) {
+        Set-AuthenticodeSignature -FilePath "dist\MistSetup-v0.2.0-rc1.exe" -Certificate $certs[0] -TimestampServer "http://timestamp.digicert.com" -ErrorAction SilentlyContinue | Out-Null
+    }
+}
 
 # 7. Package ZIP Distribution Archive
 Write-Host "Creating distribution archive: $ZipOutput" -ForegroundColor Cyan
@@ -165,6 +184,30 @@ if ($TestInstallUninstall) {
     }
     Remove-Item -Path $testInstallDir -Recurse -Force -ErrorAction SilentlyContinue
     Write-Host "  -> Uninstall verification: PASSED" -ForegroundColor Green
+
+    # Test Native Windows Setup Executable Lifecycle
+    if (Test-Path "dist\MistSetup-v0.2.0-rc1.exe") {
+        Write-Host "`nTesting native MistSetup.exe silent installation..." -ForegroundColor Yellow
+        $nativeTestDir = "$env:TEMP\MistNativeSetupTest"
+        if (Test-Path $nativeTestDir) { Remove-Item -Path $nativeTestDir -Recurse -Force }
+
+        Start-Process -FilePath "dist\MistSetup-v0.2.0-rc1.exe" -ArgumentList "/S /D=$nativeTestDir" -Wait
+        if (-not (Test-Path "$nativeTestDir\mist_desktop.exe")) {
+            Write-Error "Native installer test failed: mist_desktop.exe not found in $nativeTestDir"
+            exit 1
+        }
+        Write-Host "  -> Native installer verification: PASSED" -ForegroundColor Green
+
+        Write-Host "Testing native uninstaller lifecycle..." -ForegroundColor Yellow
+        Start-Process -FilePath "$nativeTestDir\uninstall.exe" -ArgumentList "--uninstall --silent" -Wait
+        Start-Sleep -Seconds 3
+        if (Test-Path "$nativeTestDir\mist_desktop.exe") {
+            Write-Error "Native uninstaller test failed: files remained after uninstall."
+            exit 1
+        }
+        Remove-Item -Path $nativeTestDir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "  -> Native uninstaller verification: PASSED" -ForegroundColor Green
+    }
 }
 
 Write-Host "`nMist Milestone 7 Release Distribution Complete!" -ForegroundColor Green

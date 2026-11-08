@@ -3,3 +3,4 @@
 add_subdirectory(host)
 add_subdirectory(client)
 add_subdirectory(desktop)
+add_subdirectory(installer)
