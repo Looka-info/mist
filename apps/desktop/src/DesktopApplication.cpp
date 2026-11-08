@@ -9,6 +9,7 @@
 #include <shellscalingapi.h>
 #include <random>
 #include <cmath>
+#include <vector>
 #endif
 
 #include <iostream>
@@ -57,6 +58,24 @@ static std::string generateRandomPairingCode() {
     return s;
 }
 
+static std::string resolveFontPath(const std::string& filename) {
+    const std::vector<std::string> candidates = {
+        "resources/fonts/" + filename,
+        "../resources/fonts/" + filename,
+        "../../resources/fonts/" + filename,
+        "../../../resources/fonts/" + filename,
+        "C:/Users/mumer/AppData/Local/Programs/Mist/resources/fonts/" + filename,
+        "C:/Users/mumer/OneDrive/Desktop/mist/resources/fonts/" + filename
+    };
+    for (const auto& path : candidates) {
+        DWORD attrib = GetFileAttributesA(path.c_str());
+        if (attrib != INVALID_FILE_ATTRIBUTES && !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
+            return path;
+        }
+    }
+    return "";
+}
+
 static void BeginCardContainer(const char* id, const mist::desktop::tokens::ThemeColors& c, const ImVec2& size = ImVec2(0, 0), float rounding = 28.0f) {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
     ImGui::PushStyleColor(ImGuiCol_Border, c.line);
@@ -85,7 +104,7 @@ DesktopApplication::~DesktopApplication() {
 void DesktopApplication::printHeader(const std::string& title) const {
     std::cout << "\n======================================================\n";
     std::cout << "  MIST DESKTOP -- " << title << "\n";
-    std::cout << "  Play beyond your desk. | Direct3D 11 & NVENC\n";
+    std::cout << "  Play beyond your desk. | Roboto & Mint Material\n";
     std::cout << "======================================================\n\n";
 }
 
@@ -98,10 +117,10 @@ void DesktopApplication::renderHomeScreen() const {
     std::cout << "  2. Aiden's Laptop   -- Sat * 2 h 10 min  (60 fps * 9.8 Mbps)\n";
     std::cout << "  3. Studio desktop   -- Thu * 15 min      (30 fps * 6.2 Mbps)\n\n";
     std::cout << "Quick Actions:\n";
-    std::cout << "  [1] Host this PC      -- Let paired devices see and play on your desktop.\n";
-    std::cout << "  [2] Connect to a PC   -- Join a session with its ID.\n";
-    std::cout << "  [3] Pair a device     -- Create a one-time code and set permissions.\n";
-    std::cout << "  [4] Check network     -- See how Mist adapts to your connection.\n\n";
+    std::cout << "  [Cast] Host this PC      -- Let paired devices see and play on your desktop.\n";
+    std::cout << "  [Pad]  Connect to a PC   -- Join a session with its ID.\n";
+    std::cout << "  [Dev]  Pair a device     -- Create a one-time code and set permissions.\n";
+    std::cout << "  [Net]  Check network     -- See how Mist adapts to your connection.\n\n";
     std::cout << "System Check:\n";
     std::cout << "  - Video Encoder:    NVENC * GTX 1660 SUPER [OK]\n";
     std::cout << "  - Graphics Driver:  617.14 [OK]\n";
@@ -340,6 +359,45 @@ void DesktopApplication::showToast(const std::string& message) {
     toastTimer_ = 2.5f; // Display for 2.5 seconds
 }
 
+void DesktopApplication::generateOrganicShapes() {
+    organicShapes_.clear();
+    struct ShapeTemplate {
+        int t0;
+        int t1;
+        float t2;
+    };
+    const ShapeTemplate templates[] = {
+        {1, 8, 0.35f},
+        {1, 7, 0.30f},
+        {0, 5, 0.12f},
+        {0, 4, 0.10f},
+        {0, 9, 0.07f},
+        {1, 9, 0.28f}
+    };
+
+    for (int i = 0; i < 6; ++i) {
+        OrganicShape s;
+        const auto& t = templates[i % 6];
+        s.templateType = t.t0;
+        s.symmetry = t.t1;
+        s.param = t.t2;
+        s.phase = static_cast<float>((rand() % 628)) / 100.0f;
+        s.scale = 280.0f + static_cast<float>(rand() % 160);
+
+        // Positioning matching Mist.html: L=i%2?74+rand*14:-10-rand*8, Y=i*18-6+rand*8
+        float posX = (i % 2 == 1) ? (0.76f + (rand() % 12) * 0.01f) : (-0.08f - (rand() % 8) * 0.01f);
+        float posY = (static_cast<float>(i) * 0.17f - 0.04f + (rand() % 8) * 0.01f);
+        s.posXRatio = posX;
+        s.posYRatio = posY;
+        s.driftX = -60.0f + static_cast<float>(rand() % 120);
+        s.driftY = -60.0f + static_cast<float>(rand() % 120);
+        s.driftDuration = 25.0f + static_cast<float>(rand() % 25);
+        s.colorIndex = i % 4; // 0=s1, 1=s2, 2=s3, 3=s4
+
+        organicShapes_.push_back(s);
+    }
+}
+
 common::Result<void> DesktopApplication::initializeD3D11Gui() {
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -433,25 +491,43 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    // Load TrueType fonts from Segoe UI
-    const char* fontPathRegular = "C:\\Windows\\Fonts\\segoeui.ttf";
-    const char* fontPathBold    = "C:\\Windows\\Fonts\\segoeuib.ttf";
+    // Load Roboto font from downloaded Google Fonts TTF files
+    std::string fontRobotoReg = resolveFontPath("Roboto-Regular.ttf");
+    std::string fontRobotoMed = resolveFontPath("Roboto-Medium.ttf");
+    std::string fontRobotoBld = resolveFontPath("Roboto-Bold.ttf");
+    std::string fontMatIcons  = resolveFontPath("MaterialSymbolsRounded.ttf");
 
-    if (GetFileAttributesA(fontPathRegular) != INVALID_FILE_ATTRIBUTES) {
-        fontRegular_  = io.Fonts->AddFontFromFileTTF(fontPathRegular, tokens::MintTypography::Body);     // 15px
-        fontSmall_    = io.Fonts->AddFontFromFileTTF(fontPathRegular, tokens::MintTypography::Label);    // 13px
-        if (GetFileAttributesA(fontPathBold) != INVALID_FILE_ATTRIBUTES) {
-            fontBold_     = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::BodyBold);  // 16px
-            fontTitle_    = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Title);     // 20px
-            fontHeadline_ = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Headline);  // 22px
-            fontDisplay_  = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Display);   // 32px
-            fontCode_     = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Code);      // 34px
+    if (fontRobotoMed.empty()) fontRobotoMed = fontRobotoBld;
+    if (fontRobotoReg.empty()) fontRobotoReg = "C:\\Windows\\Fonts\\segoeui.ttf";
+    if (fontRobotoMed.empty()) fontRobotoMed = "C:\\Windows\\Fonts\\segoeuib.ttf";
+
+    if (!fontRobotoReg.empty()) {
+        fontRegular_  = io.Fonts->AddFontFromFileTTF(fontRobotoReg.c_str(), tokens::MintTypography::Body);     // 15px
+        fontSmall_    = io.Fonts->AddFontFromFileTTF(fontRobotoReg.c_str(), tokens::MintTypography::Label);    // 13px
+        if (!fontRobotoMed.empty()) {
+            fontBold_     = io.Fonts->AddFontFromFileTTF(fontRobotoMed.c_str(), tokens::MintTypography::BodyBold);  // 16px
+            fontTitle_    = io.Fonts->AddFontFromFileTTF(fontRobotoMed.c_str(), tokens::MintTypography::Title);     // 20px
+            fontHeadline_ = io.Fonts->AddFontFromFileTTF(fontRobotoMed.c_str(), tokens::MintTypography::Headline);  // 22px
+            fontDisplay_  = io.Fonts->AddFontFromFileTTF(fontRobotoMed.c_str(), tokens::MintTypography::Display);   // 32px
+            fontCode_     = io.Fonts->AddFontFromFileTTF(fontRobotoMed.c_str(), tokens::MintTypography::Code);      // 34px
         }
     }
+
+    // Merge Material Symbols Rounded into font atlas
+    if (!fontMatIcons.empty()) {
+        static const ImWchar icon_ranges[] = { 0xe000, 0xf300, 0 };
+        ImFontConfig iconCfg;
+        iconCfg.MergeMode = true;
+        iconCfg.PixelSnapH = true;
+        iconCfg.GlyphOffset.y = 1.0f;
+        io.Fonts->AddFontFromFileTTF(fontMatIcons.c_str(), 20.0f, &iconCfg, icon_ranges);
+    }
+
     if (!fontRegular_) {
         fontRegular_ = io.Fonts->AddFontDefault();
     }
 
+    generateOrganicShapes();
     applyActiveTheme();
 
     ImGui_ImplWin32_Init(hwnd_);
@@ -564,6 +640,126 @@ void DesktopApplication::renderSleekMintLogo(float size) const {
     ImGui::Dummy(ImVec2(size, size));
 }
 
+void DesktopApplication::renderVectorIcon(const char* name, const ImVec2& center, float size, ImU32 color) const {
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    float cx = center.x;
+    float cy = center.y;
+    std::string icon = name ? name : "";
+
+    if (icon == "menu") {
+        float lineW = size * 0.36f;
+        drawList->AddLine(ImVec2(cx - lineW, cy - size * 0.24f), ImVec2(cx + lineW, cy - size * 0.24f), color, 2.2f);
+        drawList->AddLine(ImVec2(cx - lineW, cy),               ImVec2(cx + lineW, cy),               color, 2.2f);
+        drawList->AddLine(ImVec2(cx - lineW, cy + size * 0.24f), ImVec2(cx + lineW, cy + size * 0.24f), color, 2.2f);
+    } else if (icon == "search") {
+        float r = size * 0.22f;
+        ImVec2 c(cx - size * 0.08f, cy - size * 0.08f);
+        drawList->AddCircle(c, r, color, 0, 2.0f);
+        drawList->AddLine(ImVec2(cx + size * 0.08f, cy + size * 0.08f), ImVec2(cx + size * 0.32f, cy + size * 0.32f), color, 2.4f);
+    } else if (icon == "circle") {
+        drawList->AddCircleFilled(center, size * 0.20f, color);
+    } else if (icon == "devices") {
+        // Monitor screen outline
+        drawList->AddRect(ImVec2(cx - size * 0.38f, cy - size * 0.30f), ImVec2(cx + size * 0.15f, cy + size * 0.18f), color, 3.0f, 0, 1.8f);
+        drawList->AddLine(ImVec2(cx - size * 0.12f, cy + size * 0.18f), ImVec2(cx - size * 0.12f, cy + size * 0.28f), color, 1.8f);
+        drawList->AddLine(ImVec2(cx - size * 0.24f, cy + size * 0.28f), ImVec2(cx, cy + size * 0.28f), color, 1.8f);
+        // Phone overlay
+        drawList->AddRectFilled(ImVec2(cx + size * 0.12f, cy - size * 0.08f), ImVec2(cx + size * 0.38f, cy + size * 0.36f), color, 2.0f);
+    } else if (icon == "settings") {
+        drawList->AddCircle(center, size * 0.16f, color, 0, 2.0f);
+        for (int i = 0; i < 6; ++i) {
+            float ang = static_cast<float>(i) * 3.14159f / 3.0f;
+            ImVec2 p1(cx + std::cos(ang) * size * 0.20f, cy + std::sin(ang) * size * 0.20f);
+            ImVec2 p2(cx + std::cos(ang) * size * 0.36f, cy + std::sin(ang) * size * 0.36f);
+            drawList->AddLine(p1, p2, color, 2.4f);
+        }
+    } else if (icon == "home") {
+        // Roof
+        ImVec2 pRoof[3] = {
+            ImVec2(cx, cy - size * 0.38f),
+            ImVec2(cx - size * 0.36f, cy + size * 0.02f),
+            ImVec2(cx + size * 0.36f, cy + size * 0.02f)
+        };
+        drawList->AddPolyline(pRoof, 3, color, ImDrawFlags_None, 2.0f);
+        // Walls and door
+        drawList->AddLine(ImVec2(cx - size * 0.26f, cy + size * 0.02f), ImVec2(cx - size * 0.26f, cy + size * 0.34f), color, 2.0f);
+        drawList->AddLine(ImVec2(cx + size * 0.26f, cy + size * 0.02f), ImVec2(cx + size * 0.26f, cy + size * 0.34f), color, 2.0f);
+        drawList->AddLine(ImVec2(cx - size * 0.26f, cy + size * 0.34f), ImVec2(cx - size * 0.08f, cy + size * 0.34f), color, 2.0f);
+        drawList->AddLine(ImVec2(cx + size * 0.08f, cy + size * 0.34f), ImVec2(cx + size * 0.26f, cy + size * 0.34f), color, 2.0f);
+        drawList->AddLine(ImVec2(cx - size * 0.08f, cy + size * 0.34f), ImVec2(cx - size * 0.08f, cy + size * 0.16f), color, 2.0f);
+        drawList->AddLine(ImVec2(cx + size * 0.08f, cy + size * 0.34f), ImVec2(cx + size * 0.08f, cy + size * 0.16f), color, 2.0f);
+        drawList->AddLine(ImVec2(cx - size * 0.08f, cy + size * 0.16f), ImVec2(cx + size * 0.08f, cy + size * 0.16f), color, 2.0f);
+    } else if (icon == "cast") {
+        // Display frame
+        ImVec2 pScreen[4] = {
+            ImVec2(cx - size * 0.18f, cy + size * 0.30f),
+            ImVec2(cx + size * 0.36f, cy + size * 0.30f),
+            ImVec2(cx + size * 0.36f, cy - size * 0.26f),
+            ImVec2(cx - size * 0.36f, cy - size * 0.26f)
+        };
+        drawList->AddPolyline(pScreen, 4, color, ImDrawFlags_None, 2.0f);
+        drawList->AddLine(ImVec2(cx - size * 0.36f, cy - size * 0.26f), ImVec2(cx - size * 0.36f, cy - size * 0.05f), color, 2.0f);
+        // Cast wave arcs from bottom left
+        ImVec2 waveOrg(cx - size * 0.36f, cy + size * 0.30f);
+        drawList->AddCircleFilled(waveOrg, 2.0f, color);
+        drawList->PathArcTo(waveOrg, size * 0.16f, -1.57f, 0.0f);
+        drawList->PathStroke(color, ImDrawFlags_None, 1.8f);
+        drawList->PathArcTo(waveOrg, size * 0.30f, -1.57f, 0.0f);
+        drawList->PathStroke(color, ImDrawFlags_None, 1.8f);
+    } else if (icon == "sports_esports") {
+        // Gamepad pill body
+        drawList->AddRect(ImVec2(cx - size * 0.40f, cy - size * 0.22f), ImVec2(cx + size * 0.40f, cy + size * 0.22f), color, size * 0.18f, 0, 2.0f);
+        // D-Pad +
+        drawList->AddLine(ImVec2(cx - size * 0.24f, cy - size * 0.10f), ImVec2(cx - size * 0.24f, cy + size * 0.10f), color, 2.0f);
+        drawList->AddLine(ImVec2(cx - size * 0.34f, cy), ImVec2(cx - size * 0.14f, cy), color, 2.0f);
+        // Buttons
+        drawList->AddCircleFilled(ImVec2(cx + size * 0.24f, cy - size * 0.08f), 2.0f, color);
+        drawList->AddCircleFilled(ImVec2(cx + size * 0.24f, cy + size * 0.08f), 2.0f, color);
+        drawList->AddCircleFilled(ImVec2(cx + size * 0.16f, cy), 2.0f, color);
+        drawList->AddCircleFilled(ImVec2(cx + size * 0.32f, cy), 2.0f, color);
+    } else if (icon == "network_check") {
+        // Signal bars
+        for (int b = 0; b < 4; ++b) {
+            float bx = cx - size * 0.30f + static_cast<float>(b) * size * 0.20f;
+            float bh = size * (0.16f + static_cast<float>(b) * 0.16f);
+            drawList->AddLine(ImVec2(bx, cy + size * 0.30f), ImVec2(bx, cy + size * 0.30f - bh), color, 2.8f);
+        }
+    } else if (icon == "play_arrow") {
+        ImVec2 tri[3] = {
+            ImVec2(cx - size * 0.18f, cy - size * 0.26f),
+            ImVec2(cx + size * 0.26f, cy),
+            ImVec2(cx - size * 0.18f, cy + size * 0.26f)
+        };
+        drawList->AddConvexPolyFilled(tri, 3, color);
+    } else if (icon == "stop") {
+        drawList->AddRectFilled(ImVec2(cx - size * 0.22f, cy - size * 0.22f), ImVec2(cx + size * 0.22f, cy + size * 0.22f), color, 3.0f);
+    } else if (icon == "check_circle") {
+        drawList->AddCircleFilled(center, size * 0.36f, color);
+        // Checkmark
+        ImVec2 pChk[3] = {
+            ImVec2(cx - size * 0.18f, cy),
+            ImVec2(cx - size * 0.04f, cy + size * 0.14f),
+            ImVec2(cx + size * 0.20f, cy - size * 0.14f)
+        };
+        drawList->AddPolyline(pChk, 3, IM_COL32(255, 255, 255, 255), ImDrawFlags_None, 2.2f);
+    } else if (icon == "radio_button_unchecked") {
+        drawList->AddCircle(center, size * 0.32f, color, 0, 2.0f);
+    } else if (icon == "pending") {
+        drawList->AddCircleFilled(ImVec2(cx - size * 0.20f, cy), size * 0.08f, color);
+        drawList->AddCircleFilled(ImVec2(cx, cy), size * 0.08f, color);
+        drawList->AddCircleFilled(ImVec2(cx + size * 0.20f, cy), size * 0.08f, color);
+    } else if (icon == "casino") {
+        // Die outline
+        drawList->AddRect(ImVec2(cx - size * 0.30f, cy - size * 0.30f), ImVec2(cx + size * 0.30f, cy + size * 0.30f), color, 4.0f, 0, 2.0f);
+        // 5 dots
+        drawList->AddCircleFilled(ImVec2(cx - size * 0.16f, cy - size * 0.16f), 1.6f, color);
+        drawList->AddCircleFilled(ImVec2(cx + size * 0.16f, cy - size * 0.16f), 1.6f, color);
+        drawList->AddCircleFilled(ImVec2(cx, cy), 1.6f, color);
+        drawList->AddCircleFilled(ImVec2(cx - size * 0.16f, cy + size * 0.16f), 1.6f, color);
+        drawList->AddCircleFilled(ImVec2(cx + size * 0.16f, cy + size * 0.16f), 1.6f, color);
+    }
+}
+
 void DesktopApplication::renderChip(const char* text, int statusType) const {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     if (fontSmall_) ImGui::PushFont(fontSmall_);
@@ -602,7 +798,7 @@ void DesktopApplication::renderChip(const char* text, int statusType) const {
     // Dot indicator
     float circleX = pos.x + 12.0f;
     float circleY = pos.y + height * 0.5f;
-    drawList->AddCircleFilled(ImVec2(circleX, circleY), 4.0f, dotCol);
+    renderVectorIcon("circle", ImVec2(circleX, circleY), 16.0f, dotCol);
 
     // Text
     drawList->AddText(ImVec2(circleX + 10.0f, pos.y + (height - textSize.y) * 0.5f), textCol, text);
@@ -611,7 +807,7 @@ void DesktopApplication::renderChip(const char* text, int statusType) const {
     if (fontSmall_) ImGui::PopFont();
 }
 
-bool DesktopApplication::renderPillButton(const char* label, bool primary, bool danger, const ImVec2& size) {
+bool DesktopApplication::renderPillButton(const char* label, bool primary, bool danger, const ImVec2& size, const char* iconName) {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     ImVec2 actualSize = size;
     if (actualSize.y <= 0) actualSize.y = 40.0f;
@@ -619,27 +815,37 @@ bool DesktopApplication::renderPillButton(const char* label, bool primary, bool 
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(24.0f, 8.0f));
 
+    ImU32 iconCol = 0;
     if (primary) {
         ImGui::PushStyleColor(ImGuiCol_Button, c.mint);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(c.mint.x * 1.1f, c.mint.y * 1.1f, c.mint.z * 1.1f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.acc);
         ImGui::PushStyleColor(ImGuiCol_Text, c.onMint);
         ImGui::PushStyleColor(ImGuiCol_Border, c.mint);
+        iconCol = ImGui::ColorConvertFloat4ToU32(c.onMint);
     } else if (danger) {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.surface.x, c.surface.y, c.surface.z, 0.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct2);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.ct);
         ImGui::PushStyleColor(ImGuiCol_Text, c.bad);
         ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+        iconCol = ImGui::ColorConvertFloat4ToU32(c.bad);
     } else {
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.surface.x, c.surface.y, c.surface.z, 0.0f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct2);
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, c.ct);
         ImGui::PushStyleColor(ImGuiCol_Text, c.acc);
         ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+        iconCol = ImGui::ColorConvertFloat4ToU32(c.acc);
     }
 
-    bool clicked = ImGui::Button(label, actualSize);
+    ImVec2 pStart = ImGui::GetCursorScreenPos();
+    std::string fullLabel = (iconName ? "   " : "") + std::string(label);
+    bool clicked = ImGui::Button(fullLabel.c_str(), actualSize);
+
+    if (iconName) {
+        renderVectorIcon(iconName, ImVec2(pStart.x + 20.0f, pStart.y + actualSize.y * 0.5f), 18.0f, iconCol);
+    }
 
     ImGui::PopStyleColor(5);
     ImGui::PopStyleVar(2);
@@ -652,9 +858,23 @@ void DesktopApplication::renderGuiHeader() {
 
     ImGui::BeginGroup();
 
+    // 0. Circular Menu Button
+    ImVec2 menuPos = ImGui::GetCursorScreenPos();
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
+    ImGui::PushStyleColor(ImGuiCol_Button, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+    ImGui::PushStyleColor(ImGuiCol_Text, c.ink);
+
+    if (ImGui::Button("##MenuBtn", ImVec2(44.0f, 44.0f))) {
+        // Toggle menu / rail
+    }
+    renderVectorIcon("menu", ImVec2(menuPos.x + 22.0f, menuPos.y + 22.0f), 20.0f, ImGui::ColorConvertFloat4ToU32(c.ink));
+    ImGui::SameLine(0, 12.0f);
+
     // 1. Sleek Mint Logo & Brand Text "Mist"
     renderSleekMintLogo(44.0f);
-    ImGui::SameLine(0, 12.0f);
+    ImGui::SameLine(0, 10.0f);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 8.0f);
 
     if (fontHeadline_) ImGui::PushFont(fontHeadline_);
@@ -667,8 +887,8 @@ void DesktopApplication::renderGuiHeader() {
     float searchOffset = std::max(200.0f, availW - 480.0f);
     ImGui::SameLine(searchOffset);
 
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(16.0f, 10.0f));
+    ImVec2 searchPos = ImGui::GetCursorScreenPos();
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(36.0f, 10.0f));
     ImGui::PushStyleColor(ImGuiCol_FrameBg, c.surface);
     ImGui::PushStyleColor(ImGuiCol_Border, c.line);
     ImGui::PushItemWidth(searchWidth);
@@ -695,9 +915,12 @@ void DesktopApplication::renderGuiHeader() {
             showToast("Nothing found for '" + std::string(searchQuery_) + "'");
         }
     }
+    // Search icon inside input pill
+    renderVectorIcon("search", ImVec2(searchPos.x + 20.0f, searchPos.y + 22.0f), 18.0f, ImGui::ColorConvertFloat4ToU32(c.mute));
+
     ImGui::PopItemWidth();
     ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar();
 
     // 3. Status Chip ("Idle" or "Streaming")
     ImGui::SameLine(0, 12.0f);
@@ -712,15 +935,11 @@ void DesktopApplication::renderGuiHeader() {
     ImGui::SameLine(0, 12.0f);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 6.0f);
     ImVec2 devBtnPos = ImGui::GetCursorScreenPos();
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
-    ImGui::PushStyleColor(ImGuiCol_Button, c.surface);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, c.ct);
-    ImGui::PushStyleColor(ImGuiCol_Border, c.line);
-    ImGui::PushStyleColor(ImGuiCol_Text, c.ink);
 
-    if (ImGui::Button("[D]##TopDev", ImVec2(44.0f, 44.0f))) {
+    if (ImGui::Button("##TopDev", ImVec2(44.0f, 44.0f))) {
         currentScreen_ = DesktopScreen::Devices;
     }
+    renderVectorIcon("devices", ImVec2(devBtnPos.x + 22.0f, devBtnPos.y + 22.0f), 22.0f, ImGui::ColorConvertFloat4ToU32(c.ink));
 
     // Badge "1" at top-right corner of device button
     if (isDeviceApprovalPending_) {
@@ -732,9 +951,12 @@ void DesktopApplication::renderGuiHeader() {
 
     // 5. Circular Settings Button (Gear)
     ImGui::SameLine(0, 8.0f);
-    if (ImGui::Button("[*]##TopGear", ImVec2(44.0f, 44.0f))) {
+    ImVec2 gearPos = ImGui::GetCursorScreenPos();
+    if (ImGui::Button("##TopGear", ImVec2(44.0f, 44.0f))) {
         isSettingsOpen_ = !isSettingsOpen_;
     }
+    renderVectorIcon("settings", ImVec2(gearPos.x + 22.0f, gearPos.y + 22.0f), 22.0f, ImGui::ColorConvertFloat4ToU32(c.ink));
+
     ImGui::PopStyleColor(4);
     ImGui::PopStyleVar();
 
@@ -745,20 +967,23 @@ void DesktopApplication::renderGuiNavRail() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     float railWidth = 272.0f;
 
+    // Transparent child window so ambient wallpaper shines through
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
     ImGui::BeginChild("NavRail", ImVec2(railWidth, 0), false, ImGuiWindowFlags_NoScrollbar);
 
     struct NavItem {
         DesktopScreen screen;
         const char* label;
+        const char* icon;
         bool hasBadge;
     };
 
     const NavItem items[] = {
-        { DesktopScreen::Home,    "  Home",    false },
-        { DesktopScreen::Host,    "  Host",    false },
-        { DesktopScreen::Connect, "  Connect", false },
-        { DesktopScreen::Devices, "  Devices", isDeviceApprovalPending_ },
-        { DesktopScreen::Network, "  Network", false },
+        { DesktopScreen::Home,    "Home",    "home",          false },
+        { DesktopScreen::Host,    "Host",    "cast",          false },
+        { DesktopScreen::Connect, "Connect", "sports_esports",false },
+        { DesktopScreen::Devices, "Devices", "devices",       isDeviceApprovalPending_ },
+        { DesktopScreen::Network, "Network", "network_check", false },
     };
 
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
@@ -781,11 +1006,16 @@ void DesktopApplication::renderGuiNavRail() {
         }
 
         ImVec2 pStart = ImGui::GetCursorScreenPos();
+        std::string btnText = "      " + std::string(item.label);
         if (fontBold_) ImGui::PushFont(fontBold_);
-        if (ImGui::Button(item.label, ImVec2(railWidth - 24.0f, 52.0f))) {
+        if (ImGui::Button(btnText.c_str(), ImVec2(railWidth - 24.0f, 52.0f))) {
             currentScreen_ = item.screen;
         }
         if (fontBold_) ImGui::PopFont();
+
+        // Render the navigation icon
+        ImU32 iconColor = isSelected ? ImGui::ColorConvertFloat4ToU32(c.onCt) : ImGui::ColorConvertFloat4ToU32(c.mute);
+        renderVectorIcon(item.icon, ImVec2(pStart.x + 28.0f, pStart.y + 26.0f), 22.0f, iconColor);
 
         if (item.hasBadge) {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -811,6 +1041,7 @@ void DesktopApplication::renderGuiNavRail() {
     }
 
     ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 void DesktopApplication::renderGuiHomeScreen() {
@@ -877,13 +1108,13 @@ void DesktopApplication::renderGuiHomeScreen() {
         const char* title;
         const char* desc;
         DesktopScreen target;
-        const char* iconTag;
+        const char* icon;
     };
     const TileData tiles[] = {
-        { "Host this PC",    "Let paired devices see and play on your desktop.", DesktopScreen::Host,    "[H]" },
-        { "Connect to a PC", "Join a session with its ID.",                      DesktopScreen::Connect, "[C]" },
-        { "Pair a device",   "Create a one-time code and set permissions.",       DesktopScreen::Devices, "[D]" },
-        { "Check network",   "See how Mist adapts to your connection.",           DesktopScreen::Network, "[N]" },
+        { "Host this PC",    "Let paired devices see and play on your desktop.", DesktopScreen::Host,    "cast" },
+        { "Connect to a PC", "Join a session with its ID.",                      DesktopScreen::Connect, "sports_esports" },
+        { "Pair a device",   "Create a one-time code and set permissions.",       DesktopScreen::Devices, "devices" },
+        { "Check network",   "See how Mist adapts to your connection.",           DesktopScreen::Network, "network_check" },
     };
 
     for (int i = 0; i < 4; ++i) {
@@ -902,9 +1133,9 @@ void DesktopApplication::renderGuiHomeScreen() {
         ImVec2 curPos = ImGui::GetCursorScreenPos();
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         drawList->AddRectFilled(curPos, ImVec2(curPos.x + 48.0f, curPos.y + 48.0f), ImGui::ColorConvertFloat4ToU32(c.mint), 16.0f);
-        if (fontBold_) ImGui::PushFont(fontBold_);
-        drawList->AddText(ImVec2(curPos.x + 14.0f, curPos.y + 14.0f), ImGui::ColorConvertFloat4ToU32(c.onMint), tiles[i].iconTag);
-        if (fontBold_) ImGui::PopFont();
+
+        // Render the exact Material icon inside the mint box
+        renderVectorIcon(tiles[i].icon, ImVec2(curPos.x + 24.0f, curPos.y + 24.0f), 24.0f, ImGui::ColorConvertFloat4ToU32(c.onMint));
 
         ImGui::Dummy(ImVec2(48.0f, 48.0f));
         ImGui::SameLine(0, 14.0f);
@@ -1036,12 +1267,12 @@ void DesktopApplication::renderGuiHostScreen() {
     ImGui::Spacing();
 
     if (!isHostingActive_) {
-        if (renderPillButton("Start streaming", true, false, ImVec2(180.0f, 40.0f))) {
+        if (renderPillButton("Start streaming", true, false, ImVec2(180.0f, 40.0f), "play_arrow")) {
             isHostingActive_ = true;
             showToast("Streaming started");
         }
     } else {
-        if (renderPillButton("Stop streaming", false, true, ImVec2(180.0f, 40.0f))) {
+        if (renderPillButton("Stop streaming", false, true, ImVec2(180.0f, 40.0f), "stop")) {
             isHostingActive_ = false;
             showToast("Streaming stopped");
         }
@@ -1150,12 +1381,19 @@ void DesktopApplication::renderGuiConnectScreen() {
 
     for (int i = 0; i < 4; ++i) {
         ImGui::Spacing();
+        ImVec2 pLine = ImGui::GetCursorScreenPos();
         if (connectStep_ > i + 1) {
-            ImGui::TextColored(c.ok, "[V]  %s", steps[i]);
+            renderVectorIcon("check_circle", ImVec2(pLine.x + 12.0f, pLine.y + 10.0f), 18.0f, ImGui::ColorConvertFloat4ToU32(c.ok));
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 28.0f);
+            ImGui::TextColored(c.ink, "%s", steps[i]);
         } else if (connectStep_ == i + 1) {
-            ImGui::TextColored(c.warn, "[*]  %s (In progress)", steps[i]);
+            renderVectorIcon("pending", ImVec2(pLine.x + 12.0f, pLine.y + 10.0f), 18.0f, ImGui::ColorConvertFloat4ToU32(c.warn));
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 28.0f);
+            ImGui::TextColored(c.warn, "%s", steps[i]);
         } else {
-            ImGui::TextColored(c.mute, "[ ]  %s", steps[i]);
+            renderVectorIcon("radio_button_unchecked", ImVec2(pLine.x + 12.0f, pLine.y + 10.0f), 18.0f, ImGui::ColorConvertFloat4ToU32(c.line));
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 28.0f);
+            ImGui::TextColored(c.mute, "%s", steps[i]);
         }
     }
 
@@ -1580,7 +1818,17 @@ void DesktopApplication::renderGuiSettingsDialog() {
 
         ImGui::Spacing();
 
-        // 5. Maximum Video Bitrate Slider
+        // 5. Shapes Shuffle Button
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextColored(c.ink, "Shapes");
+        ImGui::SameLine(0, 16.0f);
+        if (renderPillButton("Shuffle", false, false, ImVec2(120.0f, 34.0f), "casino")) {
+            generateOrganicShapes();
+        }
+
+        ImGui::Spacing();
+
+        // 6. Maximum Video Bitrate Slider
         std::string capLabel = "Maximum video bitrate: " + std::to_string(settingsMaxBitrateMbps_) + " Mbps";
         if (fontRegular_) ImGui::PushFont(fontRegular_);
         ImGui::TextColored(c.ink, "%s", capLabel.c_str());
@@ -1589,7 +1837,7 @@ void DesktopApplication::renderGuiSettingsDialog() {
 
         ImGui::Spacing();
 
-        // 6. Frame Rate Select
+        // 7. Frame Rate Select
         const char* frameRates[] = { "60 frames per second", "30 frames per second" };
         ImGui::Combo("Frame rate", &settingsFrameRate_, frameRates, IM_ARRAYSIZE(frameRates));
 
@@ -1712,24 +1960,61 @@ void DesktopApplication::renderGuiFrame() {
         if (rttHistory_.size() > 60) rttHistory_.erase(rttHistory_.begin());
     }
 
-    // 2. Ambient drifting wallpaper background (matching Mist.html #wall shapes)
+    // 2. Ambient drifting wallpaper background with exact Mist.html parametric organic shapes
+    ImDrawList* bgDraw = ImGui::GetBackgroundDrawList();
+
+    // 160-degree linear gradient canvas
+    ImU32 w1Col = ImGui::ColorConvertFloat4ToU32(c.bg);
+    ImU32 w2Col = (currentTheme_ == tokens::ThemeMode::Light)
+        ? IM_COL32(220, 246, 236, 255)  // #dcf6ec soft mint gradient
+        : IM_COL32(16, 50, 41, 255);    // #103229 dark mint gradient
+
+    bgDraw->AddRectFilledMultiColor(
+        ImVec2(0, 0), io.DisplaySize,
+        w1Col, w2Col, w2Col, w1Col
+    );
+
+    // Render the 6 parametric organic fluid petal shapes
+    static float animTime = 0.0f;
     if (settingsAnimatedShapes_) {
-        ImDrawList* bgDraw = ImGui::GetBackgroundDrawList();
-        static float animTime = 0.0f;
-        animTime += dt * 0.25f;
-
-        float ox1 = std::sin(animTime) * 30.0f;
-        float oy1 = std::cos(animTime * 0.8f) * 20.0f;
-        float ox2 = std::cos(animTime * 1.1f) * 25.0f;
-        float oy2 = std::sin(animTime * 0.9f) * 35.0f;
-
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.90f + ox1, io.DisplaySize.y * 0.20f + oy1), 260.0f, ImGui::ColorConvertFloat4ToU32(c.s1));
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.10f + ox2, io.DisplaySize.y * 0.80f + oy2), 290.0f, ImGui::ColorConvertFloat4ToU32(c.s2));
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.85f - ox2, io.DisplaySize.y * 0.75f - oy1), 220.0f, ImGui::ColorConvertFloat4ToU32(c.s3));
-        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.25f + ox1, io.DisplaySize.y * 0.15f - oy2), 200.0f, ImGui::ColorConvertFloat4ToU32(c.s4));
+        animTime += dt;
     }
 
-    // 3. Main Window
+    float W = std::min(io.DisplaySize.x, 1400.0f);
+
+    for (const auto& s : organicShapes_) {
+        float driftAngle = (animTime / s.driftDuration) * 6.28318f;
+        float curDriftX = settingsAnimatedShapes_ ? (std::sin(driftAngle) * s.driftX) : 0.0f;
+        float curDriftY = settingsAnimatedShapes_ ? (std::cos(driftAngle) * s.driftY) : 0.0f;
+
+        float cx = s.posXRatio * io.DisplaySize.x + curDriftX;
+        float cy = s.posYRatio * io.DisplaySize.y + curDriftY;
+        float radius = s.scale * (W / 1200.0f);
+        float f = 88.0f / (s.templateType ? 1.0f : (1.0f + s.param));
+
+        ImVec4 shapeCol = (s.colorIndex == 0) ? c.s1 : ((s.colorIndex == 1) ? c.s2 : ((s.colorIndex == 2) ? c.s3 : c.s4));
+        shapeCol.w = (currentTheme_ == tokens::ThemeMode::Light) ? 0.75f : 0.45f;
+        ImU32 fillU32 = ImGui::ColorConvertFloat4ToU32(shapeCol);
+
+        // 160-point parametric curve
+        constexpr int NUM_PTS = 80;
+        ImVec2 pts[NUM_PTS];
+        for (int k = 0; k < NUM_PTS; ++k) {
+            float a = static_cast<float>(k) / static_cast<float>(NUM_PTS) * 6.2831853f;
+            float rVal = s.templateType
+                ? (1.0f - s.param + s.param * std::abs(std::cos(static_cast<float>(s.symmetry) * a * 0.5f + s.phase)))
+                : (1.0f + s.param * std::cos(static_cast<float>(s.symmetry) * a + s.phase));
+
+            float px = cx + (f * rVal * std::cos(a)) * (radius / 180.0f);
+            float py = cy + (f * rVal * std::sin(a)) * (radius / 180.0f);
+            pts[k] = ImVec2(px, py);
+        }
+
+        // Draw filled organic shape
+        bgDraw->AddConvexPolyFilled(pts, NUM_PTS, fillU32);
+    }
+
+    // 3. Main Window with transparent background (so organic wall shines through!)
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
 
@@ -1737,7 +2022,8 @@ void DesktopApplication::renderGuiFrame() {
                                    ImGuiWindowFlags_NoMove |
                                    ImGuiWindowFlags_NoBringToFrontOnFocus |
                                    ImGuiWindowFlags_NoScrollWithMouse |
-                                   ImGuiWindowFlags_NoScrollbar;
+                                   ImGuiWindowFlags_NoScrollbar |
+                                   ImGuiWindowFlags_NoBackground; // Transparent background!
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 16.0f));
     ImGui::Begin("MistMainWindow", nullptr, windowFlags);
@@ -1751,7 +2037,8 @@ void DesktopApplication::renderGuiFrame() {
     renderGuiNavRail();
     ImGui::SameLine(0, 16.0f);
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.bg);
+    // Transparent Child for MainContent so the wallpaper flows behind the cards
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
     ImGui::BeginChild("MainContent", ImVec2(0, 0), false);
 
     switch (currentScreen_) {

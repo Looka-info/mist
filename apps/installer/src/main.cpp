@@ -26,11 +26,15 @@
 
 namespace {
 
-constexpr int RES_MIST_DESKTOP   = 201;
-constexpr int RES_MIST_HOST      = 202;
-constexpr int RES_MIST_CLIENT    = 203;
-constexpr int RES_MIST_SIGNALING = 204;
-constexpr int RES_MIST_ICO       = 205;
+constexpr int RES_MIST_DESKTOP    = 201;
+constexpr int RES_MIST_HOST       = 202;
+constexpr int RES_MIST_CLIENT     = 203;
+constexpr int RES_MIST_SIGNALING  = 204;
+constexpr int RES_MIST_ICO        = 205;
+constexpr int RES_FONT_ROBOTO_REG = 206;
+constexpr int RES_FONT_ROBOTO_MED = 207;
+constexpr int RES_FONT_ROBOTO_BOLD= 208;
+constexpr int RES_FONT_MAT_ICONS  = 209;
 
 constexpr int IDC_BROWSE_BTN     = 1001;
 constexpr int IDC_INSTALL_BTN    = 1002;
@@ -226,8 +230,13 @@ bool PerformInstall(
     progressCb(70, L"Extracting mist-signaling.exe...");
     ExtractResourceToFile(hInstance, RES_MIST_SIGNALING, installDir + L"\\mist-signaling.exe");
 
-    progressCb(80, L"Installing icons and runtime configuration...");
+    progressCb(80, L"Installing typography, icons and runtime configuration...");
     ExtractResourceToFile(hInstance, RES_MIST_ICO, installDir + L"\\mist.ico");
+    EnsureDirectoryRecursive(installDir + L"\\resources\\fonts");
+    ExtractResourceToFile(hInstance, RES_FONT_ROBOTO_REG, installDir + L"\\resources\\fonts\\Roboto-Regular.ttf");
+    ExtractResourceToFile(hInstance, RES_FONT_ROBOTO_MED, installDir + L"\\resources\\fonts\\Roboto-Medium.ttf");
+    ExtractResourceToFile(hInstance, RES_FONT_ROBOTO_BOLD, installDir + L"\\resources\\fonts\\Roboto-Bold.ttf");
+    ExtractResourceToFile(hInstance, RES_FONT_MAT_ICONS, installDir + L"\\resources\\fonts\\MaterialSymbolsRounded.ttf");
     WriteDefaultConfig(installDir + L"\\config\\mist.ini");
 
     // Copy Self as uninstaller
@@ -288,6 +297,12 @@ bool PerformUninstall(const std::wstring& installDir, bool silent) {
     DeleteFileW((installDir + L"\\mist_client.exe").c_str());
     DeleteFileW((installDir + L"\\mist-signaling.exe").c_str());
     DeleteFileW((installDir + L"\\mist.ico").c_str());
+    DeleteFileW((installDir + L"\\resources\\fonts\\Roboto-Regular.ttf").c_str());
+    DeleteFileW((installDir + L"\\resources\\fonts\\Roboto-Medium.ttf").c_str());
+    DeleteFileW((installDir + L"\\resources\\fonts\\Roboto-Bold.ttf").c_str());
+    DeleteFileW((installDir + L"\\resources\\fonts\\MaterialSymbolsRounded.ttf").c_str());
+    RemoveDirectoryW((installDir + L"\\resources\\fonts").c_str());
+    RemoveDirectoryW((installDir + L"\\resources").c_str());
     DeleteFileW((installDir + L"\\config\\mist.ini").c_str());
     RemoveDirectoryW((installDir + L"\\config").c_str());
 

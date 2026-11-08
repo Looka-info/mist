@@ -98,10 +98,27 @@ private:
 
     // GUI Visual Components
     void renderSleekMintLogo(float size = 36.0f) const;
+    void renderVectorIcon(const char* name, const ImVec2& center, float size, ImU32 color) const;
     void renderChip(const char* text, int statusType = 0) const; // 0=neutral, 1=ok, 2=warn, 3=bad
     void renderMetricBox(const char* label, const char* value, const char* sublabel = nullptr) const;
-    bool renderPillButton(const char* label, bool primary = false, bool danger = false, const ImVec2& size = ImVec2(0, 40.0f));
+    bool renderPillButton(const char* label, bool primary = false, bool danger = false, const ImVec2& size = ImVec2(0, 40.0f), const char* iconName = nullptr);
     void showToast(const std::string& message);
+    void generateOrganicShapes();
+
+    struct OrganicShape {
+        int templateType{0};
+        int symmetry{8};
+        float param{0.35f};
+        float phase{0.0f};
+        float scale{300.0f};
+        float posXRatio{0.5f};
+        float posYRatio{0.5f};
+        float driftX{40.0f};
+        float driftY{40.0f};
+        float driftDuration{30.0f};
+        int colorIndex{0}; // 0..3 for s1..s4
+    };
+    std::vector<OrganicShape> organicShapes_;
 
     HWND hwnd_{nullptr};
     Microsoft::WRL::ComPtr<ID3D11Device> d3d11Device_;

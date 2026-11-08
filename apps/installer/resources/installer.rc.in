@@ -9,6 +9,10 @@
 203 RCDATA "@CMAKE_BINARY_DIR@/apps/client/mist_client.exe"
 204 RCDATA "@CMAKE_SOURCE_DIR@/bin/mist-signaling.exe"
 205 RCDATA "@CMAKE_SOURCE_DIR@/resources/mist.ico"
+206 RCDATA "@CMAKE_SOURCE_DIR@/resources/fonts/Roboto-Regular.ttf"
+207 RCDATA "@CMAKE_SOURCE_DIR@/resources/fonts/Roboto-Medium.ttf"
+208 RCDATA "@CMAKE_SOURCE_DIR@/resources/fonts/Roboto-Bold.ttf"
+209 RCDATA "@CMAKE_SOURCE_DIR@/resources/fonts/MaterialSymbolsRounded.ttf"
 
 // 3. Version Information
 VS_VERSION_INFO VERSIONINFO

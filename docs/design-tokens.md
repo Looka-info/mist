@@ -47,24 +47,38 @@ The application supports real-time switching between `ThemeMode::Light` and `The
 
 ---
 
-## 3. Typography Scale Tokens
+## 3. Typography & Icon Scale Tokens
 
-Derived from the reference design (`Google Sans Flex` / `Segoe UI` scale):
+Typography is powered by Google Fonts `Roboto` (`Roboto-Regular.ttf`, `Roboto-Medium.ttf`, `Roboto-Bold.ttf`) and Google `MaterialSymbolsRounded.ttf` bundled directly with the application and installer payloads.
 
 ```cpp
 struct MintTypography {
-    static constexpr float Display  = 32.0f; // Hero Title
-    static constexpr float Headline = 24.0f; // Page Titles
-    static constexpr float Title    = 20.0f; // Card headers, section titles
-    static constexpr float BodyBold = 16.0f; // Emphasized text
-    static constexpr float Body     = 15.0f; // Default standard text
-    static constexpr float Label    = 12.0f; // Overlines, badges, tags
+    static constexpr float Display  = 32.0f; // Hero Title (Roboto-Bold)
+    static constexpr float Headline = 24.0f; // Page Titles (Roboto-Medium)
+    static constexpr float Title    = 20.0f; // Card headers, section titles (Roboto-Medium)
+    static constexpr float BodyBold = 16.0f; // Emphasized text (Roboto-Bold)
+    static constexpr float Body     = 15.0f; // Default standard text (Roboto-Regular)
+    static constexpr float Label    = 12.0f; // Overlines, badges, tags (Roboto-Regular)
 };
 ```
 
+### Material Symbols & Vector Icons
+The application incorporates standard Material Symbols Rounded icons rendered across the navigation rail, action tiles, metric cards, and dialogs:
+- `menu`, `search`, `circle`, `devices`, `settings`
+- `home`, `cast`, `sports_esports`, `network_check`
+- `play_arrow`, `stop`, `check_circle`, `radio_button_unchecked`, `pending`, `casino`
+
 ---
 
-## 4. Shape & Geometry Tokens
+## 4. Organic Background & Canvas
+
+The application window renders a dynamic 160-degree linear gradient canvas overlaid with 6 drifting parametric organic fluid petal shapes (`var(--s1)` to `var(--s4)` in `#b8ebd5`, `#8ed8ba`, `#46deb5`, `#0f8466`):
+- Non-blocking parametric time-drift animation in the Dear ImGui background draw list.
+- Direct3D 11 swapchain transparent pass-through with floating white surface cards.
+
+---
+
+## 5. Shape & Geometry Tokens
 
 ```cpp
 struct MintShapes {

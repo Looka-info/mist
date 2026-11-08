@@ -56,8 +56,8 @@ if (Test-Path "resources\mist.ico") {
 
 if (Test-Path "resources") {
     New-Item -ItemType Directory -Path "$DistDir\resources" -Force | Out-Null
-    Copy-Item -Path "resources\*" -Destination "$DistDir\resources" -Force
-    Write-Host "  -> Staged: resources brand assets (logos, icons)" -ForegroundColor Gray
+    Copy-Item -Path "resources\*" -Destination "$DistDir\resources" -Recurse -Force
+    Write-Host "  -> Staged: resources brand assets (logos, icons, fonts)" -ForegroundColor Gray
 }
 
 if (Test-Path $installerBinary) {
