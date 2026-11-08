@@ -155,6 +155,63 @@ static Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> loadTextureFromPngFile(I
     return srv;
 }
 
+static uint32_t getMaterialSymbolCodepoint(const std::string& name) {
+    if (name == "menu") return 0xe5d2;
+    if (name == "search") return 0xe8b6;
+    if (name == "home") return 0xe88a;
+    if (name == "cast") return 0xe307;
+    if (name == "sports_esports") return 0xea28;
+    if (name == "videogame_asset" || name == "pad" || name == "gamepad") return 0xe30f;
+    if (name == "devices") return 0xe337;
+    if (name == "settings") return 0xe8b8;
+    if (name == "network_check" || name == "speed") return 0xe1c4;
+    if (name == "network" || name == "wifi") return 0xe63e;
+    if (name == "check_circle") return 0xe86c;
+    if (name == "radio_button_unchecked" || name == "circle") return 0xe836;
+    if (name == "error") return 0xe000;
+    if (name == "warning") return 0xe002;
+    if (name == "refresh") return 0xe5d5;
+    if (name == "bolt") return 0xea0b;
+    if (name == "close") return 0xe5cd;
+    if (name == "play_arrow") return 0xe037;
+    if (name == "stop") return 0xe047;
+    if (name == "casino") return 0xeb40;
+    if (name == "router" || name == "dns") return 0xe875;
+    if (name == "tune") return 0xe429;
+    if (name == "link") return 0xe157;
+    if (name == "desktop_windows" || name == "desktop" || name == "monitor") return 0xe30c;
+    if (name == "phonelink") return 0xe326;
+    if (name == "palette" || name == "dark_mode") return 0xe40a;
+    if (name == "light_mode") return 0xe518;
+    if (name == "sensors") return 0xe51e;
+    if (name == "keyboard") return 0xe312;
+    if (name == "mouse") return 0xe315;
+    if (name == "lock" || name == "security") return 0xe897;
+    if (name == "arrow_forward") return 0xe5c8;
+    return 0;
+}
+
+static std::string codepointToUtf8(uint32_t cp) {
+    std::string s;
+    if (cp == 0) return s;
+    if (cp <= 0x7F) {
+        s.push_back(static_cast<char>(cp));
+    } else if (cp <= 0x7FF) {
+        s.push_back(static_cast<char>(0xC0 | ((cp >> 6) & 0x1F)));
+        s.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp <= 0xFFFF) {
+        s.push_back(static_cast<char>(0xE0 | ((cp >> 12) & 0x0F)));
+        s.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        s.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp <= 0x10FFFF) {
+        s.push_back(static_cast<char>(0xF0 | ((cp >> 18) & 0x07)));
+        s.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        s.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        s.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+    return s;
+}
+
 static void BeginCardContainer(const char* id, const mist::desktop::tokens::ThemeColors& c, const ImVec2& size = ImVec2(0, 0), float rounding = 28.0f) {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
     ImGui::PushStyleColor(ImGuiCol_Border, c.line);
@@ -662,14 +719,14 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
         }
     }
 
-    // Merge Material Symbols Rounded into font atlas
+    // Load Material Symbols Rounded dedicated fonts
     if (!fontMatIcons.empty()) {
         static const ImWchar icon_ranges[] = { 0xe000, 0xf300, 0 };
         ImFontConfig iconCfg;
-        iconCfg.MergeMode = true;
         iconCfg.PixelSnapH = true;
         iconCfg.GlyphOffset.y = 1.0f;
-        io.Fonts->AddFontFromFileTTF(fontMatIcons.c_str(), 20.0f, &iconCfg, icon_ranges);
+        fontIcons_ = io.Fonts->AddFontFromFileTTF(fontMatIcons.c_str(), 22.0f, &iconCfg, icon_ranges);
+        fontIconsLarge_ = io.Fonts->AddFontFromFileTTF(fontMatIcons.c_str(), 36.0f, &iconCfg, icon_ranges);
     }
 
     if (!fontRegular_) {
@@ -700,6 +757,8 @@ void DesktopApplication::cleanupD3D11Gui() {
     fontDisplay_ = nullptr;
     fontSmall_ = nullptr;
     fontCode_ = nullptr;
+    fontIcons_ = nullptr;
+    fontIconsLarge_ = nullptr;
 
     logoTextureSrv_.Reset();
     rtv_.Reset();
@@ -852,10 +911,24 @@ void DesktopApplication::renderSleekMintLogo(float size) const {
 }
 
 void DesktopApplication::renderVectorIcon(const char* name, const ImVec2& center, float size, ImU32 color) const {
+    std::string icon = name ? name : "";
+    uint32_t cp = getMaterialSymbolCodepoint(icon);
+    std::string utf8Icon = codepointToUtf8(cp);
+
+    if (!utf8Icon.empty() && (fontIcons_ || fontIconsLarge_)) {
+        ImFont* font = (size >= 28.0f && fontIconsLarge_) ? fontIconsLarge_ : (fontIcons_ ? fontIcons_ : fontIconsLarge_);
+        if (font) {
+            ImDrawList* drawList = ImGui::GetWindowDrawList();
+            ImVec2 glyphSize = font->CalcTextSizeA(size, FLT_MAX, -1.0f, utf8Icon.c_str());
+            ImVec2 textPos(center.x - glyphSize.x * 0.5f, center.y - glyphSize.y * 0.5f);
+            drawList->AddText(font, size, textPos, color, utf8Icon.c_str());
+            return;
+        }
+    }
+
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     float cx = center.x;
     float cy = center.y;
-    std::string icon = name ? name : "";
 
     if (icon == "menu") {
         float lineW = size * 0.36f;
@@ -1410,6 +1483,15 @@ void DesktopApplication::renderGuiHeader() {
         isSettingsOpen_ = !isSettingsOpen_;
     }
     renderVectorIcon("settings", ImVec2(gearPos.x + 22.0f, gearPos.y + 22.0f), 22.0f, ImGui::ColorConvertFloat4ToU32(c.ink));
+
+    // 6. Circular Theme Toggle Button
+    ImGui::SameLine(0, 8.0f);
+    ImVec2 themePos = ImGui::GetCursorScreenPos();
+    if (ImGui::Button("##TopTheme", ImVec2(44.0f, 44.0f))) {
+        toggleTheme();
+    }
+    renderVectorIcon((currentTheme_ == tokens::ThemeMode::Light) ? "dark_mode" : "light_mode",
+                     ImVec2(themePos.x + 22.0f, themePos.y + 22.0f), 22.0f, ImGui::ColorConvertFloat4ToU32(c.ink));
 
     ImGui::PopStyleColor(4);
     ImGui::PopStyleVar();

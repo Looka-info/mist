@@ -172,6 +172,8 @@ private:
     ImFont* fontDisplay_{nullptr};
     ImFont* fontSmall_{nullptr};
     ImFont* fontCode_{nullptr};
+    ImFont* fontIcons_{nullptr};
+    ImFont* fontIconsLarge_{nullptr};
 
     // GUI Interactive State (Matching Mist.html)
     bool isSettingsOpen_{false};
