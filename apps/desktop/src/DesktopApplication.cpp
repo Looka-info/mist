@@ -337,8 +337,9 @@ common::Result<void> DesktopApplication::shutdown() {
 
 #if defined(_WIN32)
 
-static void BeginM3CardHelper(const char* strId, const tokens::ThemeColors& c, const ImVec2& size = ImVec2(0, 0), bool isVariant = false) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, isVariant ? c.surfaceVariant : c.cardBg);
+static void BeginM3CardHelper(const char* strId, const tokens::ThemeColors& c, const ImVec2& size = ImVec2(0, 0), bool isHighContainer = false) {
+    ImVec4 bg = isHighContainer ? c.surfaceContainerHigh : c.surface;
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, bg);
     ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
     ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
@@ -507,6 +508,24 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+    // Load TrueType fonts matching the exact typography scale
+    const char* fontPathRegular = "C:\\Windows\\Fonts\\segoeui.ttf";
+    const char* fontPathBold    = "C:\\Windows\\Fonts\\segoeuib.ttf";
+
+    if (GetFileAttributesA(fontPathRegular) != INVALID_FILE_ATTRIBUTES) {
+        fontRegular_  = io.Fonts->AddFontFromFileTTF(fontPathRegular, tokens::MintTypography::Body);     // 15px
+        fontSmall_    = io.Fonts->AddFontFromFileTTF(fontPathRegular, tokens::MintTypography::Label);    // 12px
+        if (GetFileAttributesA(fontPathBold) != INVALID_FILE_ATTRIBUTES) {
+            fontBold_     = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::BodyBold);  // 16px
+            fontTitle_    = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Title);     // 20px
+            fontHeadline_ = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Headline);  // 24px
+            fontDisplay_  = io.Fonts->AddFontFromFileTTF(fontPathBold, tokens::MintTypography::Display);   // 32px
+        }
+    }
+    if (!fontRegular_) {
+        fontRegular_ = io.Fonts->AddFontDefault();
+    }
+
     applyActiveTheme();
 
     ImGui_ImplWin32_Init(hwnd_);
@@ -522,6 +541,13 @@ void DesktopApplication::cleanupD3D11Gui() {
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
+
+    fontRegular_ = nullptr;
+    fontBold_ = nullptr;
+    fontTitle_ = nullptr;
+    fontHeadline_ = nullptr;
+    fontDisplay_ = nullptr;
+    fontSmall_ = nullptr;
 
     rtv_.Reset();
     swapChain_.Reset();
@@ -662,6 +688,7 @@ void DesktopApplication::renderSleekMintLogo(float size) const {
 
 void DesktopApplication::renderBadge(const char* text, bool isSuccess) const {
     const auto& c = tokens::getActiveTheme(currentTheme_);
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImVec2 textSize = ImGui::CalcTextSize(text);
     ImVec2 pos = ImGui::GetCursorScreenPos();
     float paddingX = tokens::MintSpacing::S8;
@@ -680,22 +707,31 @@ void DesktopApplication::renderBadge(const char* text, bool isSuccess) const {
     drawList->AddText(ImVec2(pos.x + paddingX, pos.y + paddingY), textCol, text);
 
     ImGui::Dummy(ImVec2(rectW, rectH));
+    if (fontSmall_) ImGui::PopFont();
 }
 
 void DesktopApplication::renderMetricBox(const char* label, const char* value, const char* sublabel) const {
     const auto& c = tokens::getActiveTheme(currentTheme_);
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surfaceVariant);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surfaceContainerLow);
     ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Medium); // 16px
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S12, tokens::MintSpacing::S8));
 
     ImGui::BeginChild(label, ImVec2(0, 76.0f), true, ImGuiWindowFlags_NoScrollbar);
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("%s", label);
+    if (fontSmall_) ImGui::PopFont();
+
     ImGui::Spacing();
+    if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextColored(c.primary, "%s", value);
+    if (fontBold_) ImGui::PopFont();
+
     if (sublabel && sublabel[0] != '\0') {
         ImGui::SameLine();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
         ImGui::TextDisabled(" %s", sublabel);
+        if (fontSmall_) ImGui::PopFont();
     }
     ImGui::EndChild();
 
@@ -716,9 +752,16 @@ void DesktopApplication::renderGuiHeader() {
     renderSleekMintLogo(36.0f);
     ImGui::SameLine(0, tokens::MintSpacing::S12);
     ImGui::AlignTextToFramePadding();
+
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
     ImGui::TextColored(c.primary, "MIST");
+    if (fontHeadline_) ImGui::PopFont();
+
     ImGui::SameLine();
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
     ImGui::TextColored(c.textSecondary, "|  Play beyond your desk.");
+    if (fontRegular_) ImGui::PopFont();
+
     ImGui::SameLine(0, tokens::MintSpacing::S12);
     renderBadge("v0.2.0-rc1", true);
 
@@ -726,7 +769,9 @@ void DesktopApplication::renderGuiHeader() {
     ImGui::SameLine(0, tokens::MintSpacing::S24);
     ImGui::TextColored(c.primary, "[ * ]");
     ImGui::SameLine(0, tokens::MintSpacing::S4);
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
     ImGui::TextUnformatted("HOST ONLINE : 127.0.0.1:8080");
+    if (fontRegular_) ImGui::PopFont();
     ImGui::SameLine(0, tokens::MintSpacing::S12);
     renderBadge("DIRECT LAN", true);
 
@@ -753,7 +798,7 @@ void DesktopApplication::renderGuiHeader() {
             isHostingActive_ = false;
         }
     } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, c.surfaceVariant);
+        ImGui::PushStyleColor(ImGuiCol_Button, c.surfaceContainerHigh);
         ImGui::PushStyleColor(ImGuiCol_Text, c.textDisabled);
         if (ImGui::Button("Hosting: PAUSED", ImVec2(130.0f, 34.0f))) {
             isHostingActive_ = true;
@@ -792,8 +837,12 @@ void DesktopApplication::renderGuiNavRail() {
         renderSleekMintLogo(34.0f);
         ImGui::SameLine(0, tokens::MintSpacing::S8);
         ImGui::BeginGroup();
+        if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextColored(c.primary, "MIST STUDIO");
+        if (fontBold_) ImGui::PopFont();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
         ImGui::TextDisabled("Direct3D 11");
+        if (fontSmall_) ImGui::PopFont();
         ImGui::EndGroup();
         ImGui::Spacing();
     } else {
@@ -837,9 +886,12 @@ void DesktopApplication::renderGuiNavRail() {
 
         const char* displayLabel = isNavRailExpanded_ ? item.label : item.shortCode;
         float btnWidth = isNavRailExpanded_ ? 194.0f : 52.0f;
+
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
         if (ImGui::Button(displayLabel, ImVec2(btnWidth, 42.0f))) {
             currentScreen_ = item.screen;
         }
+        if (fontRegular_) ImGui::PopFont();
 
         if (!isNavRailExpanded_ && ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", item.label);
@@ -854,8 +906,10 @@ void DesktopApplication::renderGuiNavRail() {
         if (availableY > 70.0f) {
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + availableY - 60.0f);
             ImGui::Separator();
+            if (fontSmall_) ImGui::PushFont(fontSmall_);
             ImGui::TextDisabled("Mist Engine v0.2.0");
             ImGui::TextDisabled("Direct3D 11 • NVENC");
+            if (fontSmall_) ImGui::PopFont();
         }
     }
 
@@ -872,9 +926,16 @@ void DesktopApplication::renderGuiHomeScreen() {
     renderSleekMintLogo(64.0f);
     ImGui::SameLine(0, tokens::MintSpacing::S16);
     ImGui::BeginGroup();
+
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
     ImGui::TextColored(c.primary, "Play beyond your desk.");
+    if (fontHeadline_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
     ImGui::TextUnformatted("Your PC. Your games. Your freedom. Native low-latency Direct3D 11 hardware capture & NVENC encoding.");
     ImGui::TextDisabled("Discover local and LAN streaming hosts, verify sub-millisecond network QoS, and connect in one click.");
+    if (fontRegular_) ImGui::PopFont();
+
     ImGui::EndGroup();
     EndM3CardHelper();
 
@@ -882,15 +943,22 @@ void DesktopApplication::renderGuiHomeScreen() {
 
     // 2. Direct Device Connection Card
     BeginM3CardHelper("DirectConnectCard", c, ImVec2(0, 84.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("DIRECT HOST CONNECTION");
+    if (fontSmall_) ImGui::PopFont();
+
     ImGui::Spacing();
     ImGui::PushItemWidth(260.0f);
     ImGui::InputTextWithHint("##QuickHostInput", "Enter Host IP (e.g. 127.0.0.1:8080)", quickConnectHostInput_, IM_ARRAYSIZE(quickConnectHostInput_));
     ImGui::PopItemWidth();
     ImGui::SameLine(0, tokens::MintSpacing::S12);
+
+    if (fontBold_) ImGui::PushFont(fontBold_);
     if (ImGui::Button("Connect to Host", ImVec2(160.0f, 32.0f))) {
         currentScreen_ = DesktopScreen::LiveSession;
     }
+    if (fontBold_) ImGui::PopFont();
+
     ImGui::SameLine(0, tokens::MintSpacing::S16);
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("Host Availability:");
@@ -905,9 +973,13 @@ void DesktopApplication::renderGuiHomeScreen() {
     float cardWidth = std::max(200.0f, (contentWidth - 24.0f) / 3.0f);
 
     BeginM3CardHelper("CardLocalNode", c, ImVec2(cardWidth, 110.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("LOCAL HOST NODE");
+    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
+    if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextUnformatted("Workstation-Host");
+    if (fontBold_) ImGui::PopFont();
     ImGui::SameLine(0, tokens::MintSpacing::S8);
     renderBadge("ONLINE", true);
     ImGui::TextDisabled("127.0.0.1:8080 (Listening)");
@@ -915,17 +987,25 @@ void DesktopApplication::renderGuiHomeScreen() {
 
     ImGui::SameLine(0, tokens::MintSpacing::S12);
     BeginM3CardHelper("CardGPU", c, ImVec2(cardWidth, 110.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("HARDWARE ENCODER");
+    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
+    if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextUnformatted("GeForce GTX 1660 SUPER");
+    if (fontBold_) ImGui::PopFont();
     ImGui::TextDisabled("NVIDIA NVENC H.264 (CBR 1080p60)");
     EndM3CardHelper();
 
     ImGui::SameLine(0, tokens::MintSpacing::S12);
     BeginM3CardHelper("CardNetwork", c, ImVec2(cardWidth, 110.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("NETWORK QOS");
+    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
+    if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextUnformatted("WebRTC Direct P2P");
+    if (fontBold_) ImGui::PopFont();
     ImGui::SameLine(0, tokens::MintSpacing::S8);
     renderBadge("< 1 ms RTT", true);
     ImGui::TextDisabled("%s", "Packet Loss: 0.00% • 45.2 Mbps");
@@ -935,7 +1015,10 @@ void DesktopApplication::renderGuiHomeScreen() {
 
     // 4. Discovered & Recently Connected Hosts Grid
     BeginM3CardHelper("DiscoveredNodesCard", c, ImVec2(0, 240.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "Discovered & Recently Connected Hosts");
+    if (fontTitle_) ImGui::PopFont();
+
     ImGui::SameLine(0, tokens::MintSpacing::S8);
     ImGui::TextDisabled("(Direct LAN Beacon Discovery)");
     ImGui::Spacing();
@@ -1001,8 +1084,11 @@ void DesktopApplication::renderGuiHomeScreen() {
 
     // 5. Quick Actions Row
     BeginM3CardHelper("QuickActionsCard", c, ImVec2(0, 88.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("QUICK ACTIONS");
+    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
+
     if (ImGui::Button("Pair New Client Device", ImVec2(220.0f, 34.0f))) {
         currentScreen_ = DesktopScreen::Pairing;
     }
@@ -1020,8 +1106,13 @@ void DesktopApplication::renderGuiHomeScreen() {
 void DesktopApplication::renderGuiPairingScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
     ImGui::TextColored(c.primary, "Device Pairing & Access Authorization");
+    if (fontHeadline_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
     ImGui::TextDisabled("Authorize client devices using single-use Base32 pairing codes and cryptographic Ed25519 authentication.");
+    if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
 
     std::string code = pairingManager_.getActivePairingCode();
@@ -1032,15 +1123,21 @@ void DesktopApplication::renderGuiPairingScreen() {
 
     // Hero Card: Active Code
     BeginM3CardHelper("HeroCodeCard", c, ImVec2(0, 190.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("ACTIVE PAIRING AUTHORIZATION CODE");
+    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
 
     // Large Code Display Box
     ImGui::PushStyleColor(ImGuiCol_ChildBg, c.primaryContainer);
     ImGui::PushStyleColor(ImGuiCol_Border, c.primary);
     ImGui::BeginChild("CodeBox", ImVec2(340.0f, 64.0f), true, ImGuiWindowFlags_NoScrollbar);
-    ImGui::SetCursorPos(ImVec2(24.0f, 14.0f));
+    ImGui::SetCursorPos(ImVec2(24.0f, 16.0f));
+
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.onPrimaryContainer, "C O D E :   %s", code.c_str());
+    if (fontTitle_) ImGui::PopFont();
+
     ImGui::EndChild();
     ImGui::PopStyleColor(2);
 
@@ -1062,7 +1159,9 @@ void DesktopApplication::renderGuiPairingScreen() {
 
     // Pending Connection Requests Card
     BeginM3CardHelper("PendingRequestsCard", c, ImVec2(0, 160.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "Incoming Authorization Requests");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
 
     if (sampleRequestPending_) {
@@ -1097,7 +1196,9 @@ void DesktopApplication::renderGuiPairingScreen() {
 
     // Manual Remote Code Entry
     BeginM3CardHelper("ManualPairCard", c, ImVec2(0, 100.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("CONNECT TO REMOTE HOST VIA CODE");
+    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
     ImGui::PushItemWidth(240.0f);
     ImGui::InputTextWithHint("##ManualCode", "Enter 6-char code (e.g. SEA-CDS)", manualPairingCodeInput_, IM_ARRAYSIZE(manualPairingCodeInput_));
@@ -1112,13 +1213,20 @@ void DesktopApplication::renderGuiPairingScreen() {
 void DesktopApplication::renderGuiHostScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
     ImGui::TextColored(c.primary, "Host Management & Safety Policies");
+    if (fontHeadline_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
     ImGui::TextDisabled("Configure host GPU display capture, hardware encoding parameters, and remote operator safety overrides.");
+    if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
 
     // Host State Card
     BeginM3CardHelper("HostStatusCard", c, ImVec2(0, 140.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("HOST BROADCASTING STATUS");
+    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
     if (isHostingActive_) {
         renderBadge("STREAMING READY", true);
@@ -1150,7 +1258,9 @@ void DesktopApplication::renderGuiHostScreen() {
 
     // Display & Hardware Selector Card
     BeginM3CardHelper("DisplayConfigCard", c, ImVec2(0, 120.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "Display Capture & Monitor Selection");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
     const char* displays[] = {
         "Display 1: 1920x1080 @ 60 Hz (Primary NVIDIA Desktop)",
@@ -1167,7 +1277,9 @@ void DesktopApplication::renderGuiHostScreen() {
 
     // Host Input & Safety Policies Card
     BeginM3CardHelper("PoliciesCard", c, ImVec2(0, 230.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "Remote Input & Safety Policies");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::TextDisabled("Mist ensures local host operator safety by prioritizing physical hardware inputs.");
     ImGui::Spacing();
 
@@ -1183,7 +1295,9 @@ void DesktopApplication::renderGuiHostScreen() {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, c.primaryContainer);
     ImGui::BeginChild("SafetyNotice", ImVec2(0, 36.0f), false);
     ImGui::SetCursorPos(ImVec2(12.0f, 8.0f));
+    if (fontBold_) ImGui::PushFont(fontBold_);
     ImGui::TextColored(c.onPrimaryContainer, "SAFETY SHIELD ACTIVE: Local physical mouse/keyboard motion instantly suppresses remote inputs.");
+    if (fontBold_) ImGui::PopFont();
     ImGui::EndChild();
     ImGui::PopStyleColor();
 
@@ -1193,8 +1307,13 @@ void DesktopApplication::renderGuiHostScreen() {
 void DesktopApplication::renderGuiSettingsScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
     ImGui::TextColored(c.primary, "Stream Quality Settings & Profiles");
+    if (fontHeadline_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
     ImGui::TextDisabled("Select an optimized quality profile or fine-tune video resolution, bitrate ranges and VSync.");
+    if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
 
     // 4 Profile Cards Grid
@@ -1238,10 +1357,18 @@ void DesktopApplication::renderGuiSettingsScreen() {
         std::string cardId = "ProfileCard" + std::to_string(i);
         ImGui::BeginChild(cardId.c_str(), ImVec2(cardW, 140.0f), true);
 
+        if (fontTitle_) ImGui::PushFont(fontTitle_);
         ImGui::TextColored(isSelected ? c.onPrimaryContainer : c.primary, "%s", profiles[i].title);
+        if (fontTitle_) ImGui::PopFont();
+
+        if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextUnformatted(profiles[i].resFps);
+        if (fontBold_) ImGui::PopFont();
+
         ImGui::TextDisabled("%s", profiles[i].bitrate);
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
         ImGui::TextDisabled("%s", profiles[i].desc);
+        if (fontSmall_) ImGui::PopFont();
         ImGui::Spacing();
 
         if (ImGui::Button(isSelected ? "Active Profile" : "Select Profile", ImVec2(-1, 26.0f))) {
@@ -1258,7 +1385,9 @@ void DesktopApplication::renderGuiSettingsScreen() {
 
     // Fine-Tuning Parameters Card
     BeginM3CardHelper("TuningCard", c, ImVec2(0, 240.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "Custom Encoding & Latency Tuning");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
 
     ImGui::PushItemWidth(320.0f);
@@ -1274,17 +1403,24 @@ void DesktopApplication::renderGuiSettingsScreen() {
     ImGui::Separator();
     ImGui::Spacing();
 
+    if (fontBold_) ImGui::PushFont(fontBold_);
     if (ImGui::Button("Save & Apply Configuration", ImVec2(240.0f, 36.0f))) {
         // Configuration persisted
     }
+    if (fontBold_) ImGui::PopFont();
     EndM3CardHelper();
 }
 
 void DesktopApplication::renderGuiLiveSessionScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
     ImGui::TextColored(c.primary, "Live Session Telemetry & Pipeline Diagnostics");
+    if (fontHeadline_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
     ImGui::TextDisabled("Direct hardware metrics captured from NVENC, Direct3D 11 NVDEC, libdatachannel QoS and WASAPI audio.");
+    if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
 
     // 3 Pipeline Columns
@@ -1293,7 +1429,9 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
 
     // Column 1: Video Pipeline
     BeginM3CardHelper("TelemetryVideo", c, ImVec2(colWidth, 240.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "VIDEO PIPELINE");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextDisabled("Resolution:          1920x1080");
@@ -1308,7 +1446,9 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
     ImGui::SameLine(0, tokens::MintSpacing::S12);
     // Column 2: Network QoS
     BeginM3CardHelper("TelemetryNetwork", c, ImVec2(colWidth, 240.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "NETWORK QOS & TRANSPORT");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextDisabled("Connection Type:     WebRTC Direct (LAN)");
@@ -1323,7 +1463,9 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
     ImGui::SameLine(0, tokens::MintSpacing::S12);
     // Column 3: Audio & Input
     BeginM3CardHelper("TelemetryAudioInput", c, ImVec2(colWidth, 240.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "AUDIO & REMOTE INPUT");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextDisabled("Audio Format / Rate: Opus 48 kHz Stereo / 128 kbps");
@@ -1339,7 +1481,9 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
 
     // End-to-End Latency Waterfall Card
     BeginM3CardHelper("LatencyWaterfallCard", c, ImVec2(0, 120.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "End-to-End Motion-to-Photon Latency Waterfall");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
     ImGui::TextUnformatted("Capture (0.4ms) + NVENC (1.8ms) + Network (1.7ms) + Decode (2.5ms) + Present (0.4ms) = Total: 6.8 ms");
     ImGui::Spacing();
@@ -1350,12 +1494,19 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
 void DesktopApplication::renderGuiDeviceManagementScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
     ImGui::TextColored(c.primary, "Trusted Device Management");
+    if (fontHeadline_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
     ImGui::TextDisabled("Manage client devices authorized to stream and send remote keyboard, mouse or gamepad inputs.");
+    if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
 
     BeginM3CardHelper("TrustedDevicesCard", c, ImVec2(0, 280.0f));
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.primary, "Authorized Client Devices");
+    if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
 
     auto devices = pairingManager_.getTrustedDevices();
@@ -1416,7 +1567,9 @@ void DesktopApplication::renderGuiDeviceManagementScreen() {
     ImGui::Spacing();
 
     BeginM3CardHelper("SecurityAdvisoryCard", c, ImVec2(0, 110.0f));
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
     ImGui::TextDisabled("CRYPTOGRAPHIC SECURITY ARCHITECTURE");
+    if (fontSmall_) ImGui::PopFont();
     ImGui::Spacing();
     ImGui::TextUnformatted("Trusted devices hold unique Ed25519 pairing credentials. Revoking a device immediately invalidates its token");
     ImGui::TextDisabled("and terminates any active WebRTC DataChannels. The remote client will be required to re-authenticate.");
@@ -1426,6 +1579,21 @@ void DesktopApplication::renderGuiDeviceManagementScreen() {
 void DesktopApplication::renderGuiFrame() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     ImGuiIO& io = ImGui::GetIO();
+
+    // 1. Organic ambient wallpaper background glow (matching the reference design)
+    ImDrawList* bgDraw = ImGui::GetBackgroundDrawList();
+    if (currentTheme_ == tokens::ThemeMode::Light) {
+        // Soft mint & sage ambient radial orbs
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.92f, io.DisplaySize.y * 0.18f), 280.0f, IM_COL32(221, 239, 228, 80));
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.12f, io.DisplaySize.y * 0.82f), 320.0f, IM_COL32(184, 235, 213, 75));
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.88f, io.DisplaySize.y * 0.78f), 240.0f, IM_COL32(221, 239, 228, 65));
+    } else {
+        // Dark theme: deep evergreen & pixel mint ambient aura
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.92f, io.DisplaySize.y * 0.18f), 300.0f, IM_COL32(34, 72, 54, 55));
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.12f, io.DisplaySize.y * 0.82f), 350.0f, IM_COL32(23, 75, 56, 45));
+        bgDraw->AddCircleFilled(ImVec2(io.DisplaySize.x * 0.88f, io.DisplaySize.y * 0.78f), 250.0f, IM_COL32(184, 235, 213, 20));
+    }
+
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
 

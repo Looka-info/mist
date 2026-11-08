@@ -100,6 +100,14 @@ private:
     DesktopScreen currentScreen_{DesktopScreen::Home};
     tokens::ThemeMode currentTheme_{tokens::ThemeMode::Light};
 
+    // Typography Handles (Segoe UI TrueType matching design scale)
+    ImFont* fontRegular_{nullptr};
+    ImFont* fontBold_{nullptr};
+    ImFont* fontTitle_{nullptr};
+    ImFont* fontHeadline_{nullptr};
+    ImFont* fontDisplay_{nullptr};
+    ImFont* fontSmall_{nullptr};
+
     // GUI Interactive State
     bool isHostingActive_{true};
     bool allowAudioLoopback_{true};

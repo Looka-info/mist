@@ -47,7 +47,24 @@ The application supports real-time switching between `ThemeMode::Light` and `The
 
 ---
 
-## 3. Shape & Geometry Tokens
+## 3. Typography Scale Tokens
+
+Derived from the reference design (`Google Sans Flex` / `Segoe UI` scale):
+
+```cpp
+struct MintTypography {
+    static constexpr float Display  = 32.0f; // Hero Title
+    static constexpr float Headline = 24.0f; // Page Titles
+    static constexpr float Title    = 20.0f; // Card headers, section titles
+    static constexpr float BodyBold = 16.0f; // Emphasized text
+    static constexpr float Body     = 15.0f; // Default standard text
+    static constexpr float Label    = 12.0f; // Overlines, badges, tags
+};
+```
+
+---
+
+## 4. Shape & Geometry Tokens
 
 ```cpp
 struct MintShapes {
