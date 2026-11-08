@@ -23,6 +23,15 @@ target_link_libraries(mist_installer PRIVATE
     shlwapi
 )
 
+set_property(SOURCE ${CMAKE_CURRENT_BINARY_DIR}/installer.rc
+    PROPERTY OBJECT_DEPENDS
+        ${CMAKE_BINARY_DIR}/apps/desktop/mist_desktop.exe
+        ${CMAKE_BINARY_DIR}/apps/host/mist_host.exe
+        ${CMAKE_BINARY_DIR}/apps/client/mist_client.exe
+        ${CMAKE_SOURCE_DIR}/bin/mist-signaling.exe
+        ${CMAKE_SOURCE_DIR}/resources/mist.ico
+)
+
 add_dependencies(mist_installer
     mist_desktop
     mist_host
