@@ -8,136 +8,201 @@ if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
 
+# Color Definitions
+$PixelMint     = [System.Drawing.Color]::FromArgb(255, 184, 235, 213) # #B8EBD5
+$FreshMint     = [System.Drawing.Color]::FromArgb(255, 142, 216, 186) # #8ED8BA
+$ForestGreen   = [System.Drawing.Color]::FromArgb(255, 23, 75, 56)    # #174B38
+$DeepEvergreen = [System.Drawing.Color]::FromArgb(255, 13, 48, 36)    # #0D3024
+$CloudBg       = [System.Drawing.Color]::FromArgb(255, 242, 248, 244) # #F2F8F4
+$SoftSage      = [System.Drawing.Color]::FromArgb(255, 221, 239, 228) # #DDEFE4
+$DarkBg        = [System.Drawing.Color]::FromArgb(255, 16, 26, 21)    # #101A15
+$DarkSurface   = [System.Drawing.Color]::FromArgb(255, 24, 35, 28)    # #18231C
+$PureWhite     = [System.Drawing.Color]::FromArgb(255, 255, 255, 255)
+
+# Function to draw the Mist Geometric M with Twin Connected Streaming Paths
+function Draw-MistLogo {
+    param(
+        [System.Drawing.Graphics]$g,
+        [int]$width,
+        [int]$height,
+        [string]$variant # "app", "light", "dark", "mono"
+    )
+
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    $scale = $width / 256.0
+
+    # 1. Background Rounded Squircle (24px radius at 256px scale)
+    $squirclePath = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $rect = New-Object System.Drawing.RectangleF (12 * $scale), (12 * $scale), (232 * $scale), (232 * $scale)
+    $radius = 56 * $scale
+    $squirclePath.AddArc($rect.X, $rect.Y, $radius, $radius, 180, 90)
+    $squirclePath.AddArc($rect.Right - $radius, $rect.Y, $radius, $radius, 270, 90)
+    $squirclePath.AddArc($rect.Right - $radius, $rect.Bottom - $radius, $radius, $radius, 0, 90)
+    $squirclePath.AddArc($rect.X, $rect.Bottom - $radius, $radius, $radius, 90, 90)
+    $squirclePath.CloseFigure()
+
+    if ($variant -eq "app" -or $variant -eq "dark") {
+        # Deep Evergreen to Dark Surface gradient
+        $bgBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            (New-Object System.Drawing.PointF 0, 0),
+            (New-Object System.Drawing.PointF ($width), ($height)),
+            $DeepEvergreen,
+            $DarkBg
+        )
+        $g.FillPath($bgBrush, $squirclePath)
+
+        # Subtle Mint Outline (1.5px)
+        $borderPen = New-Object System.Drawing.Pen($ForestGreen, 3.0 * $scale)
+        $g.DrawPath($borderPen, $squirclePath)
+        $innerBorderPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(60, 184, 235, 213), 1.5 * $scale)
+        $g.DrawPath($innerBorderPen, $squirclePath)
+    } elseif ($variant -eq "light") {
+        $bgBrush = New-Object System.Drawing.SolidBrush($CloudBg)
+        $g.FillPath($bgBrush, $squirclePath)
+        $borderPen = New-Object System.Drawing.Pen($SoftSage, 3.0 * $scale)
+        $g.DrawPath($borderPen, $squirclePath)
+    } elseif ($variant -eq "mono") {
+        $bgBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 30, 30, 30))
+        $g.FillPath($bgBrush, $squirclePath)
+        $borderPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 200, 200, 200), 2.0 * $scale)
+        $g.DrawPath($borderPen, $squirclePath)
+    }
+
+    # 2. Host and Client Path Colors
+    $hostColor   = if ($variant -eq "mono") { $PureWhite } elseif ($variant -eq "light") { $ForestGreen } else { $PixelMint }
+    $clientColor = if ($variant -eq "mono") { [System.Drawing.Color]::FromArgb(255, 210, 210, 210) } elseif ($variant -eq "light") { $ForestGreen } else { $FreshMint }
+    $nexusColor  = if ($variant -eq "mono") { $PureWhite } elseif ($variant -eq "light") { $ForestGreen } else { $PureWhite }
+
+    # 3. Geometric "M" — Twin Connected Streaming Paths
+    # Left Vertical Host Pillar (Ascending Stream Path)
+    $hostPillar = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $hostPts = @(
+        New-Object System.Drawing.PointF (52 * $scale), (196 * $scale)
+        New-Object System.Drawing.PointF (52 * $scale), (80 * $scale)
+        New-Object System.Drawing.PointF (82 * $scale), (62 * $scale)
+        New-Object System.Drawing.PointF (82 * $scale), (196 * $scale)
+    )
+    $hostPillar.AddPolygon($hostPts)
+    $hostBrush = New-Object System.Drawing.SolidBrush($hostColor)
+    $g.FillPath($hostBrush, $hostPillar)
+
+    # Right Vertical Client Pillar (Receiving Stream Path)
+    $clientPillar = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $clientPts = @(
+        New-Object System.Drawing.PointF (174 * $scale), (196 * $scale)
+        New-Object System.Drawing.PointF (174 * $scale), (62 * $scale)
+        New-Object System.Drawing.PointF (204 * $scale), (80 * $scale)
+        New-Object System.Drawing.PointF (204 * $scale), (196 * $scale)
+    )
+    $clientPillar.AddPolygon($clientPts)
+    $clientBrush = New-Object System.Drawing.SolidBrush($clientColor)
+    $g.FillPath($clientBrush, $clientPillar)
+
+    # Host Forward Streaming Diagonal Vector (Left to Center Down)
+    $hostDiag = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $hostDiagPts = @(
+        New-Object System.Drawing.PointF (82 * $scale), (62 * $scale)
+        New-Object System.Drawing.PointF (128 * $scale), (140 * $scale)
+        New-Object System.Drawing.PointF (128 * $scale), (170 * $scale)
+        New-Object System.Drawing.PointF (82 * $scale), (94 * $scale)
+    )
+    $hostDiag.AddPolygon($hostDiagPts)
+    $hostDiagBrush = New-Object System.Drawing.SolidBrush($FreshMint)
+    if ($variant -eq "light") {
+        $hostDiagBrush = New-Object System.Drawing.SolidBrush($ForestGreen)
+    } elseif ($variant -eq "mono") {
+        $hostDiagBrush = New-Object System.Drawing.SolidBrush($PureWhite)
+    }
+    $g.FillPath($hostDiagBrush, $hostDiag)
+
+    # Client Return Feedback Diagonal Vector (Right to Center Down)
+    $clientDiag = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $clientDiagPts = @(
+        New-Object System.Drawing.PointF (174 * $scale), (62 * $scale)
+        New-Object System.Drawing.PointF (174 * $scale), (94 * $scale)
+        New-Object System.Drawing.PointF (128 * $scale), (170 * $scale)
+        New-Object System.Drawing.PointF (128 * $scale), (140 * $scale)
+    )
+    $clientDiag.AddPolygon($clientDiagPts)
+    $clientDiagBrush = New-Object System.Drawing.SolidBrush($PixelMint)
+    if ($variant -eq "light") {
+        $clientDiagBrush = New-Object System.Drawing.SolidBrush($ForestGreen)
+    } elseif ($variant -eq "mono") {
+        $clientDiagBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 220, 220, 220))
+    }
+    $g.FillPath($clientDiagBrush, $clientDiag)
+
+    # Twin Interlocking Stream Bridge (Horizontal Connection Arc at Upper Valley)
+    $bridgePen = New-Object System.Drawing.Pen($PixelMint, 4.0 * $scale)
+    if ($variant -eq "light") {
+        $bridgePen = New-Object System.Drawing.Pen($ForestGreen, 4.0 * $scale)
+    } elseif ($variant -eq "mono") {
+        $bridgePen = New-Object System.Drawing.Pen($PureWhite, 4.0 * $scale)
+    }
+    $bridgePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $bridgePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $g.DrawLine($bridgePen, (82 * $scale), (62 * $scale), (174 * $scale), (62 * $scale))
+
+    # Center Sync Nexus Node (Pristine diamond node representing real-time WebRTC sync)
+    $nexus = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $nexusPts = @(
+        New-Object System.Drawing.PointF (128 * $scale), (124 * $scale)
+        New-Object System.Drawing.PointF (140 * $scale), (144 * $scale)
+        New-Object System.Drawing.PointF (128 * $scale), (164 * $scale)
+        New-Object System.Drawing.PointF (116 * $scale), (144 * $scale)
+    )
+    $nexus.AddPolygon($nexusPts)
+    $nexusBrush = New-Object System.Drawing.SolidBrush($nexusColor)
+    $g.FillPath($nexusBrush, $nexus)
+
+    # Central Core Point (Ultra-low latency indicator)
+    $dotBrush = if ($variant -eq "light") { New-Object System.Drawing.SolidBrush($CloudBg) } else { New-Object System.Drawing.SolidBrush($DeepEvergreen) }
+    $g.FillEllipse($dotBrush, (125 * $scale), (141 * $scale), (6 * $scale), (6 * $scale))
+}
+
+# 1. Generate Primary High-Res Logo (mist-logo.png)
 $Size = 256
-$bmp = New-Object System.Drawing.Bitmap $Size, $Size
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-$g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-$g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-$g.Clear([System.Drawing.Color]::Transparent)
+$bmpPrimary = New-Object System.Drawing.Bitmap $Size, $Size
+$gPrimary = [System.Drawing.Graphics]::FromImage($bmpPrimary)
+Draw-MistLogo -g $gPrimary -width $Size -height $Size -variant "app"
+$gPrimary.Dispose()
+$primaryPng = Join-Path $OutputDir "mist-logo.png"
+$bmpPrimary.Save($primaryPng, [System.Drawing.Imaging.ImageFormat]::Png)
+Write-Host "Generated primary logo: $primaryPng"
 
-# 1. Base Squircle / Rounded Shield
-$rect = New-Object System.Drawing.Rectangle 12, 12, 232, 232
-$radius = 52
-$path = New-Object System.Drawing.Drawing2D.GraphicsPath
-$path.AddArc($rect.X, $rect.Y, $radius, $radius, 180, 90)
-$path.AddArc($rect.Right - $radius, $rect.Y, $radius, $radius, 270, 90)
-$path.AddArc($rect.Right - $radius, $rect.Bottom - $radius, $radius, $radius, 0, 90)
-$path.AddArc($rect.X, $rect.Bottom - $radius, $radius, $radius, 90, 90)
-$path.CloseFigure()
+# 2. Generate Light Theme Logo (mist-logo-light.png)
+$bmpLight = New-Object System.Drawing.Bitmap $Size, $Size
+$gLight = [System.Drawing.Graphics]::FromImage($bmpLight)
+Draw-MistLogo -g $gLight -width $Size -height $Size -variant "light"
+$gLight.Dispose()
+$lightPng = Join-Path $OutputDir "mist-logo-light.png"
+$bmpLight.Save($lightPng, [System.Drawing.Imaging.ImageFormat]::Png)
+Write-Host "Generated light theme logo: $lightPng"
+$bmpLight.Dispose()
 
-# Background Gradient: Dark Slate (#0F172A) to Deep Emerald (#064E3B)
-$bgBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-    (New-Object System.Drawing.PointF 12, 12),
-    (New-Object System.Drawing.PointF 244, 244),
-    [System.Drawing.Color]::FromArgb(255, 15, 23, 42),
-    [System.Drawing.Color]::FromArgb(255, 6, 78, 59)
-)
-$g.FillPath($bgBrush, $path)
+# 3. Generate Dark Theme Logo (mist-logo-dark.png)
+$bmpDark = New-Object System.Drawing.Bitmap $Size, $Size
+$gDark = [System.Drawing.Graphics]::FromImage($bmpDark)
+Draw-MistLogo -g $gDark -width $Size -height $Size -variant "dark"
+$gDark.Dispose()
+$darkPng = Join-Path $OutputDir "mist-logo-dark.png"
+$bmpDark.Save($darkPng, [System.Drawing.Imaging.ImageFormat]::Png)
+Write-Host "Generated dark theme logo: $darkPng"
+$bmpDark.Dispose()
 
-# Subtle Inset Radial / Glow
-$glowPath = New-Object System.Drawing.Drawing2D.GraphicsPath
-$glowPath.AddEllipse(64, 40, 128, 128)
-$glowBrush = New-Object System.Drawing.Drawing2D.PathGradientBrush $glowPath
-$glowBrush.CenterColor = [System.Drawing.Color]::FromArgb(70, 16, 185, 129)
-$glowBrush.SurroundColors = @([System.Drawing.Color]::FromArgb(0, 16, 185, 129))
-$g.FillEllipse($glowBrush, 32, 20, 192, 192)
-
-# Outer Border: Crisp Vibrant Mint (#10B981)
-$borderPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 16, 185, 129), 4.5)
-$g.DrawPath($borderPen, $path)
-
-# Soft Inset Border: Bright Mint (#34D399)
-$insetPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(90, 52, 211, 153), 1.5)
-$g.DrawPath($insetPen, $path)
-
-# 2. Sleek Streaming Broadcast Waves at the top
-$wavePen1 = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(180, 110, 231, 183), 3.0)
-$wavePen2 = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(120, 16, 185, 129), 2.5)
-$wavePen1.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-$wavePen1.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-$wavePen2.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-$wavePen2.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-
-$g.DrawArc($wavePen1, 96, 44, 64, 40, 200, 140)
-$g.DrawArc($wavePen2, 80, 32, 96, 56, 205, 130)
-
-# 3. Futuristic Sleek "M" Wings (Left Wing, Right Wing, Core Node)
-# Left Wing
-$leftWing = New-Object System.Drawing.Drawing2D.GraphicsPath
-$leftWingPts = @(
-    New-Object System.Drawing.PointF 54, 188
-    New-Object System.Drawing.PointF 54, 96
-    New-Object System.Drawing.PointF 88, 80
-    New-Object System.Drawing.PointF 116, 132
-    New-Object System.Drawing.PointF 98, 152
-    New-Object System.Drawing.PointF 88, 144
-    New-Object System.Drawing.PointF 80, 188
-)
-$leftWing.AddPolygon($leftWingPts)
-$leftBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-    (New-Object System.Drawing.PointF 54, 80),
-    (New-Object System.Drawing.PointF 116, 188),
-    [System.Drawing.Color]::FromArgb(255, 52, 211, 153), # #34D399
-    [System.Drawing.Color]::FromArgb(255, 16, 185, 129)  # #10B981
-)
-$g.FillPath($leftBrush, $leftWing)
-
-# Right Wing
-$rightWing = New-Object System.Drawing.Drawing2D.GraphicsPath
-$rightWingPts = @(
-    New-Object System.Drawing.PointF 202, 188
-    New-Object System.Drawing.PointF 202, 96
-    New-Object System.Drawing.PointF 168, 80
-    New-Object System.Drawing.PointF 140, 132
-    New-Object System.Drawing.PointF 158, 152
-    New-Object System.Drawing.PointF 168, 144
-    New-Object System.Drawing.PointF 176, 188
-)
-$rightWing.AddPolygon($rightWingPts)
-$rightBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-    (New-Object System.Drawing.PointF 140, 80),
-    (New-Object System.Drawing.PointF 202, 188),
-    [System.Drawing.Color]::FromArgb(255, 16, 185, 129), # #10B981
-    [System.Drawing.Color]::FromArgb(255, 5, 150, 105)   # #059669
-)
-$g.FillPath($rightBrush, $rightWing)
-
-# Center Core Node: Sleek Glowing Diamond Crest
-$centerDiamond = New-Object System.Drawing.Drawing2D.GraphicsPath
-$centerDiamondPts = @(
-    New-Object System.Drawing.PointF 128, 98
-    New-Object System.Drawing.PointF 148, 138
-    New-Object System.Drawing.PointF 128, 168
-    New-Object System.Drawing.PointF 108, 138
-)
-$centerDiamond.AddPolygon($centerDiamondPts)
-$centerBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-    (New-Object System.Drawing.PointF 128, 98),
-    (New-Object System.Drawing.PointF 128, 168),
-    [System.Drawing.Color]::FromArgb(255, 167, 243, 208), # #A7F3D0 (High Mint)
-    [System.Drawing.Color]::FromArgb(255, 16, 185, 129)   # #10B981
-)
-$g.FillPath($centerBrush, $centerDiamond)
-
-# High-Velocity Core Spark (White highlight in the center)
-$sparkBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(240, 255, 255, 255))
-$g.FillEllipse($sparkBrush, 123, 128, 10, 10)
-
-# Speed Aero Cuts across wings
-$cutPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(200, 15, 23, 42), 3.0)
-$g.DrawLine($cutPen, 50, 124, 78, 124)
-$g.DrawLine($cutPen, 50, 150, 74, 150)
-$g.DrawLine($cutPen, 178, 124, 206, 124)
-$g.DrawLine($cutPen, 182, 150, 206, 150)
-
-# Clean up graphics
-$g.Dispose()
-
-# Save High-Res PNG
-$PngPath = Join-Path $OutputDir "mist-logo.png"
-$bmp.Save($PngPath, [System.Drawing.Imaging.ImageFormat]::Png)
-Write-Host "Saved high-resolution logo PNG to: $PngPath"
+# 4. Generate Monochrome Logo (mist-logo-mono.png)
+$bmpMono = New-Object System.Drawing.Bitmap $Size, $Size
+$gMono = [System.Drawing.Graphics]::FromImage($bmpMono)
+Draw-MistLogo -g $gMono -width $Size -height $Size -variant "mono"
+$gMono.Dispose()
+$monoPng = Join-Path $OutputDir "mist-logo-mono.png"
+$bmpMono.Save($monoPng, [System.Drawing.Imaging.ImageFormat]::Png)
+Write-Host "Generated monochrome logo: $monoPng"
+$bmpMono.Dispose()
 
 # Helper function to generate resized PNG byte arrays
 function Get-PngBytes($sourceBmp, $w, $h) {
@@ -158,15 +223,14 @@ function Get-PngBytes($sourceBmp, $w, $h) {
     return $bytes
 }
 
-# Generate multi-resolution icons (256, 64, 48, 32, 16)
+# 5. Generate Multi-Resolution Windows ICO (256, 64, 48, 32, 16)
 $sizes = @(256, 64, 48, 32, 16)
 $entries = New-Object System.Collections.ArrayList
 foreach ($s in $sizes) {
-    [byte[]]$bytes = Get-PngBytes $bmp $s $s
+    [byte[]]$bytes = Get-PngBytes $bmpPrimary $s $s
     [void]$entries.Add(@{ Dim = $s; Data = $bytes })
 }
 
-# Construct standard Windows .ICO file with PNG streams
 $IcoPath = Join-Path $OutputDir "mist.ico"
 $icoStream = [System.IO.File]::Create($IcoPath)
 $bw = New-Object System.IO.BinaryWriter $icoStream
@@ -176,7 +240,7 @@ $bw.Write([uint16]0) # Reserved
 $bw.Write([uint16]1) # Type: 1 for ICO
 $bw.Write([uint16]$entries.Count) # Number of images
 
-# Calculate offset for first image: 6 (ICONDIR) + 16 * count (ICONDIRENTRY)
+# Calculate offset for first image
 $offset = 6 + 16 * $entries.Count
 
 # Write ICONDIRENTRY for each image (16 bytes each)
@@ -207,47 +271,6 @@ foreach ($entry in $entries) {
 
 $bw.Close()
 $icoStream.Close()
-$bmp.Dispose()
+$bmpPrimary.Dispose()
 
-Write-Host "Saved multi-resolution Windows ICO to: $IcoPath"
-
-# Generate Windows Resource Script (.rc)
-$RcPath = Join-Path $OutputDir "mist.rc"
-$rcContent = @"
-// Mist Windows Application Resource Script
-#include <windows.h>
-
-IDI_MIST_ICON ICON "mist.ico"
-
-VS_VERSION_INFO VERSIONINFO
-FILEVERSION     0,2,0,1
-PRODUCTVERSION  0,2,0,1
-FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
-FILEFLAGS       0
-FILEOS          VOS_NT_WINDOWS32
-FILETYPE        VFT_APP
-FILESUBTYPE     VFT2_UNKNOWN
-BEGIN
-    BLOCK "StringFileInfo"
-    BEGIN
-        BLOCK "040904b0"
-        BEGIN
-            VALUE "CompanyName",      "Mist Project"
-            VALUE "FileDescription",  "Mist Native Low-Latency Game Streaming Studio"
-            VALUE "FileVersion",      "0.2.0-rc1"
-            VALUE "InternalName",     "mist_desktop"
-            VALUE "OriginalFilename", "mist_desktop.exe"
-            VALUE "ProductName",      "Mist Game Streaming"
-            VALUE "ProductVersion",   "0.2.0-rc1"
-            VALUE "LegalCopyright",   "Copyright (C) 2026 Mist Project Contributors"
-        END
-    END
-    BLOCK "VarFileInfo"
-    BEGIN
-        VALUE "Translation", 0x409, 1200
-    END
-END
-"@
-
-Set-Content -Path $RcPath -Value $rcContent -Encoding ASCII
-Write-Host "Saved Windows resource script to: $RcPath"
+Write-Host "Generated multi-resolution Windows ICO: $IcoPath"

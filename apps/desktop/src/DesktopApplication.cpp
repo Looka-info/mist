@@ -41,21 +41,6 @@ static LRESULT CALLBACK DesktopWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARA
     return DefWindowProcW(hWnd, msg, wParam, lParam);
 }
 
-static void BeginM3Card(const char* strId, const ImVec2& size = ImVec2(0, 0)) {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.820f, 0.900f, 0.850f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 14.0f));
-    ImGui::BeginChild(strId, size, true);
-}
-
-static void EndM3Card() {
-    ImGui::EndChild();
-    ImGui::PopStyleVar(3);
-    ImGui::PopStyleColor(2);
-}
-
 } // namespace mist::desktop
 #endif
 
@@ -72,7 +57,8 @@ DesktopApplication::~DesktopApplication() {
 
 void DesktopApplication::printHeader(const std::string& title) const {
     std::cout << "\n=======================================================\n"
-              << "   MIST GAMING STREAMING — " << title << "\n"
+              << "   MIST — Play beyond your desk. | " << title << "\n"
+              << "   Your PC. Your games. Your freedom.\n"
               << "=======================================================\n";
 }
 
@@ -182,17 +168,18 @@ void DesktopApplication::renderDeviceManagementScreen() const {
                   << "Use the Pairing screen to pair and authorize a new client device.\n";
     } else {
         std::cout << std::left << std::setw(20) << "Device Name"
-                  << std::setw(24) << "Device ID"
-                  << std::setw(16) << "Permissions"
+                  << std::setw(16) << "Device ID"
+                  << std::setw(20) << "Permissions"
                   << "Paired Epoch\n"
-                  << "-----------------------------------------------------------------------\n";
+                  << "----------------------------------------------------------------------\n";
         for (const auto& dev : devices) {
-            std::string permStr = (dev.permissions.allowKeyboard ? "K" : "-");
-            permStr += (dev.permissions.allowMouse ? "M" : "-");
-            permStr += (dev.permissions.allowGamepad ? "G" : "-");
+            std::string perms;
+            if (dev.permissions.allowKeyboard) perms += "KBD ";
+            if (dev.permissions.allowMouse) perms += "MOUSE ";
+            if (dev.permissions.allowGamepad) perms += "PAD ";
             std::cout << std::left << std::setw(20) << dev.deviceName
-                      << std::setw(24) << dev.deviceId
-                      << std::setw(16) << permStr
+                      << std::setw(16) << dev.deviceId
+                      << std::setw(20) << perms
                       << dev.pairedAtEpochSec << "\n";
         }
     }
@@ -350,6 +337,21 @@ common::Result<void> DesktopApplication::shutdown() {
 
 #if defined(_WIN32)
 
+static void BeginM3CardHelper(const char* strId, const tokens::ThemeColors& c, const ImVec2& size = ImVec2(0, 0), bool isVariant = false) {
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, isVariant ? c.surfaceVariant : c.cardBg);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S16, tokens::MintSpacing::S16));
+    ImGui::BeginChild(strId, size, true);
+}
+
+static void EndM3CardHelper() {
+    ImGui::EndChild();
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+}
+
 void DesktopApplication::handleResize(uint32_t width, uint32_t height) {
     if (width == 0 || height == 0 || !swapChain_) return;
     guiWidth_ = width;
@@ -364,74 +366,19 @@ void DesktopApplication::handleResize(uint32_t width, uint32_t height) {
     }
 }
 
+void DesktopApplication::applyActiveTheme() {
+    tokens::applyTheme(currentTheme_);
+}
+
 void DesktopApplication::applyMintAndWhiteTheme() {
-    ImGuiStyle& style = ImGui::GetStyle();
-    ImVec4* colors = style.Colors;
+    applyActiveTheme();
+}
 
-    style.WindowRounding    = 12.0f;
-    style.ChildRounding     = 10.0f;
-    style.FrameRounding     = 8.0f;
-    style.PopupRounding     = 10.0f;
-    style.ScrollbarRounding = 8.0f;
-    style.GrabRounding      = 6.0f;
-    style.TabRounding       = 8.0f;
-
-    style.WindowBorderSize  = 1.0f;
-    style.ChildBorderSize   = 1.0f;
-    style.PopupBorderSize   = 1.0f;
-    style.FrameBorderSize   = 1.0f;
-
-    style.WindowPadding     = ImVec2(16.0f, 16.0f);
-    style.FramePadding      = ImVec2(12.0f, 7.0f);
-    style.ItemSpacing       = ImVec2(12.0f, 10.0f);
-    style.ItemInnerSpacing  = ImVec2(8.0f, 6.0f);
-    style.ScrollbarSize     = 12.0f;
-
-    colors[ImGuiCol_Text]                  = ImVec4(0.059f, 0.090f, 0.165f, 1.00f); // #0F172A
-    colors[ImGuiCol_TextDisabled]          = ImVec4(0.392f, 0.455f, 0.545f, 1.00f); // #64748B
-    colors[ImGuiCol_WindowBg]              = ImVec4(0.973f, 0.988f, 0.980f, 1.00f); // #F8FCFA (Mint-tinted white canvas)
-    colors[ImGuiCol_ChildBg]               = ImVec4(1.000f, 1.000f, 1.000f, 1.00f); // #FFFFFF (Crisp white card)
-    colors[ImGuiCol_PopupBg]               = ImVec4(1.000f, 1.000f, 1.000f, 0.98f);
-    colors[ImGuiCol_Border]                = ImVec4(0.820f, 0.900f, 0.850f, 1.00f); // Soft mint border
-    colors[ImGuiCol_BorderShadow]          = ImVec4(0.000f, 0.000f, 0.000f, 0.00f);
-    colors[ImGuiCol_FrameBg]               = ImVec4(0.941f, 0.973f, 0.957f, 1.00f); // Very soft mint fill
-    colors[ImGuiCol_FrameBgHovered]        = ImVec4(0.820f, 0.980f, 0.898f, 0.60f);
-    colors[ImGuiCol_FrameBgActive]         = ImVec4(0.820f, 0.980f, 0.898f, 1.00f);
-    colors[ImGuiCol_TitleBg]               = ImVec4(1.000f, 1.000f, 1.000f, 1.00f);
-    colors[ImGuiCol_TitleBgActive]         = ImVec4(1.000f, 1.000f, 1.000f, 1.00f);
-    colors[ImGuiCol_TitleBgCollapsed]      = ImVec4(1.000f, 1.000f, 1.000f, 0.75f);
-    colors[ImGuiCol_MenuBarBg]             = ImVec4(1.000f, 1.000f, 1.000f, 1.00f);
-    colors[ImGuiCol_ScrollbarBg]           = ImVec4(0.941f, 0.973f, 0.957f, 0.60f);
-    colors[ImGuiCol_ScrollbarGrab]         = ImVec4(0.655f, 0.853f, 0.756f, 0.80f);
-    colors[ImGuiCol_ScrollbarGrabHovered]  = ImVec4(0.063f, 0.725f, 0.506f, 0.80f);
-    colors[ImGuiCol_ScrollbarGrabActive]   = ImVec4(0.020f, 0.588f, 0.412f, 1.00f);
-    colors[ImGuiCol_CheckMark]             = ImVec4(0.063f, 0.725f, 0.506f, 1.00f); // Vibrant Mint Green #10B981
-    colors[ImGuiCol_SliderGrab]            = ImVec4(0.063f, 0.725f, 0.506f, 1.00f);
-    colors[ImGuiCol_SliderGrabActive]      = ImVec4(0.020f, 0.588f, 0.412f, 1.00f);
-    colors[ImGuiCol_Button]                = ImVec4(0.063f, 0.725f, 0.506f, 1.00f); // #10B981
-    colors[ImGuiCol_ButtonHovered]         = ImVec4(0.020f, 0.588f, 0.412f, 1.00f); // #059669
-    colors[ImGuiCol_ButtonActive]          = ImVec4(0.016f, 0.471f, 0.341f, 1.00f); // #047857
-    colors[ImGuiCol_Header]                = ImVec4(0.820f, 0.980f, 0.898f, 1.00f); // Mint Tint #D1FAE5
-    colors[ImGuiCol_HeaderHovered]         = ImVec4(0.655f, 0.953f, 0.816f, 1.00f);
-    colors[ImGuiCol_HeaderActive]          = ImVec4(0.063f, 0.725f, 0.506f, 1.00f);
-    colors[ImGuiCol_Separator]             = ImVec4(0.886f, 0.930f, 0.900f, 1.00f);
-    colors[ImGuiCol_SeparatorHovered]      = ImVec4(0.063f, 0.725f, 0.506f, 0.78f);
-    colors[ImGuiCol_SeparatorActive]       = ImVec4(0.020f, 0.588f, 0.412f, 1.00f);
-    colors[ImGuiCol_ResizeGrip]            = ImVec4(0.063f, 0.725f, 0.506f, 0.20f);
-    colors[ImGuiCol_ResizeGripHovered]     = ImVec4(0.063f, 0.725f, 0.506f, 0.67f);
-    colors[ImGuiCol_ResizeGripActive]      = ImVec4(0.020f, 0.588f, 0.412f, 0.95f);
-    colors[ImGuiCol_Tab]                   = ImVec4(0.941f, 0.973f, 0.957f, 1.00f);
-    colors[ImGuiCol_TabHovered]            = ImVec4(0.820f, 0.980f, 0.898f, 0.80f);
-    colors[ImGuiCol_TabActive]             = ImVec4(0.820f, 0.980f, 0.898f, 1.00f);
-    colors[ImGuiCol_TabUnfocused]          = ImVec4(0.973f, 0.988f, 0.980f, 1.00f);
-    colors[ImGuiCol_TabUnfocusedActive]   = ImVec4(0.941f, 0.973f, 0.957f, 1.00f);
-    colors[ImGuiCol_TableHeaderBg]         = ImVec4(0.941f, 0.973f, 0.957f, 1.00f);
-    colors[ImGuiCol_TableBorderStrong]     = ImVec4(0.820f, 0.900f, 0.850f, 1.00f);
-    colors[ImGuiCol_TableBorderLight]      = ImVec4(0.886f, 0.930f, 0.900f, 1.00f);
-    colors[ImGuiCol_TableRowBg]            = ImVec4(1.000f, 1.000f, 1.000f, 0.00f);
-    colors[ImGuiCol_TableRowBgAlt]         = ImVec4(0.973f, 0.988f, 0.980f, 0.60f);
-    colors[ImGuiCol_TextSelectedBg]        = ImVec4(0.820f, 0.980f, 0.898f, 0.50f);
-    colors[ImGuiCol_NavHighlight]          = ImVec4(0.063f, 0.725f, 0.506f, 1.00f);
+void DesktopApplication::toggleTheme() {
+    currentTheme_ = (currentTheme_ == tokens::ThemeMode::Light)
+        ? tokens::ThemeMode::Dark
+        : tokens::ThemeMode::Light;
+    applyActiveTheme();
 }
 
 common::Result<void> DesktopApplication::initializeD3D11Gui() {
@@ -518,7 +465,7 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     );
 
     if (FAILED(hr)) {
-        // Fallback to WARP software rasterizer if hardware adapter creation fails (e.g. virtual environment)
+        // Fallback to WARP software rasterizer if hardware adapter creation fails
         hr = D3D11CreateDeviceAndSwapChain(
             nullptr,
             D3D_DRIVER_TYPE_WARP,
@@ -560,7 +507,7 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    applyMintAndWhiteTheme();
+    applyActiveTheme();
 
     ImGui_ImplWin32_Init(hwnd_);
     ImGui_ImplDX11_Init(d3d11Device_.Get(), d3d11Context_.Get());
@@ -616,7 +563,8 @@ common::Result<void> DesktopApplication::runGuiLoop() {
 
         ImGui::Render();
 
-        const float clearColor[4] = { 0.973f, 0.988f, 0.980f, 1.00f }; // #F8FCFA
+        const auto& c = tokens::getActiveTheme(currentTheme_);
+        const float clearColor[4] = { c.background.x, c.background.y, c.background.z, 1.00f };
         d3d11Context_->OMSetRenderTargets(1, rtv_.GetAddressOf(), nullptr);
         d3d11Context_->ClearRenderTargetView(rtv_.Get(), clearColor);
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -632,88 +580,119 @@ void DesktopApplication::renderSleekMintLogo(float size) const {
     ImVec2 pos = ImGui::GetCursorScreenPos();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    // 1. Base Squircle Badge with Dark Slate (#0F172A) & Subtle Glow
+    // Base Squircle Badge with M3 24px-scale rounding (size * 0.22)
     ImVec2 pMin = pos;
     ImVec2 pMax = ImVec2(pos.x + size, pos.y + size);
     float rounding = size * 0.22f;
 
-    drawList->AddRectFilled(pMin, pMax, IM_COL32(15, 23, 42, 255), rounding);
-    drawList->AddCircleFilled(ImVec2(pos.x + size * 0.50f, pos.y + size * 0.44f), size * 0.26f, IM_COL32(16, 185, 129, 50));
-    drawList->AddRect(pMin, pMax, IM_COL32(16, 185, 129, 255), rounding, 0, 1.8f);
+    ImU32 badgeBg = (currentTheme_ == tokens::ThemeMode::Light)
+        ? IM_COL32(23, 75, 56, 255)   // Forest Green #174B38
+        : IM_COL32(13, 48, 36, 255);  // Deep Evergreen #0D3024
 
-    // 2. Broadcast Velocity Stream Arc above crest
-    drawList->PathClear();
-    drawList->PathArcTo(ImVec2(pos.x + size * 0.50f, pos.y + size * 0.30f), size * 0.16f, 3.40f, 6.02f);
-    drawList->PathStroke(IM_COL32(110, 231, 183, 210), 0, 1.5f);
+    drawList->AddRectFilled(pMin, pMax, badgeBg, rounding);
 
-    // 3. Sleek Geometric "M" Wings
-    // Left Wing (Bright Mint #34D399)
-    const ImVec2 leftPts[5] = {
-        ImVec2(pos.x + size * 0.22f, pos.y + size * 0.74f),
-        ImVec2(pos.x + size * 0.22f, pos.y + size * 0.38f),
-        ImVec2(pos.x + size * 0.35f, pos.y + size * 0.32f),
-        ImVec2(pos.x + size * 0.46f, pos.y + size * 0.52f),
-        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.74f)
+    ImU32 borderCol = (currentTheme_ == tokens::ThemeMode::Light)
+        ? IM_COL32(184, 235, 213, 180) // Pixel Mint #B8EBD5
+        : IM_COL32(142, 216, 186, 200); // Fresh Mint #8ED8BA
+    drawList->AddRect(pMin, pMax, borderCol, rounding, 0, 1.5f);
+
+    // Twin Streaming Paths: Geometric 'M'
+    // Left Pillar: Host Upload Stream (Pixel Mint)
+    const ImVec2 hostPts[4] = {
+        ImVec2(pos.x + size * 0.20f, pos.y + size * 0.76f),
+        ImVec2(pos.x + size * 0.20f, pos.y + size * 0.31f),
+        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.24f),
+        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.76f)
     };
-    drawList->AddConvexPolyFilled(leftPts, 5, IM_COL32(52, 211, 153, 255));
+    drawList->AddConvexPolyFilled(hostPts, 4, IM_COL32(184, 235, 213, 255));
 
-    // Right Wing (Vibrant Mint #10B981)
-    const ImVec2 rightPts[5] = {
-        ImVec2(pos.x + size * 0.78f, pos.y + size * 0.74f),
-        ImVec2(pos.x + size * 0.78f, pos.y + size * 0.38f),
-        ImVec2(pos.x + size * 0.65f, pos.y + size * 0.32f),
-        ImVec2(pos.x + size * 0.54f, pos.y + size * 0.52f),
-        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.74f)
+    // Right Pillar: Client Playout Stream (Fresh Mint)
+    const ImVec2 clientPts[4] = {
+        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.76f),
+        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.24f),
+        ImVec2(pos.x + size * 0.80f, pos.y + size * 0.31f),
+        ImVec2(pos.x + size * 0.80f, pos.y + size * 0.76f)
     };
-    drawList->AddConvexPolyFilled(rightPts, 5, IM_COL32(16, 185, 129, 255));
+    drawList->AddConvexPolyFilled(clientPts, 4, IM_COL32(142, 216, 186, 255));
 
-    // Center Core Nexus Diamond (High Mint #A7F3D0)
-    const ImVec2 diamondPts[4] = {
-        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.38f),
-        ImVec2(pos.x + size * 0.58f, pos.y + size * 0.54f),
+    // Host Forward Streaming Diagonal
+    const ImVec2 hostDiag[4] = {
+        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.24f),
+        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.55f),
         ImVec2(pos.x + size * 0.50f, pos.y + size * 0.66f),
-        ImVec2(pos.x + size * 0.42f, pos.y + size * 0.54f)
+        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.37f)
     };
-    drawList->AddConvexPolyFilled(diamondPts, 4, IM_COL32(167, 243, 208, 255));
+    drawList->AddConvexPolyFilled(hostDiag, 4, IM_COL32(142, 216, 186, 255));
 
-    // Center Core White Spark
-    drawList->AddCircleFilled(ImVec2(pos.x + size * 0.50f, pos.y + size * 0.53f), size * 0.045f, IM_COL32(255, 255, 255, 255));
+    // Client Feedback Diagonal
+    const ImVec2 clientDiag[4] = {
+        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.24f),
+        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.37f),
+        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.66f),
+        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.55f)
+    };
+    drawList->AddConvexPolyFilled(clientDiag, 4, IM_COL32(184, 235, 213, 255));
+
+    // Upper Interlocking Bridge Line
+    drawList->AddLine(
+        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.24f),
+        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.24f),
+        IM_COL32(221, 239, 228, 230),
+        1.6f
+    );
+
+    // Center Sync Nexus Diamond (Pristine White)
+    const ImVec2 nexusPts[4] = {
+        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.48f),
+        ImVec2(pos.x + size * 0.55f, pos.y + size * 0.56f),
+        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.64f),
+        ImVec2(pos.x + size * 0.45f, pos.y + size * 0.56f)
+    };
+    drawList->AddConvexPolyFilled(nexusPts, 4, IM_COL32(255, 255, 255, 255));
+
+    // Center Core Point
+    drawList->AddCircleFilled(
+        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.56f),
+        size * 0.03f,
+        badgeBg
+    );
 
     ImGui::Dummy(ImVec2(size, size));
 }
 
 void DesktopApplication::renderBadge(const char* text, bool isSuccess) const {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
     ImVec2 textSize = ImGui::CalcTextSize(text);
     ImVec2 pos = ImGui::GetCursorScreenPos();
-    float paddingX = 8.0f;
-    float paddingY = 3.0f;
+    float paddingX = tokens::MintSpacing::S8;
+    float paddingY = tokens::MintSpacing::S4;
     float rectW = textSize.x + paddingX * 2.0f;
     float rectH = textSize.y + paddingY * 2.0f;
 
-    ImU32 bgCol = isSuccess
-        ? IM_COL32(209, 250, 229, 255)   // #D1FAE5 (Soft Mint)
-        : IM_COL32(254, 226, 226, 255);  // #FEE2E2 (Soft Rose)
-    ImU32 textCol = isSuccess
-        ? IM_COL32(6, 95, 70, 255)       // #065F46 (Dark Mint)
-        : IM_COL32(153, 27, 27, 255);    // #991B1B (Dark Red)
+    ImVec4 bgVec = isSuccess ? c.successContainer : c.errorContainer;
+    ImVec4 fgVec = isSuccess ? c.onSuccessContainer : c.onErrorContainer;
+
+    ImU32 bgCol = ImGui::ColorConvertFloat4ToU32(bgVec);
+    ImU32 textCol = ImGui::ColorConvertFloat4ToU32(fgVec);
 
     ImDrawList* drawList = ImGui::GetWindowDrawList();
-    drawList->AddRectFilled(pos, ImVec2(pos.x + rectW, pos.y + rectH), bgCol, 8.0f);
+    drawList->AddRectFilled(pos, ImVec2(pos.x + rectW, pos.y + rectH), bgCol, rectH * 0.5f);
     drawList->AddText(ImVec2(pos.x + paddingX, pos.y + paddingY), textCol, text);
 
     ImGui::Dummy(ImVec2(rectW, rectH));
 }
 
 void DesktopApplication::renderMetricBox(const char* label, const char* value, const char* sublabel) const {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.973f, 0.988f, 0.980f, 1.00f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.820f, 0.900f, 0.850f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 8.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surfaceVariant);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Medium); // 16px
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S12, tokens::MintSpacing::S8));
 
     ImGui::BeginChild(label, ImVec2(0, 76.0f), true, ImGuiWindowFlags_NoScrollbar);
     ImGui::TextDisabled("%s", label);
     ImGui::Spacing();
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "%s", value);
+    ImGui::TextColored(c.primary, "%s", value);
     if (sublabel && sublabel[0] != '\0') {
         ImGui::SameLine();
         ImGui::TextDisabled(" %s", sublabel);
@@ -725,60 +704,69 @@ void DesktopApplication::renderMetricBox(const char* label, const char* value, c
 }
 
 void DesktopApplication::renderGuiHeader() {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.820f, 0.900f, 0.850f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16.0f, 10.0f));
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S16, tokens::MintSpacing::S8));
 
-    ImGui::BeginChild("HeaderBar", ImVec2(0, 56.0f), true, ImGuiWindowFlags_NoScrollbar);
+    ImGui::BeginChild("HeaderBar", ImVec2(0, 58.0f), true, ImGuiWindowFlags_NoScrollbar);
 
-    // Left: Sleek Mint Brand Logo, Title and Version Pill
-    renderSleekMintLogo(34.0f);
-    ImGui::SameLine(0, 10.0f);
+    // Left: Brand Logo, Title and Tagline Pill
+    renderSleekMintLogo(36.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
     ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "MIST");
+    ImGui::TextColored(c.primary, "MIST");
     ImGui::SameLine();
-    ImGui::TextColored(ImVec4(0.392f, 0.455f, 0.545f, 1.00f), "|  STREAM STUDIO");
-    ImGui::SameLine(0, 14.0f);
+    ImGui::TextColored(c.textSecondary, "|  Play beyond your desk.");
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
     renderBadge("v0.2.0-rc1", true);
 
-    // Center: System Status Pill
-    ImGui::SameLine(0, 32.0f);
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "[ * ]");
-    ImGui::SameLine(0, 4.0f);
+    // Center: System Host Availability Indicator
+    ImGui::SameLine(0, tokens::MintSpacing::S24);
+    ImGui::TextColored(c.primary, "[ * ]");
+    ImGui::SameLine(0, tokens::MintSpacing::S4);
     ImGui::TextUnformatted("HOST ONLINE : 127.0.0.1:8080");
-    ImGui::SameLine(0, 12.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
     renderBadge("DIRECT LAN", true);
 
-    // Right: Action Buttons
-    float rightOffset = 270.0f;
+    // Right: Action Buttons & Theme Switcher
+    float rightOffset = 380.0f;
     float availX = ImGui::GetWindowWidth();
     if (availX > rightOffset) {
         ImGui::SameLine(availX - rightOffset);
     }
 
+    // Theme Switcher Toggle (Light / Dark)
+    const char* themeLabel = (currentTheme_ == tokens::ThemeMode::Light)
+        ? "Theme: Light (Day)"
+        : "Theme: Dark (Night)";
+    if (ImGui::Button(themeLabel, ImVec2(150.0f, 34.0f))) {
+        toggleTheme();
+    }
+
+    ImGui::SameLine(0, tokens::MintSpacing::S8);
+
+    // Host Service State Toggle
     if (isHostingActive_) {
-        if (ImGui::Button("Hosting: ACTIVE", ImVec2(125.0f, 32.0f))) {
+        if (ImGui::Button("Hosting: ACTIVE", ImVec2(130.0f, 34.0f))) {
             isHostingActive_ = false;
         }
     } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.94f, 0.97f, 0.95f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.39f, 0.45f, 0.54f, 1.0f));
-        if (ImGui::Button("Hosting: PAUSED", ImVec2(125.0f, 32.0f))) {
+        ImGui::PushStyleColor(ImGuiCol_Button, c.surfaceVariant);
+        ImGui::PushStyleColor(ImGuiCol_Text, c.textDisabled);
+        if (ImGui::Button("Hosting: PAUSED", ImVec2(130.0f, 34.0f))) {
             isHostingActive_ = true;
         }
         ImGui::PopStyleColor(2);
     }
 
-    ImGui::SameLine(0, 8.0f);
-    if (ImGui::Button("Settings", ImVec2(75.0f, 32.0f))) {
-        currentScreen_ = DesktopScreen::StreamSettings;
-    }
+    ImGui::SameLine(0, tokens::MintSpacing::S8);
 
-    ImGui::SameLine(0, 8.0f);
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.98f, 0.92f, 0.92f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.20f, 0.20f, 1.0f));
-    if (ImGui::Button("X", ImVec2(32.0f, 32.0f))) {
+    // Window Exit Button
+    ImGui::PushStyleColor(ImGuiCol_Button, c.errorContainer);
+    ImGui::PushStyleColor(ImGuiCol_Text, c.onErrorContainer);
+    if (ImGui::Button("X", ImVec2(34.0f, 34.0f))) {
         isRunning_.store(false);
     }
     ImGui::PopStyleColor(2);
@@ -789,20 +777,22 @@ void DesktopApplication::renderGuiHeader() {
 }
 
 void DesktopApplication::renderGuiNavRail() {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
     float railWidth = isNavRailExpanded_ ? 210.0f : 68.0f;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.820f, 0.900f, 0.850f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 12.0f));
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S8, tokens::MintSpacing::S12));
 
     ImGui::BeginChild("NavRail", ImVec2(railWidth, 0), true, ImGuiWindowFlags_NoScrollbar);
 
-    // Sleek Mint Logo Branding at top of Rail
+    // Brand Header in Navigation Rail
     if (isNavRailExpanded_) {
         renderSleekMintLogo(34.0f);
-        ImGui::SameLine(0, 10.0f);
+        ImGui::SameLine(0, tokens::MintSpacing::S8);
         ImGui::BeginGroup();
-        ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "MIST STUDIO");
+        ImGui::TextColored(c.primary, "MIST STUDIO");
         ImGui::TextDisabled("Direct3D 11");
         ImGui::EndGroup();
         ImGui::Spacing();
@@ -836,12 +826,12 @@ void DesktopApplication::renderGuiNavRail() {
     for (const auto& item : items) {
         bool isSelected = (currentScreen_ == item.screen);
         if (isSelected) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.820f, 0.980f, 0.898f, 1.00f)); // Mint tint
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.024f, 0.471f, 0.341f, 1.00f));   // Dark mint text
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.063f, 0.725f, 0.506f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_Button, c.primaryContainer);
+            ImGui::PushStyleColor(ImGuiCol_Text, c.onPrimaryContainer);
+            ImGui::PushStyleColor(ImGuiCol_Border, c.primary);
         } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));        // Transparent
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.15f, 0.20f, 0.28f, 1.00f));      // Slate
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.surface.x, c.surface.y, c.surface.z, 0.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, c.textPrimary);
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
         }
 
@@ -865,7 +855,7 @@ void DesktopApplication::renderGuiNavRail() {
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + availableY - 60.0f);
             ImGui::Separator();
             ImGui::TextDisabled("Mist Engine v0.2.0");
-            ImGui::TextDisabled("D3D11 / NVENC / P2P");
+            ImGui::TextDisabled("Direct3D 11 • NVENC");
         }
     }
 
@@ -875,62 +865,84 @@ void DesktopApplication::renderGuiNavRail() {
 }
 
 void DesktopApplication::renderGuiHomeScreen() {
-    // Sleek Mint Hero Banner Card
-    BeginM3Card("HeroBannerCard", ImVec2(0, 92.0f));
-    renderSleekMintLogo(60.0f);
-    ImGui::SameLine(0, 16.0f);
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+
+    // 1. Sleek Mint Hero Banner Card
+    BeginM3CardHelper("HeroBannerCard", c, ImVec2(0, 96.0f));
+    renderSleekMintLogo(64.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S16);
     ImGui::BeginGroup();
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "MIST HIGH-PERFORMANCE GAME STREAMING");
-    ImGui::TextUnformatted("Ultra low-latency Direct3D 11 hardware capture, NVENC encoding & WebRTC transport.");
-    ImGui::TextDisabled("Discover nearby host streaming nodes, verify network latency, and manage remote gameplay sessions.");
+    ImGui::TextColored(c.primary, "Play beyond your desk.");
+    ImGui::TextUnformatted("Your PC. Your games. Your freedom. Native low-latency Direct3D 11 hardware capture & NVENC encoding.");
+    ImGui::TextDisabled("Discover local and LAN streaming hosts, verify sub-millisecond network QoS, and connect in one click.");
     ImGui::EndGroup();
-    EndM3Card();
+    EndM3CardHelper();
 
     ImGui::Spacing();
 
-    // 3 KPI Metric Cards
+    // 2. Direct Device Connection Card
+    BeginM3CardHelper("DirectConnectCard", c, ImVec2(0, 84.0f));
+    ImGui::TextDisabled("DIRECT HOST CONNECTION");
+    ImGui::Spacing();
+    ImGui::PushItemWidth(260.0f);
+    ImGui::InputTextWithHint("##QuickHostInput", "Enter Host IP (e.g. 127.0.0.1:8080)", quickConnectHostInput_, IM_ARRAYSIZE(quickConnectHostInput_));
+    ImGui::PopItemWidth();
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
+    if (ImGui::Button("Connect to Host", ImVec2(160.0f, 32.0f))) {
+        currentScreen_ = DesktopScreen::LiveSession;
+    }
+    ImGui::SameLine(0, tokens::MintSpacing::S16);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("Host Availability:");
+    ImGui::SameLine(0, tokens::MintSpacing::S8);
+    renderBadge("ONLINE (< 0.5 ms RTT)", true);
+    EndM3CardHelper();
+
+    ImGui::Spacing();
+
+    // 3. KPI Metric Cards
     float contentWidth = ImGui::GetContentRegionAvail().x;
     float cardWidth = std::max(200.0f, (contentWidth - 24.0f) / 3.0f);
 
-    BeginM3Card("CardLocalNode", ImVec2(cardWidth, 110.0f));
+    BeginM3CardHelper("CardLocalNode", c, ImVec2(cardWidth, 110.0f));
     ImGui::TextDisabled("LOCAL HOST NODE");
     ImGui::Spacing();
     ImGui::TextUnformatted("Workstation-Host");
-    ImGui::SameLine(0, 8.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S8);
     renderBadge("ONLINE", true);
     ImGui::TextDisabled("127.0.0.1:8080 (Listening)");
-    EndM3Card();
+    EndM3CardHelper();
 
-    ImGui::SameLine(0, 12.0f);
-    BeginM3Card("CardGPU", ImVec2(cardWidth, 110.0f));
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
+    BeginM3CardHelper("CardGPU", c, ImVec2(cardWidth, 110.0f));
     ImGui::TextDisabled("HARDWARE ENCODER");
     ImGui::Spacing();
     ImGui::TextUnformatted("GeForce GTX 1660 SUPER");
     ImGui::TextDisabled("NVIDIA NVENC H.264 (CBR 1080p60)");
-    EndM3Card();
+    EndM3CardHelper();
 
-    ImGui::SameLine(0, 12.0f);
-    BeginM3Card("CardNetwork", ImVec2(cardWidth, 110.0f));
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
+    BeginM3CardHelper("CardNetwork", c, ImVec2(cardWidth, 110.0f));
     ImGui::TextDisabled("NETWORK QOS");
     ImGui::Spacing();
     ImGui::TextUnformatted("WebRTC Direct P2P");
-    ImGui::SameLine(0, 8.0f);
-    renderBadge("<1ms RTT", true);
+    ImGui::SameLine(0, tokens::MintSpacing::S8);
+    renderBadge("< 1 ms RTT", true);
     ImGui::TextDisabled("%s", "Packet Loss: 0.00% • 45.2 Mbps");
-    EndM3Card();
+    EndM3CardHelper();
 
     ImGui::Spacing();
 
-    // Discovered Host Nodes Grid
-    BeginM3Card("DiscoveredNodesCard", ImVec2(0, 260.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "Discovered Streaming Hosts");
-    ImGui::SameLine(0, 8.0f);
-    ImGui::TextDisabled("(Broadcast Beacon & LAN Discovery)");
+    // 4. Discovered & Recently Connected Hosts Grid
+    BeginM3CardHelper("DiscoveredNodesCard", c, ImVec2(0, 240.0f));
+    ImGui::TextColored(c.primary, "Discovered & Recently Connected Hosts");
+    ImGui::SameLine(0, tokens::MintSpacing::S8);
+    ImGui::TextDisabled("(Direct LAN Beacon Discovery)");
     ImGui::Spacing();
 
     if (ImGui::BeginTable("HostsTable", 5, ImGuiTableFlags_BordersInner | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("Host Node / IP", ImGuiTableColumnFlags_WidthStretch, 0.30f);
-        ImGui::TableSetupColumn("Device Spec", ImGuiTableColumnFlags_WidthStretch, 0.30f);
+        ImGui::TableSetupColumn("Device Spec & Profile", ImGuiTableColumnFlags_WidthStretch, 0.30f);
         ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthStretch, 0.15f);
         ImGui::TableSetupColumn("Ping / RTT", ImGuiTableColumnFlags_WidthStretch, 0.12f);
         ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch, 0.13f);
@@ -954,7 +966,7 @@ void DesktopApplication::renderGuiHomeScreen() {
         // Node 2
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
-        ImGui::TextUnformatted("192.168.1.9:8080 (LAN Desktop)");
+        ImGui::TextUnformatted("192.168.1.9:8080 (Gaming Rig)");
         ImGui::TableNextColumn();
         ImGui::TextDisabled("RTX 3070 • 1440p120 • ViGEm");
         ImGui::TableNextColumn();
@@ -969,7 +981,7 @@ void DesktopApplication::renderGuiHomeScreen() {
         // Node 3
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
-        ImGui::TextUnformatted("192.168.1.15:8080 (Living Room)");
+        ImGui::TextUnformatted("192.168.1.15:8080 (Living Room NUC)");
         ImGui::TableNextColumn();
         ImGui::TextDisabled("GTX 1080 • 1080p60 • 5.1 Ch");
         ImGui::TableNextColumn();
@@ -983,30 +995,32 @@ void DesktopApplication::renderGuiHomeScreen() {
 
         ImGui::EndTable();
     }
-    EndM3Card();
+    EndM3CardHelper();
 
     ImGui::Spacing();
 
-    // Quick Actions Row
-    BeginM3Card("QuickActionsCard", ImVec2(0, 110.0f));
+    // 5. Quick Actions Row
+    BeginM3CardHelper("QuickActionsCard", c, ImVec2(0, 88.0f));
     ImGui::TextDisabled("QUICK ACTIONS");
     ImGui::Spacing();
-    if (ImGui::Button("Pair New Client Device", ImVec2(220.0f, 36.0f))) {
+    if (ImGui::Button("Pair New Client Device", ImVec2(220.0f, 34.0f))) {
         currentScreen_ = DesktopScreen::Pairing;
     }
-    ImGui::SameLine(0, 12.0f);
-    if (ImGui::Button("Configure Stream Settings", ImVec2(220.0f, 36.0f))) {
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
+    if (ImGui::Button("Configure Stream Settings", ImVec2(220.0f, 34.0f))) {
         currentScreen_ = DesktopScreen::StreamSettings;
     }
-    ImGui::SameLine(0, 12.0f);
-    if (ImGui::Button("View Real-Time Telemetry", ImVec2(220.0f, 36.0f))) {
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
+    if (ImGui::Button("View Real-Time Telemetry", ImVec2(220.0f, 34.0f))) {
         currentScreen_ = DesktopScreen::LiveSession;
     }
-    EndM3Card();
+    EndM3CardHelper();
 }
 
 void DesktopApplication::renderGuiPairingScreen() {
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Device Pairing & Access Authorization");
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+
+    ImGui::TextColored(c.primary, "Device Pairing & Access Authorization");
     ImGui::TextDisabled("Authorize client devices using single-use Base32 pairing codes and cryptographic Ed25519 authentication.");
     ImGui::Spacing();
 
@@ -1017,20 +1031,20 @@ void DesktopApplication::renderGuiPairingScreen() {
     }
 
     // Hero Card: Active Code
-    BeginM3Card("HeroCodeCard", ImVec2(0, 190.0f));
+    BeginM3CardHelper("HeroCodeCard", c, ImVec2(0, 190.0f));
     ImGui::TextDisabled("ACTIVE PAIRING AUTHORIZATION CODE");
     ImGui::Spacing();
 
     // Large Code Display Box
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.941f, 0.988f, 0.957f, 1.00f)); // Mint tint
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.063f, 0.725f, 0.506f, 1.00f));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.primaryContainer);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.primary);
     ImGui::BeginChild("CodeBox", ImVec2(340.0f, 64.0f), true, ImGuiWindowFlags_NoScrollbar);
     ImGui::SetCursorPos(ImVec2(24.0f, 14.0f));
-    ImGui::TextColored(ImVec4(0.024f, 0.471f, 0.341f, 1.00f), "C O D E :   %s", code.c_str());
+    ImGui::TextColored(c.onPrimaryContainer, "C O D E :   %s", code.c_str());
     ImGui::EndChild();
     ImGui::PopStyleColor(2);
 
-    ImGui::SameLine(0, 20.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S20);
     ImGui::BeginGroup();
     ImGui::TextUnformatted("Host Identity: MIST-HOST-PROD-01");
     ImGui::TextDisabled("Ed25519 Fingerprint: 4A:9F:88:B1:C2:E4:67:9A:01:DF:3E:22");
@@ -1042,18 +1056,18 @@ void DesktopApplication::renderGuiPairingScreen() {
 
     ImGui::Spacing();
     ImGui::ProgressBar(0.85f, ImVec2(340.0f, 8.0f), "");
-    EndM3Card();
+    EndM3CardHelper();
 
     ImGui::Spacing();
 
     // Pending Connection Requests Card
-    BeginM3Card("PendingRequestsCard", ImVec2(0, 160.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Incoming Authorization Requests");
+    BeginM3CardHelper("PendingRequestsCard", c, ImVec2(0, 160.0f));
+    ImGui::TextColored(c.primary, "Incoming Authorization Requests");
     ImGui::Spacing();
 
     if (sampleRequestPending_) {
         ImGui::TextUnformatted("Device: Remote-Laptop-Pro");
-        ImGui::SameLine(0, 8.0f);
+        ImGui::SameLine(0, tokens::MintSpacing::S8);
         renderBadge("DEV-88219", true);
         ImGui::TextDisabled("Requested Permissions: Keyboard, Mouse, Virtual Gamepad Control");
         ImGui::Spacing();
@@ -1063,9 +1077,9 @@ void DesktopApplication::renderGuiPairingScreen() {
             (void)pairingManager_.approvePairingRequest("DEV-88219", perms);
             sampleRequestPending_ = false;
         }
-        ImGui::SameLine(0, 12.0f);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.98f, 0.92f, 0.92f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.20f, 0.20f, 1.0f));
+        ImGui::SameLine(0, tokens::MintSpacing::S12);
+        ImGui::PushStyleColor(ImGuiCol_Button, c.errorContainer);
+        ImGui::PushStyleColor(ImGuiCol_Text, c.onErrorContainer);
         if (ImGui::Button("Deny Request", ImVec2(140.0f, 34.0f))) {
             (void)pairingManager_.rejectPairingRequest("DEV-88219");
             sampleRequestPending_ = false;
@@ -1077,55 +1091,86 @@ void DesktopApplication::renderGuiPairingScreen() {
             sampleRequestPending_ = true;
         }
     }
-    EndM3Card();
+    EndM3CardHelper();
 
     ImGui::Spacing();
 
     // Manual Remote Code Entry
-    BeginM3Card("ManualPairCard", ImVec2(0, 110.0f));
+    BeginM3CardHelper("ManualPairCard", c, ImVec2(0, 100.0f));
     ImGui::TextDisabled("CONNECT TO REMOTE HOST VIA CODE");
     ImGui::Spacing();
     ImGui::PushItemWidth(240.0f);
     ImGui::InputTextWithHint("##ManualCode", "Enter 6-char code (e.g. SEA-CDS)", manualPairingCodeInput_, IM_ARRAYSIZE(manualPairingCodeInput_));
     ImGui::PopItemWidth();
-    ImGui::SameLine(0, 12.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
     if (ImGui::Button("Authorize & Pair Remote", ImVec2(190.0f, 32.0f))) {
         manualPairingCodeInput_[0] = '\0';
     }
-    EndM3Card();
+    EndM3CardHelper();
 }
 
 void DesktopApplication::renderGuiHostScreen() {
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Host Management & Safety Policies");
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+
+    ImGui::TextColored(c.primary, "Host Management & Safety Policies");
     ImGui::TextDisabled("Configure host GPU display capture, hardware encoding parameters, and remote operator safety overrides.");
     ImGui::Spacing();
 
     // Host State Card
-    BeginM3Card("HostStatusCard", ImVec2(0, 130.0f));
+    BeginM3CardHelper("HostStatusCard", c, ImVec2(0, 140.0f));
     ImGui::TextDisabled("HOST BROADCASTING STATUS");
     ImGui::Spacing();
     if (isHostingActive_) {
         renderBadge("STREAMING READY", true);
-        ImGui::SameLine(0, 12.0f);
+        ImGui::SameLine(0, tokens::MintSpacing::S12);
         ImGui::TextUnformatted("Listening on 0.0.0.0:8080 • WebRTC Signaling Ready");
     } else {
         renderBadge("PAUSED", false);
-        ImGui::SameLine(0, 12.0f);
+        ImGui::SameLine(0, tokens::MintSpacing::S12);
         ImGui::TextUnformatted("Hosting currently paused • Incoming stream requests blocked");
     }
     ImGui::Spacing();
     ImGui::TextDisabled("Active Hardware: GPU 0 (NVIDIA GeForce GTX 1660 SUPER) • Display 1 (1920x1080 @ 60 Hz)");
-    EndM3Card();
+    ImGui::Spacing();
+
+    // Emergency Disconnect Button
+    ImGui::PushStyleColor(ImGuiCol_Button, c.errorContainer);
+    ImGui::PushStyleColor(ImGuiCol_Text, c.onErrorContainer);
+    if (ImGui::Button("Immediate Emergency Disconnect", ImVec2(260.0f, 30.0f))) {
+        emergencyDisconnectTriggered_ = true;
+    }
+    ImGui::PopStyleColor(2);
+    if (emergencyDisconnectTriggered_) {
+        ImGui::SameLine(0, tokens::MintSpacing::S12);
+        ImGui::TextColored(c.error, "All active streams instantly severed.");
+    }
+    EndM3CardHelper();
+
+    ImGui::Spacing();
+
+    // Display & Hardware Selector Card
+    BeginM3CardHelper("DisplayConfigCard", c, ImVec2(0, 120.0f));
+    ImGui::TextColored(c.primary, "Display Capture & Monitor Selection");
+    ImGui::Spacing();
+    const char* displays[] = {
+        "Display 1: 1920x1080 @ 60 Hz (Primary NVIDIA Desktop)",
+        "Display 2: 2560x1440 @ 144 Hz (Secondary Display)"
+    };
+    ImGui::PushItemWidth(450.0f);
+    ImGui::Combo("Capture Target Display", &selectedMonitorIndex_, displays, IM_ARRAYSIZE(displays));
+    ImGui::PopItemWidth();
+    ImGui::Spacing();
+    ImGui::Checkbox("Audio Loopback Sharing (Stream system WASAPI audio to remote player)", &allowAudioLoopback_);
+    EndM3CardHelper();
 
     ImGui::Spacing();
 
     // Host Input & Safety Policies Card
-    BeginM3Card("PoliciesCard", ImVec2(0, 240.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Remote Input & Safety Policies");
+    BeginM3CardHelper("PoliciesCard", c, ImVec2(0, 230.0f));
+    ImGui::TextColored(c.primary, "Remote Input & Safety Policies");
     ImGui::TextDisabled("Mist ensures local host operator safety by prioritizing physical hardware inputs.");
     ImGui::Spacing();
 
-    ImGui::Checkbox("Audio Loopback Sharing (Stream system audio to remote player)", &allowAudioLoopback_);
     ImGui::Checkbox("Remote Keyboard Control (Allow authorized remote keystrokes)", &allowKeyboard_);
     ImGui::Checkbox("Remote Mouse Control (Allow authorized remote cursor movement & clicks)", &allowMouse_);
     ImGui::Checkbox("Virtual Gamepad Emulation (DualShock 4 / Xbox 360 controller via ViGEm)", &allowGamepad_);
@@ -1135,18 +1180,20 @@ void DesktopApplication::renderGuiHostScreen() {
     ImGui::Separator();
     ImGui::Spacing();
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.941f, 0.988f, 0.957f, 1.00f));
-    ImGui::BeginChild("SafetyNotice", ImVec2(0, 40.0f), false);
-    ImGui::SetCursorPos(ImVec2(12.0f, 10.0f));
-    ImGui::TextColored(ImVec4(0.024f, 0.471f, 0.341f, 1.00f), "SAFETY SHIELD ACTIVE: Local physical mouse/keyboard motion instantly suppresses remote inputs.");
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.primaryContainer);
+    ImGui::BeginChild("SafetyNotice", ImVec2(0, 36.0f), false);
+    ImGui::SetCursorPos(ImVec2(12.0f, 8.0f));
+    ImGui::TextColored(c.onPrimaryContainer, "SAFETY SHIELD ACTIVE: Local physical mouse/keyboard motion instantly suppresses remote inputs.");
     ImGui::EndChild();
     ImGui::PopStyleColor();
 
-    EndM3Card();
+    EndM3CardHelper();
 }
 
 void DesktopApplication::renderGuiSettingsScreen() {
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Stream Quality Settings & Profiles");
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+
+    ImGui::TextColored(c.primary, "Stream Quality Settings & Profiles");
     ImGui::TextDisabled("Select an optimized quality profile or fine-tune video resolution, bitrate ranges and VSync.");
     ImGui::Spacing();
 
@@ -1173,25 +1220,25 @@ void DesktopApplication::renderGuiSettingsScreen() {
     auto currentProf = qualityManager_.getProfile();
 
     for (int i = 0; i < 4; ++i) {
-        if (i > 0) ImGui::SameLine(0, 12.0f);
+        if (i > 0) ImGui::SameLine(0, tokens::MintSpacing::S12);
 
         bool isSelected = (currentProf == profiles[i].profile);
         if (isSelected) {
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.941f, 0.988f, 0.957f, 1.00f));
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.063f, 0.725f, 0.506f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, c.primaryContainer);
+            ImGui::PushStyleColor(ImGuiCol_Border, c.primary);
         } else {
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.820f, 0.900f, 0.850f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, c.surface);
+            ImGui::PushStyleColor(ImGuiCol_Border, c.cardBorder);
         }
 
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, tokens::MintShapes::Large); // 24px
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, isSelected ? 2.0f : 1.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 12.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S12, tokens::MintSpacing::S12));
 
         std::string cardId = "ProfileCard" + std::to_string(i);
         ImGui::BeginChild(cardId.c_str(), ImVec2(cardW, 140.0f), true);
 
-        ImGui::TextColored(isSelected ? ImVec4(0.024f, 0.471f, 0.341f, 1.0f) : ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "%s", profiles[i].title);
+        ImGui::TextColored(isSelected ? c.onPrimaryContainer : c.primary, "%s", profiles[i].title);
         ImGui::TextUnformatted(profiles[i].resFps);
         ImGui::TextDisabled("%s", profiles[i].bitrate);
         ImGui::TextDisabled("%s", profiles[i].desc);
@@ -1210,8 +1257,8 @@ void DesktopApplication::renderGuiSettingsScreen() {
     ImGui::Spacing();
 
     // Fine-Tuning Parameters Card
-    BeginM3Card("TuningCard", ImVec2(0, 240.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Custom Encoding & Latency Tuning");
+    BeginM3CardHelper("TuningCard", c, ImVec2(0, 240.0f));
+    ImGui::TextColored(c.primary, "Custom Encoding & Latency Tuning");
     ImGui::Spacing();
 
     ImGui::PushItemWidth(320.0f);
@@ -1228,13 +1275,15 @@ void DesktopApplication::renderGuiSettingsScreen() {
     ImGui::Spacing();
 
     if (ImGui::Button("Save & Apply Configuration", ImVec2(240.0f, 36.0f))) {
-        // Saved
+        // Configuration persisted
     }
-    EndM3Card();
+    EndM3CardHelper();
 }
 
 void DesktopApplication::renderGuiLiveSessionScreen() {
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Live Session Telemetry & Pipeline Diagnostics");
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+
+    ImGui::TextColored(c.primary, "Live Session Telemetry & Pipeline Diagnostics");
     ImGui::TextDisabled("Direct hardware metrics captured from NVENC, Direct3D 11 NVDEC, libdatachannel QoS and WASAPI audio.");
     ImGui::Spacing();
 
@@ -1243,8 +1292,8 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
     float colWidth = std::max(200.0f, (contentWidth - 24.0f) / 3.0f);
 
     // Column 1: Video Pipeline
-    BeginM3Card("TelemetryVideo", ImVec2(colWidth, 240.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "VIDEO PIPELINE");
+    BeginM3CardHelper("TelemetryVideo", c, ImVec2(colWidth, 240.0f));
+    ImGui::TextColored(c.primary, "VIDEO PIPELINE");
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextDisabled("Resolution:          1920x1080");
@@ -1254,12 +1303,12 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
     ImGui::TextDisabled("Decode Latency:      2.45 ms (D3D11 NVDEC)");
     ImGui::TextDisabled("Render Latency:      0.41 ms (Flip Model)");
     ImGui::TextDisabled("%s", "Dropped Frames:      0 (0.00%)");
-    EndM3Card();
+    EndM3CardHelper();
 
-    ImGui::SameLine(0, 12.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
     // Column 2: Network QoS
-    BeginM3Card("TelemetryNetwork", ImVec2(colWidth, 240.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "NETWORK QOS & TRANSPORT");
+    BeginM3CardHelper("TelemetryNetwork", c, ImVec2(colWidth, 240.0f));
+    ImGui::TextColored(c.primary, "NETWORK QOS & TRANSPORT");
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextDisabled("Connection Type:     WebRTC Direct (LAN)");
@@ -1269,12 +1318,12 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
     ImGui::TextDisabled("%s", "Packet Loss:         0.00% (0 packets)");
     ImGui::TextDisabled("Congestion State:    Stable (AIMD)");
     ImGui::TextDisabled("DataChannel State:   Open (SCTP)");
-    EndM3Card();
+    EndM3CardHelper();
 
-    ImGui::SameLine(0, 12.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
     // Column 3: Audio & Input
-    BeginM3Card("TelemetryAudioInput", ImVec2(colWidth, 240.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "AUDIO & REMOTE INPUT");
+    BeginM3CardHelper("TelemetryAudioInput", c, ImVec2(colWidth, 240.0f));
+    ImGui::TextColored(c.primary, "AUDIO & REMOTE INPUT");
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::TextDisabled("Audio Format / Rate: Opus 48 kHz Stereo / 128 kbps");
@@ -1284,27 +1333,29 @@ void DesktopApplication::renderGuiLiveSessionScreen() {
     ImGui::TextDisabled("Input Events:        183 events processed");
     ImGui::TextDisabled("Dispatch Latency:    0.28 ms");
     ImGui::TextDisabled("Physical Override:   Active & Ready");
-    EndM3Card();
+    EndM3CardHelper();
 
     ImGui::Spacing();
 
     // End-to-End Latency Waterfall Card
-    BeginM3Card("LatencyWaterfallCard", ImVec2(0, 120.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "End-to-End Motion-to-Photon Latency Waterfall");
+    BeginM3CardHelper("LatencyWaterfallCard", c, ImVec2(0, 120.0f));
+    ImGui::TextColored(c.primary, "End-to-End Motion-to-Photon Latency Waterfall");
     ImGui::Spacing();
     ImGui::TextUnformatted("Capture (0.4ms) + NVENC (1.8ms) + Network (1.7ms) + Decode (2.5ms) + Present (0.4ms) = Total: 6.8 ms");
     ImGui::Spacing();
     ImGui::ProgressBar(0.07f, ImVec2(-1, 14.0f), "Sub-Frame Motion-to-Photon: 6.8ms (Target < 16.6ms)");
-    EndM3Card();
+    EndM3CardHelper();
 }
 
 void DesktopApplication::renderGuiDeviceManagementScreen() {
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Trusted Device Management");
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+
+    ImGui::TextColored(c.primary, "Trusted Device Management");
     ImGui::TextDisabled("Manage client devices authorized to stream and send remote keyboard, mouse or gamepad inputs.");
     ImGui::Spacing();
 
-    BeginM3Card("TrustedDevicesCard", ImVec2(0, 280.0f));
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "Authorized Client Devices");
+    BeginM3CardHelper("TrustedDevicesCard", c, ImVec2(0, 280.0f));
+    ImGui::TextColored(c.primary, "Authorized Client Devices");
     ImGui::Spacing();
 
     auto devices = pairingManager_.getTrustedDevices();
@@ -1349,8 +1400,8 @@ void DesktopApplication::renderGuiDeviceManagementScreen() {
 
                 ImGui::TableNextColumn();
                 std::string btnLabel = "Revoke##" + dev.deviceId;
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.98f, 0.92f, 0.92f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.20f, 0.20f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Button, c.errorContainer);
+                ImGui::PushStyleColor(ImGuiCol_Text, c.onErrorContainer);
                 if (ImGui::Button(btnLabel.c_str(), ImVec2(-1, 26.0f))) {
                     (void)pairingManager_.revokeDevice(dev.deviceId);
                 }
@@ -1360,19 +1411,20 @@ void DesktopApplication::renderGuiDeviceManagementScreen() {
             ImGui::EndTable();
         }
     }
-    EndM3Card();
+    EndM3CardHelper();
 
     ImGui::Spacing();
 
-    BeginM3Card("SecurityAdvisoryCard", ImVec2(0, 110.0f));
+    BeginM3CardHelper("SecurityAdvisoryCard", c, ImVec2(0, 110.0f));
     ImGui::TextDisabled("CRYPTOGRAPHIC SECURITY ARCHITECTURE");
     ImGui::Spacing();
     ImGui::TextUnformatted("Trusted devices hold unique Ed25519 pairing credentials. Revoking a device immediately invalidates its token");
     ImGui::TextDisabled("and terminates any active WebRTC DataChannels. The remote client will be required to re-authenticate.");
-    EndM3Card();
+    EndM3CardHelper();
 }
 
 void DesktopApplication::renderGuiFrame() {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
     ImGuiIO& io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
@@ -1383,7 +1435,7 @@ void DesktopApplication::renderGuiFrame() {
                                    ImGuiWindowFlags_NoScrollWithMouse |
                                    ImGuiWindowFlags_NoScrollbar;
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 12.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(tokens::MintSpacing::S12, tokens::MintSpacing::S12));
     ImGui::Begin("MistDesktopMainWindow", nullptr, windowFlags);
 
     // Top Header Bar
@@ -1392,9 +1444,9 @@ void DesktopApplication::renderGuiFrame() {
 
     // Body: Left Nav Rail + Right Content Area
     renderGuiNavRail();
-    ImGui::SameLine(0, 12.0f);
+    ImGui::SameLine(0, tokens::MintSpacing::S12);
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.973f, 0.988f, 0.980f, 1.00f)); // Surface
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, c.background);
     ImGui::BeginChild("ContentArea", ImVec2(0, 0), false);
 
     switch (currentScreen_) {

@@ -20,6 +20,7 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include <wrl/client.h>
+#include "MintDesignTokens.h"
 #endif
 
 namespace mist::desktop {
@@ -68,6 +69,8 @@ private:
     [[nodiscard]] common::Result<void> initializeD3D11Gui();
     void cleanupD3D11Gui();
     void applyMintAndWhiteTheme();
+    void applyActiveTheme();
+    void toggleTheme();
     void renderGuiFrame();
 
     // GUI Screen Components
@@ -95,6 +98,7 @@ private:
     uint32_t guiHeight_{800};
     bool isNavRailExpanded_{true};
     DesktopScreen currentScreen_{DesktopScreen::Home};
+    tokens::ThemeMode currentTheme_{tokens::ThemeMode::Light};
 
     // GUI Interactive State
     bool isHostingActive_{true};
@@ -111,7 +115,10 @@ private:
     bool vsyncEnabled_{false};
 
     char manualPairingCodeInput_[32]{""};
+    char quickConnectHostInput_[64]{"127.0.0.1:8080"};
     bool sampleRequestPending_{true};
+    int selectedMonitorIndex_{0};
+    bool emergencyDisconnectTriggered_{false};
 #endif
 
     common::AppConfig config_;
