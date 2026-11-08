@@ -86,8 +86,8 @@ foreach ($bin in $binaries) {
 # 3. Generate Release Manifest
 $manifest = [PSCustomObject]@{
     product = "Mist Native Game Streaming"
-    version = "0.1.0"
-    milestone = 6
+    version = "0.2.0-rc1"
+    milestone = 7
     generated_at = (Get-Date -Format o)
     files = $manifestEntries
 }

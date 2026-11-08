@@ -62,12 +62,21 @@ public:
     [[nodiscard]] uint32_t getWidth() const noexcept { return width_; }
     [[nodiscard]] uint32_t getHeight() const noexcept { return height_; }
 
+    struct DecoderStats {
+        uint64_t packetsSubmitted{0};
+        uint64_t framesDecoded{0};
+        uint64_t framesQueueDiscarded{0};
+        uint64_t decoderErrors{0};
+    };
+    [[nodiscard]] DecoderStats getDecoderStats() const noexcept;
+
 private:
     [[nodiscard]] common::Result<void> initializeMft();
     [[nodiscard]] common::Result<void> drainOutput();
     void cleanup() noexcept;
 
     mutable std::mutex mutex_;
+    DecoderStats stats_{};
     DecodeConfig config_;
     bool isInitialized_{false};
     uint32_t width_{1920};

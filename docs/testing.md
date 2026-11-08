@@ -46,8 +46,8 @@ Mist employs a multi-tiered automated testing strategy:
 | `InputPermissionTest` | `TestInputPermission.cpp` | Permission state machine (Disabled/Requested/Granted/Revoked), feature bitmask, session matching, sliding-window rate limiter (2000 ev/s), emergency release callbacks. |
 | `InputDispatcherTest` | `TestInputDispatcher.cpp` | Decoupled worker thread, bounded queue (max 64, drop oldest on overflow), relative mouse displacement coalescing, dispatch latency telemetry recording. |
 | `GamepadCaptureTest` | `TestGamepadCapture.cpp` | Dynamic XInput loader, thumbstick deadzones (7849/8689), trigger thresholds (30), virtual gamepad dynamic probe and graceful fallback. |
-| `QosTest` | `TestCongestionControl.cpp` | EWMA loss/RTT/jitter smoothing, REMB tracking, candidate pair link classification (DirectLan, DirectWan, RelayedTurn), AIMD state machine transitions, bandwidth budgeting, adaptive bitrate delta gating. |
-| `PairingTest` | `TestPairing.cpp` | 6-character alphanumeric code generation, entropy check, expiration validation, 5-attempt rate-limiting lockout, granular permissions, atomic JSON persistence and reloading. |
+| `QosTest` | `TestCongestionControl.cpp` | EWMA loss/RTT/jitter smoothing, REMB tracking, candidate pair link classification (DirectLan, DirectWan, RelayedTurn), AIMD state machine transitions, bandwidth budgeting, adaptive bitrate delta gating, controlled network impairment simulation (25M/10M/5M/2M bottlenecks, RTT latency spikes, packet loss bursts). |
+| `PairingTest` | `TestPairing.cpp` | 6-character unambiguous Base32 code generation, entropy check, expiration validation, 5-attempt rate-limiting lockout, granular permissions, atomic JSON persistence, and security abuse prevention (empty ID rejection, single-use code replay rejection, fingerprint mismatch rejection, default-disabled permissions). |
 | `DesktopAppTest` | `TestDesktopApp.cpp` | Desktop application initialization, non-interactive `--self-test` mode, view navigation across all 6 screens, settings round-trip. |
 
 ### 2.2 Smoke Tests (CTest)
@@ -219,3 +219,24 @@ ctest --test-dir build/release -C Release --output-on-failure --verbose
 ```powershell
 ./build/release/tests/unit/mist_unit_tests.exe
 ```
+
+---
+
+## 4. Release Candidate Qualification Verification Suite
+
+To run the complete 10-step qualification suite for Release Candidate v0.2.0-rc1:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-milestone-7.ps1
+```
+
+Verification pipeline includes:
+1. Toolchain & compiler detection (CMake 4.x, Clang++ 20.x, Ninja 1.x).
+2. Release C++ compilation (`mist_host`, `mist_client`, `mist_desktop`, `mist_unit_tests`).
+3. Automated unit testing (`114 tests from 33 test suites`: 112 passed, 2 skipped in non-interactive CI).
+4. Host diagnostic commands & TURN configuration verification (`--turn-server`, `--system-info`).
+5. Client diagnostic commands verification (`--turn-server`, `--decoder-info`).
+6. Desktop application 6-screen UI self-test (`mist_desktop.exe --self-test`).
+7. Distribution packaging (`mist-v0.2.0-rc1-windows-x64.zip`), Authenticode signing, manifest generation, and install/uninstall lifecycle testing.
+8. Live tri-stream WebRTC session (Video + Audio + Input + QoS) with dynamic in-flight NVENC rate adaptation.
+9. Accounting counter reconciliation validation (zero frame queue discards, zero hardware decoder errors, 100% decode efficiency).
+10. Unified field test report generation (`artifacts/field-test-report.json`) and milestone record emission (`artifacts/milestone-7.json`).

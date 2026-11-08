@@ -42,7 +42,7 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
         if (arg == "--help" || arg == "-h") {
-            std::cout << "Mist Host v0.1.0\n"
+            std::cout << "Mist Host v0.2.0-rc1\n"
                       << "Usage: mist_host [options]\n\n"
                       << "General Options:\n"
                       << "  -h, --help                          Show help information\n"
@@ -83,7 +83,7 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
                       << "  --allow-remote-input                Grant remote control permissions to client\n";
             return std::optional<int>(0);
         } else if (arg == "--version" || arg == "-v") {
-            std::cout << "mist_host version 0.1.0\n";
+            std::cout << "mist_host version 0.2.0-rc1\n";
             return std::optional<int>(0);
         } else if (arg == "--self-test") {
             options_.mode = HostCommandMode::SelfTest;
@@ -137,6 +137,12 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
             options_.sessionId = argv[++i];
         } else if (arg == "--auth-token" && i + 1 < argc) {
             options_.authToken = argv[++i];
+        } else if (arg == "--turn-server" && i + 1 < argc) {
+            options_.turnServer = argv[++i];
+        } else if (arg == "--turn-username" && i + 1 < argc) {
+            options_.turnUsername = argv[++i];
+        } else if (arg == "--turn-password" && i + 1 < argc) {
+            options_.turnPassword = argv[++i];
         } else if (arg == "--display" && i + 1 < argc) {
             options_.displayIndex = static_cast<uint32_t>(std::stoul(argv[++i]));
         } else if (arg == "--duration" && i + 1 < argc) {
@@ -176,6 +182,14 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
     }
 
     (void)platform::windows::initializeProcessDpiAwareness();
+    if (options_.turnServer.empty()) {
+        const char* envServer = std::getenv("MIST_TURN_SERVER");
+        if (envServer) options_.turnServer = envServer;
+        const char* envUser = std::getenv("MIST_TURN_USERNAME");
+        if (envUser) options_.turnUsername = envUser;
+        const char* envPass = std::getenv("MIST_TURN_PASSWORD");
+        if (envPass) options_.turnPassword = envPass;
+    }
     isInitialized_.store(true);
 
     switch (options_.mode) {
@@ -580,6 +594,9 @@ int HostApplication::executeStreamTest() {
     rtcConfig.signalingUrl = options_.signalingUrl;
     rtcConfig.videoClockRate = 90000;
     rtcConfig.enableAudio = options_.enableAudio;
+    if (!options_.turnServer.empty()) {
+        rtcConfig.iceServers.push_back({options_.turnServer, options_.turnUsername, options_.turnPassword});
+    }
 
     transport::WebRtcTransport rtcTransport;
     auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signalingClient);
@@ -592,6 +609,15 @@ int HostApplication::executeStreamTest() {
         MIST_LOG_INFO(common::SubsystemId::HostApp, "RTCP PLI keyframe request received -> forcing IDR frame");
         pipeline.requestKeyframe();
     });
+
+    auto qos = rtcTransport.getQosController();
+    if (qos) {
+        qos->setEncoderReconfigCallback([&pipeline](uint32_t targetVideoKbps) -> common::Result<void> {
+            MIST_LOG_INFO(common::SubsystemId::HostApp, "QoS triggered in-flight NVENC reconfiguration: " +
+                          std::to_string(targetVideoKbps) + " kbps");
+            return pipeline.setBitrate(targetVideoKbps);
+        });
+    }
 
     pipeline.setEncodedPacketCallback([&rtcTransport](const encode::EncodedPacket& packet) {
         (void)rtcTransport.sendVideoPacket(packet);
@@ -633,7 +659,7 @@ int HostApplication::executeStreamTest() {
                     auto counterBytes = telemetry::MetricRegistry::instance().getOrCreateCounter("audio.encode.bytes_total");
 
                     while (audioRunning.load()) {
-                        auto pktRes = audioCapture.readPacket(20);
+                        auto pktRes = audioCapture.readPacket(10);
                         if (pktRes) {
                             auto& pkt = pktRes.value();
                             counterFrames->increment(pkt.frames);
@@ -741,7 +767,30 @@ int HostApplication::executeStreamTest() {
                 << "  \"audio_bytes_sent\": " << audioBytesSent.load() << ",\n"
                 << "  \"input_packets_received\": " << receiver->getPacketsReceived() << ",\n"
                 << "  \"input_events_processed\": " << dispatcher->getEventsProcessed() << ",\n"
-                << "  \"input_events_dropped\": " << dispatcher->getEventsDropped() << "\n"
+                << "  \"input_events_dropped\": " << dispatcher->getEventsDropped() << ",\n"
+                << "  \"video\": {\n"
+                << "    \"frames_acquired\": " << report.framesAcquired << ",\n"
+                << "    \"frames_encoded\": " << report.framesEncoded << ",\n"
+                << "    \"frames_dropped\": " << report.framesDropped << ",\n"
+                << "    \"actual_fps\": " << report.actualFps << ",\n"
+                << "    \"average_bitrate_kbps\": " << report.averageBitrateKbps << "\n"
+                << "  },\n"
+                << "  \"audio\": {\n"
+                << "    \"opus_packets_generated\": " << audioPacketsSent.load() << ",\n"
+                << "    \"rtp_packets_sent\": " << audioPacketsSent.load() << ",\n"
+                << "    \"rtp_bytes_sent\": " << audioBytesSent.load() << "\n"
+                << "  },\n"
+                << "  \"input\": {\n"
+                << "    \"packets_received\": " << receiver->getPacketsReceived() << ",\n"
+                << "    \"events_processed\": " << dispatcher->getEventsProcessed() << ",\n"
+                << "    \"events_dropped\": " << dispatcher->getEventsDropped() << "\n"
+                << "  },\n"
+                << "  \"network\": {\n"
+                << "    \"total_packets_sent\": " << stats.packetsSent << ",\n"
+                << "    \"total_bytes_sent\": " << stats.bytesSent << ",\n"
+                << "    \"rtt_ms\": " << stats.rttMs << ",\n"
+                << "    \"jitter_ms\": " << stats.jitterMs << "\n"
+                << "  }\n"
                 << "}\n";
         }
     }
@@ -792,6 +841,9 @@ int HostApplication::executeStreamLive() {
     rtcConfig.authToken = options_.authToken;
     rtcConfig.signalingUrl = options_.signalingUrl;
     rtcConfig.enableAudio = options_.enableAudio;
+    if (!options_.turnServer.empty()) {
+        rtcConfig.iceServers.push_back({options_.turnServer, options_.turnUsername, options_.turnPassword});
+    }
 
     transport::WebRtcTransport rtcTransport;
     auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signalingClient);
@@ -803,6 +855,15 @@ int HostApplication::executeStreamLive() {
     rtcTransport.setKeyframeRequestCallback([&pipeline]() {
         pipeline.requestKeyframe();
     });
+
+    auto liveQos = rtcTransport.getQosController();
+    if (liveQos) {
+        liveQos->setEncoderReconfigCallback([&pipeline](uint32_t targetVideoKbps) -> common::Result<void> {
+            MIST_LOG_INFO(common::SubsystemId::HostApp, "Live QoS triggered in-flight NVENC reconfiguration: " +
+                          std::to_string(targetVideoKbps) + " kbps");
+            return pipeline.setBitrate(targetVideoKbps);
+        });
+    }
 
     pipeline.setEncodedPacketCallback([&rtcTransport](const encode::EncodedPacket& packet) {
         (void)rtcTransport.sendVideoPacket(packet);
@@ -844,7 +905,7 @@ int HostApplication::executeStreamLive() {
                     auto counterBytes = telemetry::MetricRegistry::instance().getOrCreateCounter("audio.encode.bytes_total");
 
                     while (audioRunning.load()) {
-                        auto pktRes = audioCapture.readPacket(20);
+                        auto pktRes = audioCapture.readPacket(10);
                         if (pktRes) {
                             auto& pkt = pktRes.value();
                             counterFrames->increment(pkt.frames);

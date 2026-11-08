@@ -147,7 +147,7 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
         if (arg == "--help" || arg == "-h") {
-            std::cout << "Mist Desktop Management Application v0.1.0\n"
+            std::cout << "Mist Desktop Management Application v0.2.0-rc1\n"
                       << "Usage: mist_desktop [options]\n\n"
                       << "Options:\n"
                       << "  -h, --help            Show help information\n"
@@ -163,7 +163,7 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
                       << "  --self-test           Run automated desktop self-test suite\n";
             return std::optional<int>(0);
         } else if (arg == "--version" || arg == "-v") {
-            std::cout << "mist_desktop version 0.1.0 (Milestone 6: Production Ready)\n";
+            std::cout << "mist_desktop version 0.2.0-rc1\n";
             return std::optional<int>(0);
         } else if (arg == "--home") {
             targetScreen_ = DesktopScreen::Home;
@@ -193,7 +193,7 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
     auto valRes = config_.validate();
     if (!valRes) return valRes.error();
 
-    MIST_LOG_INFO(common::SubsystemId::DesktopApp, "Initializing Mist Desktop Application v0.1.0...");
+    MIST_LOG_INFO(common::SubsystemId::DesktopApp, "Initializing Mist Desktop Application v0.2.0-rc1...");
     (void)platform::windows::initializeProcessDpiAwareness();
 
     (void)pairingManager_.loadTrustedDevices("trusted_devices.json");

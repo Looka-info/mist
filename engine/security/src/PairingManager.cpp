@@ -5,6 +5,10 @@
 #include <chrono>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 namespace mist::security {
 
@@ -19,7 +23,8 @@ common::Result<std::string> PairingManager::generatePairingCode(uint32_t lifetim
     std::lock_guard<std::mutex> lock(mutex_);
     if (nowEpochSec == 0) nowEpochSec = getNowEpochSec();
 
-    static constexpr char charset[] = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    // 32-symbol unambiguous charset (excludes 0, O, 1, I) providing 30 bits of entropy
+    static constexpr char charset[] = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<size_t> dist(0, sizeof(charset) - 2);
@@ -211,10 +216,11 @@ void PairingManager::reset() noexcept {
 
 common::Result<void> PairingManager::saveTrustedDevices(const std::string& filePath) const {
     std::lock_guard<std::mutex> lock(mutex_);
-    std::ofstream out(filePath, std::ios::trunc);
+    std::string tmpPath = filePath + ".tmp";
+    std::ofstream out(tmpPath, std::ios::trunc);
     if (!out.is_open()) {
         return common::Error(common::SubsystemId::Security, common::ErrorCode::InternalError,
-                             "Failed to open file for writing: " + filePath);
+                             "Failed to open file for writing: " + tmpPath);
     }
 
     out << "[\n";
@@ -236,6 +242,20 @@ common::Result<void> PairingManager::saveTrustedDevices(const std::string& fileP
             << "  }";
     }
     out << "\n]\n";
+    out.close();
+
+    // Atomic replacement to prevent corruption on sudden termination
+#if defined(_WIN32)
+    if (!MoveFileExA(tmpPath.c_str(), filePath.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        // Fallback to std::filesystem
+        std::error_code ec;
+        std::filesystem::rename(tmpPath, filePath, ec);
+    }
+#else
+    std::error_code ec;
+    std::filesystem::rename(tmpPath, filePath, ec);
+#endif
+
     return common::Result<void>::success();
 }
 

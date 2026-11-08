@@ -298,8 +298,10 @@ common::Result<void> D3D11VideoDecoder::submitPacket(const encode::EncodedPacket
         sample->SetUINT32(MFSampleExtension_CleanPoint, TRUE);
     }
 
+    stats_.packetsSubmitted++;
     hr = decoderTransform_->ProcessInput(0, sample.Get(), 0);
     if (FAILED(hr) && hr != MF_E_NOTACCEPTING) {
+        stats_.decoderErrors++;
         return platform::windows::hresultToMistError(hr, common::SubsystemId::Decode, "ProcessInput failed");
     }
 
@@ -410,10 +412,13 @@ common::Result<void> D3D11VideoDecoder::drainOutput() {
                         .nativeResource = rawTexture
                     };
 
+                    stats_.framesDecoded++;
+
                     // Bounded queue: max 2 frames, drop oldest if full
                     while (decodedQueue_.size() >= 2) {
                         auto dropped = decodedQueue_.front();
                         decodedQueue_.pop();
+                        stats_.framesQueueDiscarded++;
                         (void)releaseFrame(dropped);
                     }
                     decodedQueue_.push(frame);
@@ -489,6 +494,11 @@ void D3D11VideoDecoder::cleanup() noexcept {
     dxgiManager_.Reset();
 #endif
     isInitialized_ = false;
+}
+
+D3D11VideoDecoder::DecoderStats D3D11VideoDecoder::getDecoderStats() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return stats_;
 }
 
 } // namespace mist::decode

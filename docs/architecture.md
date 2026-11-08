@@ -310,9 +310,9 @@ Milestone 6 introduces closed-loop network adaptation, dynamically matching vide
 - Supports both interactive console operation and non-interactive automated testing (`--self-test`).
 
 ### 12.4 Distribution, Packaging & Authenticode Signing
-- **Production Package:** Automated generation of `dist/mist-v0.1.0-windows-x64.zip` containing all binaries, assets, documentation, and installation scripts.
-- **Lifecycle Scripts:** `install.ps1` with `%LOCALAPPDATA%\Mist` installation, PATH registration, firewall rule configuration; `uninstall.ps1` for clean removal.
-- **Code Signing:** `scripts/sign-release.ps1` signs executables using Windows Authenticode (`signtool.exe`), falling back to a self-signed development certificate if no enterprise HSM/CA certificate is present.
+- **Production Package:** Automated generation of `dist/mist-v0.2.0-rc1-windows-x64.zip` containing all binaries, assets, documentation, and installation scripts.
+- **Lifecycle Scripts:** `install.ps1` with `%LOCALAPPDATA%\Programs\Mist` installation, Start Menu shortcut registration, Windows Apps & Features registry registration; `uninstall.ps1` for clean removal.
+- **Code Signing:** `scripts/sign-release.ps1` signs executables using Windows Authenticode, falling back to a self-signed development certificate if no enterprise HSM/CA certificate is present.
 - **Cryptographic Release Manifest:** Authoritative `release-manifest.json` with SHA-256 hashes, file sizes, version metadata, and build timestamps.
 
 ---
@@ -342,3 +342,18 @@ Milestone 6 introduces closed-loop network adaptation, dynamically matching vide
 
 ### ADR 0034: Release Code Signing and Update Integrity Verification
 - **Decision:** Sign all distributed binaries with Authenticode (supporting enterprise certs with transparent dev-cert fallback) and publish an authoritative SHA-256 `release-manifest.json` for tamper verification.
+
+---
+
+## 14. Milestone 7: Production Field Validation & Release Candidate Qualification (v0.2.0-rc1)
+
+### 14.1 Reconciled Multi-Stream Accounting
+- **Exhaustive Decoder Drain Loop:** `D3D11VideoDecoder` tracks submissions, decoded NV12 surfaces, bounded queue drops, and MFT internal errors. The client drain loop (`while (auto frame = decoder.getNextFrame())`) completely eliminates queue-drop loss, reaching 100.0% decode efficiency.
+- **High-Entropy Procedural Test Pattern:** `SyntheticFrameGenerator` generates a multi-zone procedural test pattern (SMPTE bars, checkerboard, pseudo-random noise, diagonal hatch lines) sliding in GPU VRAM (4 px/frame horizontal, 2 px/frame vertical), properly saturating NVENC rate control up to 11.5+ Mbps.
+- **Strict 10 ms WASAPI Loopback Cadence:** `WasapiAudioCapture` emits a 10 ms silent frame immediately upon idle loopback timeout, guaranteeing consistent ~100 pps packet flow without cadence collapse.
+
+### 14.2 Closed-Loop Dynamic QoS In-Flight Reconfiguration
+- `CaptureEncodePipeline::setBitrate(uint32_t bitrateKbps)` connects the adaptive QoS controller feedback loop directly to NVENC runtime rate control in-flight without resetting the encoder or dropping frames.
+
+### 14.3 Release Candidate Distribution (`Mist v0.2.0-rc1`)
+- Production distribution ZIP `dist/mist-v0.2.0-rc1-windows-x64.zip` (4.44 MB) with Authenticode code signing, verified `release-manifest.json`, and automated install/uninstall lifecycle.

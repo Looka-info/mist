@@ -33,7 +33,7 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
         if (arg == "--help" || arg == "-h") {
-            std::cout << "Mist Client v0.1.0 (Milestone 2: Native Hardware Decoding & D3D11 Presentation)\n"
+            std::cout << "Mist Client v0.2.0-rc1\n"
                       << "Usage: mist_client [options]\n\n"
                       << "General Options:\n"
                       << "  -h, --help                Show help information\n"
@@ -68,7 +68,7 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
                       << "  --vsync                   Enable vertical sync (default: false)\n";
             return std::optional<int>(0);
         } else if (arg == "--version" || arg == "-v") {
-            std::cout << "mist_client version 0.1.0\n";
+            std::cout << "mist_client version 0.2.0-rc1\n";
             return std::optional<int>(0);
         } else if (arg == "--self-test") {
             options_.mode = ClientCommandMode::SelfTest;
@@ -112,6 +112,12 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
             options_.sessionId = argv[++i];
         } else if (arg == "--auth-token" && i + 1 < argc) {
             options_.authToken = argv[++i];
+        } else if (arg == "--turn-server" && i + 1 < argc) {
+            options_.turnServer = argv[++i];
+        } else if (arg == "--turn-username" && i + 1 < argc) {
+            options_.turnUsername = argv[++i];
+        } else if (arg == "--turn-password" && i + 1 < argc) {
+            options_.turnPassword = argv[++i];
         } else if (arg == "--input") {
             if (i + 1 < argc) {
                 options_.inputPath = argv[++i];
@@ -171,6 +177,14 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
     }
 
     (void)platform::windows::initializeProcessDpiAwareness();
+    if (options_.turnServer.empty()) {
+        const char* envServer = std::getenv("MIST_TURN_SERVER");
+        if (envServer) options_.turnServer = envServer;
+        const char* envUser = std::getenv("MIST_TURN_USERNAME");
+        if (envUser) options_.turnUsername = envUser;
+        const char* envPass = std::getenv("MIST_TURN_PASSWORD");
+        if (envPass) options_.turnPassword = envPass;
+    }
     isInitialized_.store(true);
 
     switch (options_.mode) {
@@ -527,6 +541,9 @@ int ClientApplication::executeReceiveStream() {
     rtcConfig.signalingUrl = options_.signalingUrl;
     rtcConfig.videoClockRate = 90000;
     rtcConfig.enableAudio = options_.enableAudio;
+    if (!options_.turnServer.empty()) {
+        rtcConfig.iceServers.push_back({options_.turnServer, options_.turnUsername, options_.turnPassword});
+    }
 
     transport::WebRtcTransport rtcTransport;
     auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signaling);
@@ -536,8 +553,10 @@ int ClientApplication::executeReceiveStream() {
     }
 
     std::atomic<uint64_t> framesReceived{0};
+    std::atomic<uint64_t> framesSubmitted{0};
     std::atomic<uint64_t> framesDecoded{0};
     std::atomic<uint64_t> framesPresented{0};
+    std::atomic<uint64_t> decoderErrors{0};
     std::atomic<uint64_t> totalBytesReceived{0};
     std::atomic<uint64_t> lastVideoTimestampNs{0};
 
@@ -558,10 +577,11 @@ int ClientApplication::executeReceiveStream() {
         packet.data = accessUnit;
         packet.timestampNs = timestampNs;
 
+        framesSubmitted.fetch_add(1, std::memory_order_relaxed);
         auto subRes = decoder.submitPacket(packet);
         if (subRes) {
-            auto frameRes = decoder.getNextFrame();
-            if (frameRes) {
+            // Milestone 7: Drain all decoded frames output by the hardware MFT decoder pipeline
+            while (auto frameRes = decoder.getNextFrame()) {
                 framesDecoded.fetch_add(1, std::memory_order_relaxed);
                 auto frame = frameRes.value();
                 if (renderer) {
@@ -573,6 +593,7 @@ int ClientApplication::executeReceiveStream() {
                 (void)decoder.releaseFrame(frame);
             }
         } else {
+            decoderErrors.fetch_add(1, std::memory_order_relaxed);
             auto receiver = rtcTransport.getVideoReceiver();
             if (receiver) {
                 receiver->requestKeyframe();
@@ -698,10 +719,28 @@ int ClientApplication::executeReceiveStream() {
         (void)audioPlayback.stop();
     }
 
+    // Milestone 7: Final end-of-stream drain for buffered hardware decoder frames
+    while (auto frameRes = decoder.getNextFrame()) {
+        framesDecoded.fetch_add(1, std::memory_order_relaxed);
+        auto frame = frameRes.value();
+        if (renderer) {
+            auto presRes = renderer->present(frame);
+            if (presRes) {
+                framesPresented.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+        (void)decoder.releaseFrame(frame);
+    }
+
     auto actualDuration = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
     uint64_t rec = framesReceived.load();
+    uint64_t sub = framesSubmitted.load();
     uint64_t dec = framesDecoded.load();
     uint64_t rnd = framesPresented.load();
+    uint64_t decErrors = decoderErrors.load();
+    auto decStats = decoder.getDecoderStats();
+    uint64_t queueDiscarded = decStats.framesQueueDiscarded;
+
     double fps = actualDuration > 0.0 ? static_cast<double>(dec) / actualDuration : 0.0;
     double bitrateMbps = actualDuration > 0.0 ? ((static_cast<double>(totalBytesReceived.load()) * 8.0) / (actualDuration * 1000000.0)) : 0.0;
 
@@ -710,11 +749,14 @@ int ClientApplication::executeReceiveStream() {
     auto skewSnap = skewHistogram->snapshot();
     double p95SkewMs = skewSnap.p95Us / 1000.0;
 
-    std::cout << "=== Client Streaming Results ===\n"
+    std::cout << "=== Client Streaming Results (Milestone 7 Reconciled) ===\n"
               << "Duration:            " << actualDuration << " s\n"
               << "Frames Received:     " << rec << "\n"
+              << "Frames Submitted:    " << sub << "\n"
               << "Frames Decoded:      " << dec << " (" << fps << " FPS)\n"
               << "Frames Presented:    " << rnd << "\n"
+              << "Frames Discarded:    " << queueDiscarded << "\n"
+              << "Decoder Errors:      " << decErrors << "\n"
               << "Bitrate:             " << bitrateMbps << " Mbps\n"
               << "Packets Recv:        " << stats.packetsReceived << "\n"
               << "Bytes Recv:          " << stats.bytesReceived << "\n";
@@ -732,8 +774,11 @@ int ClientApplication::executeReceiveStream() {
             rep << "{\n"
                 << "  \"duration_sec\": " << actualDuration << ",\n"
                 << "  \"frames_received\": " << rec << ",\n"
+                << "  \"frames_submitted\": " << sub << ",\n"
                 << "  \"frames_decoded\": " << dec << ",\n"
                 << "  \"frames_presented\": " << rnd << ",\n"
+                << "  \"frames_discarded\": " << queueDiscarded << ",\n"
+                << "  \"decoder_errors\": " << decErrors << ",\n"
                 << "  \"achieved_fps\": " << fps << ",\n"
                 << "  \"bitrate_mbps\": " << bitrateMbps << ",\n"
                 << "  \"packets_received\": " << stats.packetsReceived << ",\n"
@@ -743,7 +788,27 @@ int ClientApplication::executeReceiveStream() {
                 << "  \"audio_underruns\": " << pbStats.underrunCount << ",\n"
                 << "  \"av_skew_p95_ms\": " << p95SkewMs << ",\n"
                 << "  \"input_enabled\": " << (options_.enableInput ? "true" : "false") << ",\n"
-                << "  \"input_packets_sent\": " << (options_.enableInput ? (clientInput->getNextSequenceNumber() - 1) : 0) << "\n"
+                << "  \"input_packets_sent\": " << (options_.enableInput ? (clientInput->getNextSequenceNumber() - 1) : 0) << ",\n"
+                << "  \"video\": {\n"
+                << "    \"complete_access_units_received\": " << rec << ",\n"
+                << "    \"frames_submitted_to_decoder\": " << sub << ",\n"
+                << "    \"frames_decoded\": " << dec << ",\n"
+                << "    \"frames_presented\": " << rnd << ",\n"
+                << "    \"frames_queue_discarded\": " << queueDiscarded << ",\n"
+                << "    \"decoder_errors\": " << decErrors << "\n"
+                << "  },\n"
+                << "  \"audio\": {\n"
+                << "    \"rtp_packets_received\": " << audioPacketsReceived.load() << ",\n"
+                << "    \"pcm_frames_rendered\": " << audioFramesDecoded.load() << ",\n"
+                << "    \"playback_underruns\": " << pbStats.underrunCount << ",\n"
+                << "    \"av_presentation_skew_ms\": " << p95SkewMs << "\n"
+                << "  },\n"
+                << "  \"network\": {\n"
+                << "    \"packets_received\": " << stats.packetsReceived << ",\n"
+                << "    \"bytes_received\": " << stats.bytesReceived << ",\n"
+                << "    \"rtt_ms\": " << stats.rttMs << ",\n"
+                << "    \"jitter_ms\": " << stats.jitterMs << "\n"
+                << "  }\n"
                 << "}\n";
         }
     }

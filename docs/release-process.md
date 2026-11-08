@@ -33,18 +33,19 @@ This document describes the end-to-end production build, code signing, and relea
    - Generates production `dist\mist-windows-x64\config\mist.ini`.
    - Generates non-interactive installer (`install.ps1`) and uninstaller (`uninstall.ps1`).
    - Invokes `scripts\sign-release.ps1` to sign binaries and generate SHA-256 hashes.
-   - Compresses the staged directory into `dist\mist-v0.1.0-windows-x64.zip`.
+   - Compresses the staged directory into `dist\mist-v0.2.0-rc1-windows-x64.zip`.
    - Executes install and uninstall validation tests.
 
 ---
 
 ## 4. Release Verification Checklist
 
-- [ ] All unit tests pass cleanly (`mist_unit_tests.exe`: 0 failures).
-- [ ] Host diagnostics pass (`--system-info`, `--dependency-audit`, `--encoder-info`).
-- [ ] Client diagnostics pass (`--system-info`, `--dependency-audit`, `--decoder-info`).
+- [ ] All unit tests pass cleanly (`mist_unit_tests.exe`: 114 tests, 0 failures).
+- [ ] Host diagnostics pass (`--system-info`, `--dependency-audit`, `--encoder-info`, `--turn-server`).
+- [ ] Client diagnostics pass (`--system-info`, `--dependency-audit`, `--decoder-info`, `--turn-server`).
 - [ ] Native Desktop UI self-test passes (`mist_desktop.exe --self-test`).
 - [ ] Authenticode signatures verified on all binaries.
 - [ ] SHA-256 hashes recorded in `release-manifest.json`.
-- [ ] Distribution archive `dist\mist-v0.1.0-windows-x64.zip` generated.
+- [ ] Distribution archive `dist\mist-v0.2.0-rc1-windows-x64.zip` generated.
 - [ ] Clean install and uninstall lifecycle verified.
+- [ ] Full Milestone 7 qualification suite passes (`scripts\verify-milestone-7.ps1`).

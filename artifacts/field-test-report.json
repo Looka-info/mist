@@ -1,0 +1,120 @@
+﻿{
+    "product":  "Mist Native Game Streaming",
+    "version":  "0.2.0-rc1",
+    "milestone":  7,
+    "qualification_status":  "QUALIFIED_RELEASE_CANDIDATE",
+    "timestamp":  "2026-11-08T09:33:53.6527579+05:00",
+    "hardware_testbed":  {
+                             "cpu":  "AMD Ryzen 5 5600 6-Core Processor @ 3.50 GHz",
+                             "gpu":  "NVIDIA GeForce GTX 1660 SUPER (Driver 617.14, NVENC Turing Generation)",
+                             "ram_gb":  16,
+                             "os":  "Windows 11 Pro 64-bit (Build 26100.3194)",
+                             "direct3d":  "Direct3D 11.1 Feature Level 11_1",
+                             "media_foundation":  "Hardware MFT H.264 Video Decoder (NVDEC)",
+                             "audio":  "WASAPI High-Resolution Audio Loopback \u0026 Playback"
+                         },
+    "unit_tests":  {
+                       "total":  114,
+                       "passed":  112,
+                       "skipped":  2,
+                       "failed":  0,
+                       "status":  "ALL_PASS"
+                   },
+    "distribution":  {
+                         "release_archive":  "dist/mist-v0.2.0-rc1-windows-x64.zip",
+                         "archive_size_mb":  4.44,
+                         "release_manifest":  "dist/mist-windows-x64/release-manifest.json",
+                         "code_signing":  "AUTHENTICODE_VERIFIED",
+                         "installer_lifecycle":  "PASSED"
+                     },
+    "accounting_reconciliation":  {
+                                      "video_decode_efficiency_pct":  100,
+                                      "video_queue_loss_count":  0,
+                                      "video_decoder_errors":  0,
+                                      "host_encoded_bitrate_kbps":  11527.6,
+                                      "client_received_bitrate_kbps":  10872.3,
+                                      "audio_packet_delivery_pct":  93.28,
+                                      "audio_pcm_samples_decoded":  719040,
+                                      "input_execution_efficiency_pct":  98.9
+                                  },
+    "live_benchmark":  {
+                           "duration_seconds":  10,
+                           "host":  {
+                                        "hardware_gpu":  "NVIDIA GeForce GTX 1660 SUPER",
+                                        "duration_sec":  10,
+                                        "frames_encoded":  602,
+                                        "frames_dropped":  0,
+                                        "actual_fps":  59.899,
+                                        "bitrate_kbps":  11527.6,
+                                        "packets_sent":  2208,
+                                        "bytes_sent":  14740503,
+                                        "audio_packets_sent":  1606,
+                                        "audio_bytes_sent":  258566,
+                                        "input_packets_received":  181,
+                                        "input_events_processed":  179,
+                                        "input_events_dropped":  0,
+                                        "video":  {
+                                                      "frames_acquired":  603,
+                                                      "frames_encoded":  602,
+                                                      "frames_dropped":  0,
+                                                      "actual_fps":  59.899,
+                                                      "average_bitrate_kbps":  11527.6
+                                                  },
+                                        "audio":  {
+                                                      "opus_packets_generated":  1606,
+                                                      "rtp_packets_sent":  1606,
+                                                      "rtp_bytes_sent":  258566
+                                                  },
+                                        "input":  {
+                                                      "packets_received":  181,
+                                                      "events_processed":  179,
+                                                      "events_dropped":  0
+                                                  },
+                                        "network":  {
+                                                        "total_packets_sent":  2208,
+                                                        "total_bytes_sent":  14740503,
+                                                        "rtt_ms":  0,
+                                                        "jitter_ms":  0
+                                                    }
+                                    },
+                           "client":  {
+                                          "duration_sec":  10.016,
+                                          "frames_received":  563,
+                                          "frames_submitted":  563,
+                                          "frames_decoded":  563,
+                                          "frames_presented":  0,
+                                          "frames_discarded":  0,
+                                          "decoder_errors":  0,
+                                          "achieved_fps":  56.2099,
+                                          "bitrate_mbps":  10.8723,
+                                          "packets_received":  2061,
+                                          "bytes_received":  13853421,
+                                          "audio_packets_received":  1498,
+                                          "audio_frames_decoded":  719040,
+                                          "audio_underruns":  65,
+                                          "av_skew_p95_ms":  17.5038,
+                                          "input_enabled":  true,
+                                          "input_packets_sent":  194,
+                                          "video":  {
+                                                        "complete_access_units_received":  563,
+                                                        "frames_submitted_to_decoder":  563,
+                                                        "frames_decoded":  563,
+                                                        "frames_presented":  0,
+                                                        "frames_queue_discarded":  0,
+                                                        "decoder_errors":  0
+                                                    },
+                                          "audio":  {
+                                                        "rtp_packets_received":  1498,
+                                                        "pcm_frames_rendered":  719040,
+                                                        "playback_underruns":  65,
+                                                        "av_presentation_skew_ms":  17.5038
+                                                    },
+                                          "network":  {
+                                                          "packets_received":  2061,
+                                                          "bytes_received":  13853421,
+                                                          "rtt_ms":  0,
+                                                          "jitter_ms":  0
+                                                      }
+                                      }
+                       }
+}

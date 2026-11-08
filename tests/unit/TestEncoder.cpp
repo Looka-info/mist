@@ -85,3 +85,67 @@ TEST(EncoderTest, NvencInitializationAndBitstreamOutput) {
     EXPECT_TRUE(flushRes.hasValue());
 #endif
 }
+
+TEST(EncoderTest, InFlightDynamicReconfiguration) {
+#if defined(_WIN32)
+    auto cap = NvencVideoEncoder::queryCapabilities();
+    if (!cap.isSupported) {
+        GTEST_SKIP() << "NVIDIA NVENC hardware unavailable";
+    }
+
+    auto devRes = D3D11DeviceManager::createDevice(0);
+    ASSERT_TRUE(devRes.hasValue());
+
+    SyntheticFrameGenerator gen;
+    auto genRes = gen.initialize(devRes.value().first.Get(), devRes.value().second.Get(), 1280, 720);
+    ASSERT_TRUE(genRes.hasValue());
+
+    auto encRes = NvencVideoEncoder::create();
+    ASSERT_TRUE(encRes.hasValue()) << encRes.error().format();
+    auto encoder = std::move(encRes.value());
+
+    EncodeConfig config{
+        .codec = VideoCodec::H264,
+        .width = 1280,
+        .height = 720,
+        .targetFps = 60,
+        .bitrateKbps = 5000,
+        .gopLength = 60,
+        .lowLatencyTuning = true
+    };
+
+    auto initRes = encoder->initializeWithDevice(config, devRes.value().first, devRes.value().second);
+    ASSERT_TRUE(initRes.hasValue()) << initRes.error().format();
+
+    // 1. Encode initial frames at 5000 kbps
+    for (uint64_t i = 1; i <= 3; ++i) {
+        auto frame = gen.generateFrame(i, i * 16666666);
+        ASSERT_TRUE(frame.hasValue());
+        ASSERT_TRUE(encoder->encode(frame.value()).hasValue());
+    }
+
+    // 2. Reconfigure upward to 8000 kbps in-flight
+    auto reconfigUpRes = encoder->setBitrate(8000);
+    EXPECT_TRUE(reconfigUpRes.hasValue());
+    EXPECT_EQ(encoder->getConfig().bitrateKbps, 8000u);
+
+    for (uint64_t i = 4; i <= 6; ++i) {
+        auto frame = gen.generateFrame(i, i * 16666666);
+        ASSERT_TRUE(frame.hasValue());
+        ASSERT_TRUE(encoder->encode(frame.value()).hasValue());
+    }
+
+    // 3. Reconfigure downward to 2500 kbps (severe congestion mitigation)
+    auto reconfigDownRes = encoder->setBitrate(2500);
+    EXPECT_TRUE(reconfigDownRes.hasValue());
+    EXPECT_EQ(encoder->getConfig().bitrateKbps, 2500u);
+
+    for (uint64_t i = 7; i <= 9; ++i) {
+        auto frame = gen.generateFrame(i, i * 16666666);
+        ASSERT_TRUE(frame.hasValue());
+        ASSERT_TRUE(encoder->encode(frame.value()).hasValue());
+    }
+
+    (void)encoder->flush();
+#endif
+}

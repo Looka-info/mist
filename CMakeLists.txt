@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.25)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
 
 project(Mist
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "High-performance native Windows game-streaming platform"
     LANGUAGES C CXX
 )

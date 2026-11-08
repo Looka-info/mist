@@ -65,6 +65,7 @@ public:
     using EncodedPacketCallback = std::function<void(const encode::EncodedPacket&)>;
     void setEncodedPacketCallback(EncodedPacketCallback cb) { packetCb_ = std::move(cb); }
     void requestKeyframe() noexcept;
+    [[nodiscard]] common::Result<void> setBitrate(uint32_t bitrateKbps) noexcept;
 
 private:
     void captureWorker();

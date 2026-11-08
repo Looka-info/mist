@@ -1,0 +1,1524 @@
+{
+  "tests": 114,
+  "failures": 0,
+  "disabled": 0,
+  "errors": 0,
+  "timestamp": "2026-11-08T09:33:27Z",
+  "time": "10.768s",
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "DesktopAppTest",
+      "tests": 2,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0.001s",
+      "testsuite": [
+        {
+          "name": "HelpAndVersionArgs",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestDesktopApp.cpp",
+          "line": 6,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "DesktopAppTest"
+        },
+        {
+          "name": "SelfTestAndProfileConfig",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestDesktopApp.cpp",
+          "line": 21,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.001s",
+          "classname": "DesktopAppTest"
+        }
+      ]
+    },
+    {
+      "name": "PairingTest",
+      "tests": 5,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "CodeGenerationAndFormat",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPairing.cpp",
+          "line": 7,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "PairingTest"
+        },
+        {
+          "name": "ExpirationAndLockout",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPairing.cpp",
+          "line": 18,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "PairingTest"
+        },
+        {
+          "name": "ApprovalAndPermissions",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPairing.cpp",
+          "line": 51,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "PairingTest"
+        },
+        {
+          "name": "JsonPersistence",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPairing.cpp",
+          "line": 90,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "PairingTest"
+        },
+        {
+          "name": "SecurityAbusePrevention",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPairing.cpp",
+          "line": 122,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "PairingTest"
+        }
+      ]
+    },
+    {
+      "name": "QosTest",
+      "tests": 6,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "NetworkQualityEstimatorSmoothing",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCongestionControl.cpp",
+          "line": 10,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "QosTest"
+        },
+        {
+          "name": "CandidatePairClassification",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCongestionControl.cpp",
+          "line": 36,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "QosTest"
+        },
+        {
+          "name": "CongestionControllerStateMachine",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCongestionControl.cpp",
+          "line": 48,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "QosTest"
+        },
+        {
+          "name": "QualityAdaptationManagerBudgets",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCongestionControl.cpp",
+          "line": 86,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "QosTest"
+        },
+        {
+          "name": "AdaptiveBitrateControllerReconfigTrigger",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCongestionControl.cpp",
+          "line": 104,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "QosTest"
+        },
+        {
+          "name": "ControlledNetworkImpairmentSimulation",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCongestionControl.cpp",
+          "line": 133,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "QosTest"
+        }
+      ]
+    },
+    {
+      "name": "GamepadTest",
+      "tests": 2,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "DeadZoneFiltering",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestGamepadCapture.cpp",
+          "line": 8,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "GamepadTest"
+        },
+        {
+          "name": "HostVirtualGamepadFallback",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestGamepadCapture.cpp",
+          "line": 26,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "GamepadTest"
+        }
+      ]
+    },
+    {
+      "name": "InputDispatcherTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0.045s",
+      "testsuite": [
+        {
+          "name": "QueueBoundingAndDrop",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputDispatcher.cpp",
+          "line": 11,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputDispatcherTest"
+        },
+        {
+          "name": "ContinuousMovementCoalescing",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputDispatcher.cpp",
+          "line": 32,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputDispatcherTest"
+        },
+        {
+          "name": "ReceiverAndDispatcherIntegration",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputDispatcher.cpp",
+          "line": 52,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.045s",
+          "classname": "InputDispatcherTest"
+        }
+      ]
+    },
+    {
+      "name": "InputPermissionTest",
+      "tests": 4,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "DefaultDisabledAndGrant",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputPermission.cpp",
+          "line": 8,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputPermissionTest"
+        },
+        {
+          "name": "FeatureMasking",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputPermission.cpp",
+          "line": 32,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputPermissionTest"
+        },
+        {
+          "name": "LocalOverrideAndRevocation",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputPermission.cpp",
+          "line": 48,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputPermissionTest"
+        },
+        {
+          "name": "RateLimiter",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputPermission.cpp",
+          "line": 75,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputPermissionTest"
+        }
+      ]
+    },
+    {
+      "name": "InputStateTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "KeyHoldingTracking",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputState.cpp",
+          "line": 8,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputStateTest"
+        },
+        {
+          "name": "MouseButtonsMask",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputState.cpp",
+          "line": 29,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputStateTest"
+        },
+        {
+          "name": "MousePositionAndSnapshot",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputState.cpp",
+          "line": 48,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputStateTest"
+        }
+      ]
+    },
+    {
+      "name": "InputProtocolTest",
+      "tests": 5,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "KeyEventRoundTrip",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputProtocol.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputProtocolTest"
+        },
+        {
+          "name": "MouseMoveRoundTrip",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputProtocol.cpp",
+          "line": 42,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputProtocolTest"
+        },
+        {
+          "name": "MouseButtonAndWheelRoundTrip",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputProtocol.cpp",
+          "line": 68,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputProtocolTest"
+        },
+        {
+          "name": "GamepadRoundTrip",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputProtocol.cpp",
+          "line": 91,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputProtocolTest"
+        },
+        {
+          "name": "SizeAndVersionGuards",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestInputProtocol.cpp",
+          "line": 123,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "InputProtocolTest"
+        }
+      ]
+    },
+    {
+      "name": "AudioWebRtcTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0.007s",
+      "testsuite": [
+        {
+          "name": "AudioTrackSenderAndReceiverLifecycle",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAudioWebRtc.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "AudioWebRtcTest"
+        },
+        {
+          "name": "WebRtcTransportAudioConfiguration",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAudioWebRtc.cpp",
+          "line": 26,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.007s",
+          "classname": "AudioWebRtcTest"
+        },
+        {
+          "name": "ClientWebRtcTransportAudioSetup",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAudioWebRtc.cpp",
+          "line": 47,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "AudioWebRtcTest"
+        }
+      ]
+    },
+    {
+      "name": "WasapiAudioTest",
+      "tests": 4,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0.035s",
+      "testsuite": [
+        {
+          "name": "DeviceEnumeration",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWasapiAudio.cpp",
+          "line": 8,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.006s",
+          "classname": "WasapiAudioTest"
+        },
+        {
+          "name": "GetDefaultRenderDevice",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWasapiAudio.cpp",
+          "line": 26,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.001s",
+          "classname": "WasapiAudioTest"
+        },
+        {
+          "name": "CaptureLifecycle",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWasapiAudio.cpp",
+          "line": 34,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.018s",
+          "classname": "WasapiAudioTest"
+        },
+        {
+          "name": "PlaybackLifecycleAndStats",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWasapiAudio.cpp",
+          "line": 59,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.009s",
+          "classname": "WasapiAudioTest"
+        }
+      ]
+    },
+    {
+      "name": "OpusCodecTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "EncoderLifecycleAndConfiguration",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestOpusCodec.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "OpusCodecTest"
+        },
+        {
+          "name": "EncodeDecodeRoundTrip",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestOpusCodec.cpp",
+          "line": 37,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "OpusCodecTest"
+        },
+        {
+          "name": "PacketLossConcealment",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestOpusCodec.cpp",
+          "line": 83,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "OpusCodecTest"
+        }
+      ]
+    },
+    {
+      "name": "AudioFormatTest",
+      "tests": 5,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0.001s",
+      "testsuite": [
+        {
+          "name": "ConfigureValidFormats",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAudioFormat.cpp",
+          "line": 8,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "AudioFormatTest"
+        },
+        {
+          "name": "DownmixMonoToStereo",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAudioFormat.cpp",
+          "line": 36,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "AudioFormatTest"
+        },
+        {
+          "name": "Downmix5Point1SurroundToStereo",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAudioFormat.cpp",
+          "line": 59,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "AudioFormatTest"
+        },
+        {
+          "name": "Resample44100To48000",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAudioFormat.cpp",
+          "line": 86,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.001s",
+          "classname": "AudioFormatTest"
+        },
+        {
+          "name": "PopFrameInt16",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAudioFormat.cpp",
+          "line": 110,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "AudioFormatTest"
+        }
+      ]
+    },
+    {
+      "name": "TestNetworkStability",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0.006s",
+      "testsuite": [
+        {
+          "name": "MultipleOpenCloseCycles",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestNetworkStability.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.004s",
+          "classname": "TestNetworkStability"
+        },
+        {
+          "name": "BackpressureDropOldestFrames",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestNetworkStability.cpp",
+          "line": 26,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.001s",
+          "classname": "TestNetworkStability"
+        },
+        {
+          "name": "TransportStatisticsUnderLoad",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestNetworkStability.cpp",
+          "line": 52,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "TestNetworkStability"
+        }
+      ]
+    },
+    {
+      "name": "TestSignaling",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "MessageTypesAndStructure",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestSignaling.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "TestSignaling"
+        },
+        {
+          "name": "WebSocketClientLifecycle",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestSignaling.cpp",
+          "line": 25,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "TestSignaling"
+        },
+        {
+          "name": "MessageCallbackRegistration",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestSignaling.cpp",
+          "line": 43,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "TestSignaling"
+        }
+      ]
+    },
+    {
+      "name": "TestWebRtcTransport",
+      "tests": 5,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:27Z",
+      "time": "2.324s",
+      "testsuite": [
+        {
+          "name": "ConfigDefaults",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWebRtcTransport.cpp",
+          "line": 15,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "TestWebRtcTransport"
+        },
+        {
+          "name": "StatisticsTracking",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWebRtcTransport.cpp",
+          "line": 24,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0s",
+          "classname": "TestWebRtcTransport"
+        },
+        {
+          "name": "TransportInitialization",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWebRtcTransport.cpp",
+          "line": 48,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "0.001s",
+          "classname": "TestWebRtcTransport"
+        },
+        {
+          "name": "DirectLoopbackNegotiation",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWebRtcTransport.cpp",
+          "line": 73,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:27Z",
+          "time": "1.059s",
+          "classname": "TestWebRtcTransport"
+        },
+        {
+          "name": "VideoPacketizationAndPLI",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestWebRtcTransport.cpp",
+          "line": 127,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:28Z",
+          "time": "1.263s",
+          "classname": "TestWebRtcTransport"
+        }
+      ]
+    },
+    {
+      "name": "ClientStabilityTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:29Z",
+      "time": "2.842s",
+      "testsuite": [
+        {
+          "name": "RepeatedRendererInitTeardown",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestClientStability.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:29Z",
+          "time": "0.964s",
+          "classname": "ClientStabilityTest"
+        },
+        {
+          "name": "RepeatedDecoderInitTeardown",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestClientStability.cpp",
+          "line": 35,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:30Z",
+          "time": "1.158s",
+          "classname": "ClientStabilityTest"
+        },
+        {
+          "name": "RepeatedPipelineInitTeardown",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestClientStability.cpp",
+          "line": 64,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:31Z",
+          "time": "0.718s",
+          "classname": "ClientStabilityTest"
+        }
+      ]
+    },
+    {
+      "name": "ClientPipelineTest",
+      "tests": 1,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:32Z",
+      "time": "1.389s",
+      "testsuite": [
+        {
+          "name": "RunBitstreamHeadless",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestClientPipeline.cpp",
+          "line": 16,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:32Z",
+          "time": "1.389s",
+          "classname": "ClientPipelineTest"
+        }
+      ]
+    },
+    {
+      "name": "RendererTest",
+      "tests": 2,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:34Z",
+      "time": "0.206s",
+      "testsuite": [
+        {
+          "name": "CreateAndInitializeHeadless",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestRenderer.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0.165s",
+          "classname": "RendererTest"
+        },
+        {
+          "name": "PresentSyntheticFrameHeadless",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestRenderer.cpp",
+          "line": 46,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0.04s",
+          "classname": "RendererTest"
+        }
+      ]
+    },
+    {
+      "name": "DecoderTest",
+      "tests": 2,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:34Z",
+      "time": "0.202s",
+      "testsuite": [
+        {
+          "name": "QueryCapabilities",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestDecoder.cpp",
+          "line": 19,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0.037s",
+          "classname": "DecoderTest"
+        },
+        {
+          "name": "D3D11HardwareDecoding",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestDecoder.cpp",
+          "line": 28,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0.165s",
+          "classname": "DecoderTest"
+        }
+      ]
+    },
+    {
+      "name": "AnnexBReaderTest",
+      "tests": 2,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:34Z",
+      "time": "0.002s",
+      "testsuite": [
+        {
+          "name": "OpenInvalidFile",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAnnexBReader.cpp",
+          "line": 15,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0s",
+          "classname": "AnnexBReaderTest"
+        },
+        {
+          "name": "OpenMilestone1Artifact",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestAnnexBReader.cpp",
+          "line": 22,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0.001s",
+          "classname": "AnnexBReaderTest"
+        }
+      ]
+    },
+    {
+      "name": "H264ParserTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:34Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "ParseEmptyAndTruncated",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestH264Parser.cpp",
+          "line": 7,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0s",
+          "classname": "H264ParserTest"
+        },
+        {
+          "name": "ParseSyntheticNalUnits",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestH264Parser.cpp",
+          "line": 23,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0s",
+          "classname": "H264ParserTest"
+        },
+        {
+          "name": "ExtractAccessUnits",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestH264Parser.cpp",
+          "line": 54,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0s",
+          "classname": "H264ParserTest"
+        }
+      ]
+    },
+    {
+      "name": "StabilityTest",
+      "tests": 2,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:34Z",
+      "time": "0.576s",
+      "testsuite": [
+        {
+          "name": "RepeatedCaptureInitialization",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestStability.cpp",
+          "line": 11,
+          "status": "RUN",
+          "result": "SKIPPED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0.051s",
+          "classname": "StabilityTest",
+          "skipped": [
+            {
+              "message": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestStability.cpp:30\nDuplication unavailable in session: [Capture] InternalError (16): DuplicateOutput failed (HRESULT: 0x80070005) [PlatformCode=-2147024891]\n"
+            }
+          ]
+        },
+        {
+          "name": "RepeatedEncoderInitialization",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestStability.cpp",
+          "line": 38,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:34Z",
+          "time": "0.525s",
+          "classname": "StabilityTest"
+        }
+      ]
+    },
+    {
+      "name": "PipelineTest",
+      "tests": 2,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:35Z",
+      "time": "1.164s",
+      "testsuite": [
+        {
+          "name": "ReportJsonFormatting",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPipeline.cpp",
+          "line": 10,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:35Z",
+          "time": "0s",
+          "classname": "PipelineTest"
+        },
+        {
+          "name": "SyntheticPipelineBenchmark",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPipeline.cpp",
+          "line": 39,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:35Z",
+          "time": "1.164s",
+          "classname": "PipelineTest"
+        }
+      ]
+    },
+    {
+      "name": "EncoderTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:36Z",
+      "time": "0.358s",
+      "testsuite": [
+        {
+          "name": "QueryCapabilities",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestEncoder.cpp",
+          "line": 11,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0.038s",
+          "classname": "EncoderTest"
+        },
+        {
+          "name": "NvencInitializationAndBitstreamOutput",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestEncoder.cpp",
+          "line": 21,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0.154s",
+          "classname": "EncoderTest"
+        },
+        {
+          "name": "InFlightDynamicReconfiguration",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestEncoder.cpp",
+          "line": 89,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0.166s",
+          "classname": "EncoderTest"
+        }
+      ]
+    },
+    {
+      "name": "CaptureTest",
+      "tests": 4,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:36Z",
+      "time": "0.083s",
+      "testsuite": [
+        {
+          "name": "DisplayEnumeration",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCapture.cpp",
+          "line": 10,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "CaptureTest"
+        },
+        {
+          "name": "InvalidDisplayIndexRejected",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCapture.cpp",
+          "line": 20,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "CaptureTest"
+        },
+        {
+          "name": "SyntheticFrameGeneratorLifecycle",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCapture.cpp",
+          "line": 34,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0.047s",
+          "classname": "CaptureTest"
+        },
+        {
+          "name": "LiveDesktopCapture",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCapture.cpp",
+          "line": 57,
+          "status": "RUN",
+          "result": "SKIPPED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0.035s",
+          "classname": "CaptureTest",
+          "skipped": [
+            {
+              "message": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCapture.cpp:74\nDesktop duplication not available in current session: [Capture] InternalError (16): DuplicateOutput failed (HRESULT: 0x80070005) [PlatformCode=-2147024891]\n"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "PlatformWindowsTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:36Z",
+      "time": "0.026s",
+      "testsuite": [
+        {
+          "name": "Win32ErrorMapping",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPlatformWindows.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "PlatformWindowsTest"
+        },
+        {
+          "name": "HResultMapping",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPlatformWindows.cpp",
+          "line": 24,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "PlatformWindowsTest"
+        },
+        {
+          "name": "HighResolutionTimerMonotonicity",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestPlatformWindows.cpp",
+          "line": 35,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0.026s",
+          "classname": "PlatformWindowsTest"
+        }
+      ]
+    },
+    {
+      "name": "TelemetryTest",
+      "tests": 4,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:36Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "CounterBehavior",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestTelemetry.cpp",
+          "line": 6,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "TelemetryTest"
+        },
+        {
+          "name": "GaugeBehavior",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestTelemetry.cpp",
+          "line": 18,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "TelemetryTest"
+        },
+        {
+          "name": "LatencyHistogramStatistics",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestTelemetry.cpp",
+          "line": 29,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "TelemetryTest"
+        },
+        {
+          "name": "MetricRegistryLifecycle",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestTelemetry.cpp",
+          "line": 49,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "TelemetryTest"
+        }
+      ]
+    },
+    {
+      "name": "SecurityTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:36Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "DeviceIdentityValidation",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestSecurity.cpp",
+          "line": 7,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "SecurityTest"
+        },
+        {
+          "name": "AuthTokenValidationAndExpiration",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestSecurity.cpp",
+          "line": 30,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "SecurityTest"
+        },
+        {
+          "name": "ConstantTimeComparison",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestSecurity.cpp",
+          "line": 46,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "SecurityTest"
+        }
+      ]
+    },
+    {
+      "name": "ApplicationLifecycleTest",
+      "tests": 8,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:36Z",
+      "time": "1.488s",
+      "testsuite": [
+        {
+          "name": "HostVersionAndHelp",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestApplicationLifecycle.cpp",
+          "line": 9,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "0s",
+          "classname": "ApplicationLifecycleTest"
+        },
+        {
+          "name": "HostSelfTest",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestApplicationLifecycle.cpp",
+          "line": 26,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:36Z",
+          "time": "1.184s",
+          "classname": "ApplicationLifecycleTest"
+        },
+        {
+          "name": "HostRejectsBadArgument",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestApplicationLifecycle.cpp",
+          "line": 38,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:37Z",
+          "time": "0s",
+          "classname": "ApplicationLifecycleTest"
+        },
+        {
+          "name": "HostRunAndGracefulShutdown",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestApplicationLifecycle.cpp",
+          "line": 50,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:37Z",
+          "time": "0.104s",
+          "classname": "ApplicationLifecycleTest"
+        },
+        {
+          "name": "ClientVersionAndHelp",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestApplicationLifecycle.cpp",
+          "line": 67,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:37Z",
+          "time": "0s",
+          "classname": "ApplicationLifecycleTest"
+        },
+        {
+          "name": "ClientSelfTest",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestApplicationLifecycle.cpp",
+          "line": 84,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:37Z",
+          "time": "0.092s",
+          "classname": "ApplicationLifecycleTest"
+        },
+        {
+          "name": "ClientRejectsBadArgument",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestApplicationLifecycle.cpp",
+          "line": 96,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "ApplicationLifecycleTest"
+        },
+        {
+          "name": "ClientRunAndGracefulShutdown",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestApplicationLifecycle.cpp",
+          "line": 108,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0.107s",
+          "classname": "ApplicationLifecycleTest"
+        }
+      ]
+    },
+    {
+      "name": "SessionStateTest",
+      "tests": 2,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:38Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "StateTransitions",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestSessionState.cpp",
+          "line": 21,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "SessionStateTest"
+        },
+        {
+          "name": "StateMachineTransitionExecution",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestSessionState.cpp",
+          "line": 37,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "SessionStateTest"
+        }
+      ]
+    },
+    {
+      "name": "ConfigTest",
+      "tests": 5,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:38Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "DefaultConfigIsValid",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestConfig.cpp",
+          "line": 6,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "ConfigTest"
+        },
+        {
+          "name": "InvalidHostConfigRejected",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestConfig.cpp",
+          "line": 16,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "ConfigTest"
+        },
+        {
+          "name": "InvalidClientConfigRejected",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestConfig.cpp",
+          "line": 43,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "ConfigTest"
+        },
+        {
+          "name": "SerializationAndDeserialization",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestConfig.cpp",
+          "line": 53,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "ConfigTest"
+        },
+        {
+          "name": "RejectInvalidSchemaVersion",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestConfig.cpp",
+          "line": 77,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "ConfigTest"
+        }
+      ]
+    },
+    {
+      "name": "LoggerTest",
+      "tests": 3,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:38Z",
+      "time": "0.001s",
+      "testsuite": [
+        {
+          "name": "LevelFiltering",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestLogger.cpp",
+          "line": 21,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "LoggerTest"
+        },
+        {
+          "name": "SensitiveDataRedaction",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestLogger.cpp",
+          "line": 47,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "LoggerTest"
+        },
+        {
+          "name": "ThreadSafety",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestLogger.cpp",
+          "line": 65,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0.001s",
+          "classname": "LoggerTest"
+        }
+      ]
+    },
+    {
+      "name": "CommonTest",
+      "tests": 6,
+      "failures": 0,
+      "disabled": 0,
+      "errors": 0,
+      "timestamp": "2026-11-08T09:33:38Z",
+      "time": "0s",
+      "testsuite": [
+        {
+          "name": "SubsystemToString",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCommon.cpp",
+          "line": 8,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "CommonTest"
+        },
+        {
+          "name": "ErrorFormatting",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCommon.cpp",
+          "line": 23,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "CommonTest"
+        },
+        {
+          "name": "ResultWithValue",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCommon.cpp",
+          "line": 39,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "CommonTest"
+        },
+        {
+          "name": "ResultWithError",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCommon.cpp",
+          "line": 48,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "CommonTest"
+        },
+        {
+          "name": "ResultVoidSuccess",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCommon.cpp",
+          "line": 59,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "CommonTest"
+        },
+        {
+          "name": "ResultVoidError",
+          "file": "C:\/Users\/mumer\/OneDrive\/Desktop\/mist\/tests\/unit\/TestCommon.cpp",
+          "line": 66,
+          "status": "RUN",
+          "result": "COMPLETED",
+          "timestamp": "2026-11-08T09:33:38Z",
+          "time": "0s",
+          "classname": "CommonTest"
+        }
+      ]
+    }
+  ]
+}

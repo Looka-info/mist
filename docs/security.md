@@ -112,3 +112,21 @@ Mist handles desktop capture, input injection, and low-latency network streaming
 2. **Release Manifest (`release-manifest.json`):**
    - Every distribution archive includes a cryptographically verifiable release manifest recording SHA-256 hashes, file sizes, version metadata, and build timestamps.
    - Installers and update verifiers check file integrity against the manifest before execution.
+
+---
+
+## 6. Milestone 7: Pairing Security Hardening & Atomic Persistence
+
+1. **Unambiguous Base32 Pairing Codes:**
+   - Codes are drawn strictly from 32 unambiguous characters: `"23456789ABCDEFGHJKLMNPQRSTUVWXYZ"`.
+   - Glyphs susceptible to human visual misreading (`0`, `O`, `1`, `I`) are omitted.
+   - 6-character length provides 30 bits of cryptographic entropy ($32^6 = 1,073,741,824$ combinations).
+2. **Single-Use Consumption & Replay Resistance:**
+   - Active pairing codes are immediately consumed and erased upon successful pairing.
+   - Replay attempts using a previously used code fail with `InvalidPairingCode`.
+3. **Atomic File Persistence:**
+   - `PairingManager::saveTrustedDevices` writes to `<path>.tmp` first and then replaces the target via `MoveFileExA` with `MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH`.
+   - Prevents file corruption, truncation, or empty state files during power failure or unexpected process termination.
+4. **Default-Deny Permission Policies:**
+   - Newly paired devices have all remote input permissions (`allowKeyboard`, `allowMouse`, `allowGamepad`) explicitly disabled by default.
+   - Remote input injection requires affirmative host operator approval via the desktop management interface.

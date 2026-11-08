@@ -20,7 +20,7 @@
 ## 2. Installation
 
 1. **Download Release Package:**
-   Download `mist-v0.1.0-windows-x64.zip` from the official release distribution.
+   Download `mist-v0.2.0-rc1-windows-x64.zip` from the official release distribution.
 
 2. **Extract Archive:**
    Extract the archive to any temporary folder.

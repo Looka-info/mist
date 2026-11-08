@@ -45,6 +45,9 @@ struct ClientCliOptions {
     bool vsync{false};
     bool enableAudio{false};
     bool enableInput{false};
+    std::string turnServer;
+    std::string turnUsername;
+    std::string turnPassword;
 };
 
 class ClientApplication {

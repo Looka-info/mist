@@ -129,3 +129,95 @@ TEST(QosTest, AdaptiveBitrateControllerReconfigTrigger) {
     EXPECT_LT(reconfigBitrate, 8000);
     EXPECT_EQ(controller.getCongestionState(), CongestionState::CriticallyCongested);
 }
+
+TEST(QosTest, ControlledNetworkImpairmentSimulation) {
+    // Milestone 7 Workstream 2: Controlled network impairment simulation across
+    // 25M, 10M, 5M, 2M, RTT spikes, packet loss bursts, and additive recovery.
+    AdaptiveBitrateController controller(QualityProfile::Adaptive);
+
+    std::vector<std::pair<uint64_t, uint32_t>> adaptationHistory;
+    uint64_t currentSimTimeMs = 10000;
+    controller.setEncoderReconfigCallback([&](uint32_t newBitrateKbps) {
+        adaptationHistory.emplace_back(currentSimTimeMs, newBitrateKbps);
+        return mist::common::Result<void>::success();
+    });
+
+    uint64_t t = 10000;
+    currentSimTimeMs = t;
+
+    // 1. Initial 25 Mbps high-bandwidth link with pristine metrics
+    controller.onRembReceived(25000000, t); // 25 Mbps
+    RtcpStatistics rtcpPristine{};
+    rtcpPristine.fractionLost = 0;
+    rtcpPristine.jitterSamples = 45;
+    rtcpPristine.roundTripTimeMs = 8.5;
+    controller.onRtcpReportReceived(rtcpPristine, t);
+    uint32_t bInitial = controller.getCurrentVideoBitrateKbps();
+    EXPECT_GE(bInitial, 2000);
+
+    // 2. Network throttled to 10 Mbps
+    t += 1000;
+    currentSimTimeMs = t;
+    controller.onRembReceived(10000000, t); // 10 Mbps
+    controller.onRtcpReportReceived(rtcpPristine, t);
+    uint32_t b10M = controller.getCurrentVideoBitrateKbps();
+    EXPECT_LE(b10M, 10000);
+
+    // 3. Network throttled to 5 Mbps with mild RTT elevation
+    t += 1000;
+    currentSimTimeMs = t;
+    controller.onRembReceived(5000000, t); // 5 Mbps
+    RtcpStatistics rtcpMild{};
+    rtcpMild.fractionLost = 5;
+    rtcpMild.jitterSamples = 90;
+    rtcpMild.roundTripTimeMs = 35.0;
+    controller.onRtcpReportReceived(rtcpMild, t);
+    uint32_t b5M = controller.getCurrentVideoBitrateKbps();
+    EXPECT_LE(b5M, 5000);
+
+    // 4. Congestion Detection: Sudden loss burst (18%) and RTT spike (140 ms)
+    t += 1000;
+    currentSimTimeMs = t;
+    RtcpStatistics rtcpBurst{};
+    rtcpBurst.fractionLost = 46;
+    rtcpBurst.jitterSamples = 450;
+    rtcpBurst.roundTripTimeMs = 140.0;
+    controller.onRtcpReportReceived(rtcpBurst, t);
+    auto st = controller.getCongestionState();
+    EXPECT_TRUE(st == CongestionState::Congested || st == CongestionState::CriticallyCongested);
+    uint32_t bCritical = controller.getCurrentVideoBitrateKbps();
+    EXPECT_LT(bCritical, b5M);
+
+    // 5. Constrained 2 Mbps bottleneck
+    t += 1000;
+    currentSimTimeMs = t;
+    controller.onRembReceived(2000000, t); // 2 Mbps
+    controller.onRtcpReportReceived(rtcpBurst, t);
+    uint32_t bBottleneck = controller.getCurrentVideoBitrateKbps();
+    EXPECT_LE(bBottleneck, 3000);
+
+    // 6. Network stabilization: EWMA decay with successive 0% loss reports
+    RtcpStatistics rtcpRecovered{};
+    rtcpRecovered.fractionLost = 0;
+    rtcpRecovered.jitterSamples = 30;
+    rtcpRecovered.roundTripTimeMs = 12.0;
+    controller.onRembReceived(15000000, t); // 15 Mbps available again
+
+    for (int i = 0; i < 8; ++i) {
+        t += 600;
+        currentSimTimeMs = t;
+        controller.onRtcpReportReceived(rtcpRecovered, t);
+    }
+    uint32_t bTrough = controller.getCurrentVideoBitrateKbps();
+
+    // 7. Controlled Additive Increase recovery
+    t += 1200;
+    currentSimTimeMs = t;
+    (void)controller.tick(t);
+    t += 1200;
+    currentSimTimeMs = t;
+    (void)controller.tick(t);
+    uint32_t bRecovered = controller.getCurrentVideoBitrateKbps();
+    EXPECT_GT(bRecovered, bTrough);
+    EXPECT_EQ(controller.getCongestionState(), CongestionState::Increasing);
+}

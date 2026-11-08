@@ -51,6 +51,9 @@ struct HostCommandLineOptions {
     bool enableAudio{false};
     std::string audioDevice;
     bool allowRemoteInput{false};
+    std::string turnServer;
+    std::string turnUsername;
+    std::string turnPassword;
 };
 
 class HostApplication {

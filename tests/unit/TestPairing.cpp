@@ -118,3 +118,56 @@ TEST(PairingTest, JsonPersistence) {
 
     (void)std::remove(testFile.c_str());
 }
+
+TEST(PairingTest, SecurityAbusePrevention) {
+    PairingManager pm;
+    auto codeRes = pm.generatePairingCode(300);
+    ASSERT_TRUE(codeRes.hasValue());
+    std::string code = codeRes.value();
+
+    // 1. Invalid empty device ID rejection
+    PairingRequest emptyIdReq{};
+    emptyIdReq.deviceId = "";
+    emptyIdReq.deviceName = "Bad Dev";
+    emptyIdReq.pairingCode = code;
+    auto emptyRes = pm.submitPairingRequest(emptyIdReq);
+    EXPECT_FALSE(emptyRes.hasValue());
+    EXPECT_EQ(emptyRes.error().code(), mist::common::ErrorCode::InvalidArgument);
+
+    // 2. Legitimate submission & approval
+    PairingRequest legitimateReq{};
+    legitimateReq.deviceId = "client-legit-01";
+    legitimateReq.deviceName = "Legitimate Peer";
+    legitimateReq.publicKeyFingerprint = "11:22:33:44:55:66";
+    legitimateReq.pairingCode = code;
+    ASSERT_TRUE(pm.submitPairingRequest(legitimateReq).hasValue());
+    ASSERT_TRUE(pm.approvePairingRequest(legitimateReq.deviceId).hasValue());
+
+    // 3. Single-use enforcement: Attempting to reuse the consumed code must fail
+    PairingRequest reuseReq{};
+    reuseReq.deviceId = "client-attacker-02";
+    reuseReq.deviceName = "Attacker Peer";
+    reuseReq.publicKeyFingerprint = "99:88:77:66:55:44";
+    reuseReq.pairingCode = code;
+    auto reuseRes = pm.submitPairingRequest(reuseReq);
+    EXPECT_FALSE(reuseRes.hasValue());
+    EXPECT_EQ(reuseRes.error().code(), mist::common::ErrorCode::ResourceExhausted);
+
+    // 4. Default permissions guarantee: input must be FALSE by default
+    auto defaultPerms = pm.getDevicePermissions(legitimateReq.deviceId);
+    ASSERT_TRUE(defaultPerms.hasValue());
+    EXPECT_TRUE(defaultPerms.value().allowVideo);
+    EXPECT_TRUE(defaultPerms.value().allowAudio);
+    EXPECT_FALSE(defaultPerms.value().allowKeyboard);
+    EXPECT_FALSE(defaultPerms.value().allowMouse);
+    EXPECT_FALSE(defaultPerms.value().allowGamepad);
+
+    // 5. Fingerprint verification and mismatch rejection
+    EXPECT_TRUE(pm.isDeviceTrusted(legitimateReq.deviceId, "11:22:33:44:55:66"));
+    EXPECT_FALSE(pm.isDeviceTrusted(legitimateReq.deviceId, "WRONG:FINGERPRINT"));
+
+    // 6. Device revocation blocks future session connection
+    ASSERT_TRUE(pm.revokeDevice(legitimateReq.deviceId).hasValue());
+    EXPECT_FALSE(pm.isDeviceTrusted(legitimateReq.deviceId));
+    EXPECT_FALSE(pm.getDevicePermissions(legitimateReq.deviceId).hasValue());
+}

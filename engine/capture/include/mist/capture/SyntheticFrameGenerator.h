@@ -31,6 +31,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context_;
     Microsoft::WRL::ComPtr<ID3D11Texture2D> texture_;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> patternTexture_;
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> rtv_;
 #endif
 };

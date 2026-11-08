@@ -196,56 +196,54 @@ common::Result<AudioPacket> WasapiAudioCapture::readPacket(uint32_t timeoutMs) {
         return pkt;
     }
 
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+    // Wait at most timeoutMs (default 10ms for 10ms framing cadence)
+    DWORD waitMs = static_cast<DWORD>(timeoutMs > 0 ? timeoutMs : 10);
+    DWORD waitRes = WaitForSingleObject(hCaptureEvent_, waitMs);
+    if (waitRes == WAIT_OBJECT_0) {
+        UINT32 packetLength = 0;
+        HRESULT hr = captureClient_->GetNextPacketSize(&packetLength);
+        while (SUCCEEDED(hr) && packetLength > 0) {
+            BYTE* pData = nullptr;
+            UINT32 numFramesRead = 0;
+            DWORD flags = 0;
+            UINT64 devicePosition = 0;
+            UINT64 qpcPosition = 0;
 
-    while (std::chrono::steady_clock::now() < deadline) {
-        DWORD waitRes = WaitForSingleObject(hCaptureEvent_, 10);
-        if (waitRes == WAIT_OBJECT_0) {
-            UINT32 packetLength = 0;
-            HRESULT hr = captureClient_->GetNextPacketSize(&packetLength);
-            while (SUCCEEDED(hr) && packetLength > 0) {
-                BYTE* pData = nullptr;
-                UINT32 numFramesRead = 0;
-                DWORD flags = 0;
-                UINT64 devicePosition = 0;
-                UINT64 qpcPosition = 0;
-
-                hr = captureClient_->GetBuffer(&pData, &numFramesRead, &flags, &devicePosition, &qpcPosition);
-                if (SUCCEEDED(hr)) {
-                    if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
-                        // Silent buffer: fill with zeros
-                        size_t sampleBytes = (deviceFormat_.bitsPerSample / 8) * deviceFormat_.channels;
-                        size_t totalBytes = numFramesRead * sampleBytes;
-                        if (silentBuffer_.size() < totalBytes) {
-                            silentBuffer_.resize(totalBytes, 0);
-                        } else {
-                            std::fill(silentBuffer_.begin(), silentBuffer_.begin() + static_cast<std::ptrdiff_t>(totalBytes), 0);
-                        }
-                        (void)resampler_.pushInput(silentBuffer_.data(), numFramesRead);
-                    } else if (pData && numFramesRead > 0) {
-                        (void)resampler_.pushInput(pData, numFramesRead);
+            hr = captureClient_->GetBuffer(&pData, &numFramesRead, &flags, &devicePosition, &qpcPosition);
+            if (SUCCEEDED(hr)) {
+                if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
+                    // Silent buffer: fill with zeros
+                    size_t sampleBytes = (deviceFormat_.bitsPerSample / 8) * deviceFormat_.channels;
+                    size_t totalBytes = numFramesRead * sampleBytes;
+                    if (silentBuffer_.size() < totalBytes) {
+                        silentBuffer_.resize(totalBytes, 0);
+                    } else {
+                        std::fill(silentBuffer_.begin(), silentBuffer_.begin() + static_cast<std::ptrdiff_t>(totalBytes), 0);
                     }
-
-                    captureClient_->ReleaseBuffer(numFramesRead);
+                    (void)resampler_.pushInput(silentBuffer_.data(), numFramesRead);
+                } else if (pData && numFramesRead > 0) {
+                    (void)resampler_.pushInput(pData, numFramesRead);
                 }
 
-                hr = captureClient_->GetNextPacketSize(&packetLength);
+                captureClient_->ReleaseBuffer(numFramesRead);
             }
 
-            if (resampler_.hasFrame(config_.bufferFrameSize)) {
-                (void)resampler_.popFrame(std::span<float>(tempFrameBuffer_.data(), tempFrameBuffer_.size()), config_.bufferFrameSize);
-                AudioPacket pkt;
-                pkt.timestampNs = getNowNs();
-                pkt.frames = config_.bufferFrameSize;
-                pkt.data.resize(tempFrameBuffer_.size() * sizeof(float));
-                std::memcpy(pkt.data.data(), tempFrameBuffer_.data(), pkt.data.size());
-                return pkt;
-            }
+            hr = captureClient_->GetNextPacketSize(&packetLength);
+        }
+
+        if (resampler_.hasFrame(config_.bufferFrameSize)) {
+            (void)resampler_.popFrame(std::span<float>(tempFrameBuffer_.data(), tempFrameBuffer_.size()), config_.bufferFrameSize);
+            AudioPacket pkt;
+            pkt.timestampNs = getNowNs();
+            pkt.frames = config_.bufferFrameSize;
+            pkt.data.resize(tempFrameBuffer_.size() * sizeof(float));
+            std::memcpy(pkt.data.data(), tempFrameBuffer_.data(), pkt.data.size());
+            return pkt;
         }
     }
 
     // Timeout: if no audio is actively playing on the host, loopback produces silence.
-    // Emit a silent frame so the audio stream maintains its 100 or 50 pps cadence without freezing.
+    // Emit a silent frame so the audio stream maintains strict 100 pps (10ms) cadence without freezing.
     std::fill(tempFrameBuffer_.begin(), tempFrameBuffer_.end(), 0.0f);
     AudioPacket pkt;
     pkt.timestampNs = getNowNs();

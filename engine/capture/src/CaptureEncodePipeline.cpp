@@ -362,6 +362,13 @@ void CaptureEncodePipeline::requestKeyframe() noexcept {
     }
 }
 
+common::Result<void> CaptureEncodePipeline::setBitrate(uint32_t bitrateKbps) noexcept {
+    if (encoder_) {
+        return encoder_->setBitrate(bitrateKbps);
+    }
+    return common::Error(common::SubsystemId::Capture, common::ErrorCode::NotInitialized, "Encoder not initialized");
+}
+
 PipelineReport CaptureEncodePipeline::generateReport() const {
     double elapsedSec = pipelineTimer_.elapsedMilliseconds() / 1000.0;
     if (elapsedSec <= 0.0) elapsedSec = 1.0;
