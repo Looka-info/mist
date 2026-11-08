@@ -919,6 +919,223 @@ bool DesktopApplication::renderPillButton(const char* label, bool primary, bool 
     return clicked;
 }
 
+bool DesktopApplication::renderM3Switch(const char* id, const char* label, bool* v, const char* sublabel, float width) {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    float trackW = 52.0f;
+    float trackH = 32.0f;
+    float trackRadius = 16.0f;
+
+    float availW = ImGui::GetContentRegionAvail().x;
+    float rowW = (width > 0.0f) ? width : ((availW > 100.0f) ? availW : 300.0f);
+    ImVec2 pStart = ImGui::GetCursorScreenPos();
+
+    float rowH = std::max(trackH, sublabel ? 42.0f : 32.0f);
+    ImGui::InvisibleButton(id, ImVec2(rowW, rowH));
+    bool isHovered = ImGui::IsItemHovered();
+    bool isClicked = ImGui::IsItemClicked();
+
+    if (isClicked) {
+        *v = !(*v);
+    }
+
+    // Draw label & sublabel on left
+    ImGui::SetCursorScreenPos(pStart);
+    ImGui::BeginGroup();
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    ImGui::TextColored(c.ink, "%s", label);
+    if (fontBold_) ImGui::PopFont();
+    if (sublabel && sublabel[0] != '\0') {
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "%s", sublabel);
+        if (fontSmall_) ImGui::PopFont();
+    }
+    ImGui::EndGroup();
+
+    // Draw M3 Switch track on right
+    float trackX = pStart.x + rowW - trackW - 4.0f;
+    float trackY = pStart.y + (rowH - trackH) * 0.5f;
+
+    ImVec2 trackMin(trackX, trackY);
+    ImVec2 trackMax(trackX + trackW, trackY + trackH);
+
+    if (*v) {
+        // Active M3 Switch: filled track with mint, large thumb
+        drawList->AddRectFilled(trackMin, trackMax, ImGui::ColorConvertFloat4ToU32(c.mint), trackRadius);
+        float thumbRadius = 12.0f;
+        ImVec2 thumbCenter(trackMax.x - 16.0f, trackMin.y + 16.0f);
+        drawList->AddCircleFilled(thumbCenter, thumbRadius, ImGui::ColorConvertFloat4ToU32(c.on));
+        // Small check icon inside thumb (M3 spec with icon)
+        ImVec2 pChk[3] = {
+            ImVec2(thumbCenter.x - 4.0f, thumbCenter.y),
+            ImVec2(thumbCenter.x - 1.0f, thumbCenter.y + 3.0f),
+            ImVec2(thumbCenter.x + 4.0f, thumbCenter.y - 3.0f)
+        };
+        drawList->AddPolyline(pChk, 3, ImGui::ColorConvertFloat4ToU32(c.acc), ImDrawFlags_None, 1.8f);
+    } else {
+        // Inactive M3 Switch: outline track with ct2 background, small thumb
+        drawList->AddRectFilled(trackMin, trackMax, ImGui::ColorConvertFloat4ToU32(c.ct2), trackRadius);
+        drawList->AddRect(trackMin, trackMax, ImGui::ColorConvertFloat4ToU32(isHovered ? c.ink : c.mute), trackRadius, 0, 2.0f);
+        float thumbRadius = 8.0f;
+        ImVec2 thumbCenter(trackMin.x + 16.0f, trackMin.y + 16.0f);
+        drawList->AddCircleFilled(thumbCenter, thumbRadius, ImGui::ColorConvertFloat4ToU32(isHovered ? c.ink : c.mute));
+    }
+
+    ImGui::SetCursorScreenPos(ImVec2(pStart.x, pStart.y + rowH + 6.0f));
+    return isClicked;
+}
+
+bool DesktopApplication::renderM3TextField(const char* id, const char* label, char* buf, size_t bufSize, const char* hint, float width) {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    if (label && label[0] != '\0') {
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.mute, "%s", label);
+        if (fontSmall_) ImGui::PopFont();
+        ImGui::Spacing();
+    }
+
+    float fieldW = (width > 0.0f) ? width : ImGui::GetContentRegionAvail().x;
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+    ImGui::PushStyleColor(ImGuiCol_Text, c.ink);
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, c.mute);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 12.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14.0f, 10.0f));
+
+    ImGui::SetNextItemWidth(fieldW);
+    bool changed = false;
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+    if (hint && hint[0] != '\0') {
+        changed = ImGui::InputTextWithHint(id, hint, buf, bufSize);
+    } else {
+        changed = ImGui::InputText(id, buf, bufSize);
+    }
+    if (fontRegular_) ImGui::PopFont();
+
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(4);
+    return changed;
+}
+
+bool DesktopApplication::renderM3SegmentedButton(const char* id, const std::vector<const char*>& options, int* selectedIndex, float width) {
+    if (options.empty()) return false;
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    float totalW = (width > 0.0f) ? width : ImGui::GetContentRegionAvail().x;
+    float segH = 40.0f;
+    float segW = totalW / static_cast<float>(options.size());
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    ImVec2 pStart = ImGui::GetCursorScreenPos();
+    bool changed = false;
+
+    // Draw outer pill border
+    ImVec2 outerMin = pStart;
+    ImVec2 outerMax(pStart.x + totalW, pStart.y + segH);
+    drawList->AddRect(outerMin, outerMax, ImGui::ColorConvertFloat4ToU32(c.line), 20.0f, 0, 1.5f);
+
+    for (size_t i = 0; i < options.size(); ++i) {
+        ImVec2 segMin(pStart.x + static_cast<float>(i) * segW, pStart.y);
+        ImVec2 segMax(segMin.x + segW, segMin.y + segH);
+
+        std::string btnId = std::string(id) + "_seg_" + std::to_string(i);
+        ImGui::SetCursorScreenPos(segMin);
+        if (ImGui::InvisibleButton(btnId.c_str(), ImVec2(segW, segH))) {
+            if (*selectedIndex != static_cast<int>(i)) {
+                *selectedIndex = static_cast<int>(i);
+                changed = true;
+            }
+        }
+        bool isHovered = ImGui::IsItemHovered();
+        bool isSelected = (*selectedIndex == static_cast<int>(i));
+
+        // Draw selection fill
+        if (isSelected) {
+            ImDrawFlags flags = ImDrawFlags_None;
+            if (i == 0) flags = ImDrawFlags_RoundCornersLeft;
+            else if (i == options.size() - 1) flags = ImDrawFlags_RoundCornersRight;
+            drawList->AddRectFilled(segMin, segMax, ImGui::ColorConvertFloat4ToU32(c.ct), 20.0f, flags);
+        } else if (isHovered) {
+            ImDrawFlags flags = ImDrawFlags_None;
+            if (i == 0) flags = ImDrawFlags_RoundCornersLeft;
+            else if (i == options.size() - 1) flags = ImDrawFlags_RoundCornersRight;
+            drawList->AddRectFilled(segMin, segMax, ImGui::ColorConvertFloat4ToU32(c.ct2), 20.0f, flags);
+        }
+
+        // Divider lines between segments
+        if (i > 0) {
+            drawList->AddLine(ImVec2(segMin.x, segMin.y), ImVec2(segMin.x, segMax.y), ImGui::ColorConvertFloat4ToU32(c.line), 1.0f);
+        }
+
+        // Segment label with checkmark if selected
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImVec2 txtSize = ImGui::CalcTextSize(options[i]);
+        float textX = segMin.x + (segW - txtSize.x) * 0.5f;
+        float textY = segMin.y + (segH - txtSize.y) * 0.5f;
+
+        if (isSelected) {
+            renderVectorIcon("check_circle", ImVec2(textX - 10.0f, segMin.y + segH * 0.5f), 14.0f, ImGui::ColorConvertFloat4ToU32(c.acc));
+            textX += 6.0f;
+        }
+
+        drawList->AddText(ImVec2(textX, textY), ImGui::ColorConvertFloat4ToU32(isSelected ? c.onCt : c.ink), options[i]);
+        if (fontRegular_) ImGui::PopFont();
+    }
+
+    ImGui::SetCursorScreenPos(ImVec2(pStart.x, pStart.y + segH + 8.0f));
+    return changed;
+}
+
+bool DesktopApplication::renderM3Slider(const char* id, const char* label, int* v, int vMin, int vMax, const char* unit) {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    float availW = ImGui::GetContentRegionAvail().x;
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // Label with value badge
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    ImGui::TextColored(c.ink, "%s: %d %s", label, *v, unit);
+    if (fontBold_) ImGui::PopFont();
+    ImGui::Spacing();
+
+    ImVec2 pStart = ImGui::GetCursorScreenPos();
+    float sliderH = 32.0f;
+    float trackH = 14.0f;
+    float trackY = pStart.y + (sliderH - trackH) * 0.5f;
+
+    ImGui::InvisibleButton(id, ImVec2(availW, sliderH));
+    bool isActive = ImGui::IsItemActive();
+
+    if (isActive) {
+        float mouseX = ImGui::GetIO().MousePos.x;
+        float ratio = std::clamp((mouseX - pStart.x) / availW, 0.0f, 1.0f);
+        *v = vMin + static_cast<int>(std::round(ratio * static_cast<float>(vMax - vMin)));
+    }
+
+    float ratio = static_cast<float>(*v - vMin) / static_cast<float>(vMax - vMin);
+    float activeW = availW * ratio;
+
+    // Inactive track (M3 Container)
+    drawList->AddRectFilled(ImVec2(pStart.x, trackY), ImVec2(pStart.x + availW, trackY + trackH), ImGui::ColorConvertFloat4ToU32(c.ct2), trackH * 0.5f);
+
+    // Active track (M3 Primary / Mint)
+    if (activeW > 0.0f) {
+        drawList->AddRectFilled(ImVec2(pStart.x, trackY), ImVec2(pStart.x + activeW, trackY + trackH), ImGui::ColorConvertFloat4ToU32(c.mint), trackH * 0.5f);
+    }
+
+    // M3 Thumb (Rounded pill handle)
+    float thumbW = 10.0f;
+    float thumbH = 26.0f;
+    float thumbX = pStart.x + activeW - thumbW * 0.5f;
+    float thumbY = pStart.y + (sliderH - thumbH) * 0.5f;
+    thumbX = std::clamp(thumbX, pStart.x, pStart.x + availW - thumbW);
+
+    drawList->AddRectFilled(ImVec2(thumbX, thumbY), ImVec2(thumbX + thumbW, thumbY + thumbH), ImGui::ColorConvertFloat4ToU32(c.acc), thumbW * 0.5f);
+
+    ImGui::SetCursorScreenPos(ImVec2(pStart.x, pStart.y + sliderH + 8.0f));
+    return isActive;
+}
+
 void DesktopApplication::renderGuiHeader() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
@@ -1370,27 +1587,18 @@ void DesktopApplication::renderGuiHostScreen() {
     if (fontTitle_) ImGui::PopFont();
 
     ImGui::Spacing();
-    ImGui::Checkbox("Stream audio", &hostAudioStream_);
+    renderM3Switch("HostStreamAudio", "Stream audio", &hostAudioStream_, "Transmits low-delay stereo game sound");
 
     ImGui::Spacing();
-    if (ImGui::Checkbox("Allow remote input", &hostAllowRemoteInput_)) {
+    if (renderM3Switch("HostRemoteInput", "Allow remote input", &hostAllowRemoteInput_, "Off until you turn it on. Your mouse always wins.")) {
         showToast(hostAllowRemoteInput_ ? "Remote input allowed" : "Remote input blocked");
     }
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "Off until you turn it on. Your own mouse and keyboard always win.");
-    if (fontSmall_) ImGui::PopFont();
 
     ImGui::Spacing();
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "Session ID");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::InputText("##HostSessionId", hostSessionId_, IM_ARRAYSIZE(hostSessionId_));
+    renderM3TextField("##HostSessionId", "Session ID", hostSessionId_, IM_ARRAYSIZE(hostSessionId_));
 
     ImGui::Spacing();
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "Signaling server");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::InputText("##HostSignaling", hostSignalingServer_, IM_ARRAYSIZE(hostSignalingServer_));
+    renderM3TextField("##HostSignaling", "Signaling server", hostSignalingServer_, IM_ARRAYSIZE(hostSignalingServer_));
 
     EndCardContainer();
 }
@@ -1413,26 +1621,15 @@ void DesktopApplication::renderGuiConnectScreen() {
     // Left: Connect Form Card
     BeginCardContainer("ConnectFormCard", c, ImVec2(colW, 400.0f), 28.0f);
 
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "Session ID");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::InputText("##ConnSessionId", connectSessionId_, IM_ARRAYSIZE(connectSessionId_));
+    renderM3TextField("##ConnSessionId", "Session ID", connectSessionId_, IM_ARRAYSIZE(connectSessionId_));
+    ImGui::Spacing();
+    renderM3TextField("##ConnSignaling", "Signaling server", connectSignalingServer_, IM_ARRAYSIZE(connectSignalingServer_));
+    ImGui::Spacing();
+    renderM3TextField("##ConnRelay", "Relay server (optional)", connectRelayServer_, IM_ARRAYSIZE(connectRelayServer_), "turn:relay.example.com:3478");
 
     ImGui::Spacing();
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "Signaling server");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::InputText("##ConnSignaling", connectSignalingServer_, IM_ARRAYSIZE(connectSignalingServer_));
-
-    ImGui::Spacing();
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "Relay server (optional)");
-    if (fontSmall_) ImGui::PopFont();
-    ImGui::InputTextWithHint("##ConnRelay", "turn:relay.example.com:3478", connectRelayServer_, IM_ARRAYSIZE(connectRelayServer_));
-
-    ImGui::Spacing();
-    ImGui::Checkbox("Hear audio", &connectHearAudio_);
-    ImGui::Checkbox("Send keyboard, mouse and controller", &connectSendInput_);
+    renderM3Switch("ConnHearAudio", "Hear audio", &connectHearAudio_);
+    renderM3Switch("ConnSendInput", "Send input", &connectSendInput_, "Keyboard, mouse and gamepad");
 
     ImGui::Spacing();
     ImGui::Spacing();
@@ -1658,14 +1855,14 @@ void DesktopApplication::renderGuiDevicesScreen() {
 
             float rowW = ImGui::GetContentRegionAvail().x;
             ImGui::SameLine(rowW - 380.0f);
-            std::string kbdId = "Keyboard and mouse##" + std::to_string(i);
-            if (ImGui::Checkbox(kbdId.c_str(), &trustedDevices_[i].allowKbdMouse)) {
+            std::string kbdId = "KbdSwitch_" + std::to_string(i);
+            if (renderM3Switch(kbdId.c_str(), "Mouse/Keys", &trustedDevices_[i].allowKbdMouse, nullptr, 140.0f)) {
                 showToast("Permission updated");
             }
 
             ImGui::SameLine(0, 16.0f);
-            std::string padId = "Controller##" + std::to_string(i);
-            if (ImGui::Checkbox(padId.c_str(), &trustedDevices_[i].allowController)) {
+            std::string padId = "PadSwitch_" + std::to_string(i);
+            if (renderM3Switch(padId.c_str(), "Gamepad", &trustedDevices_[i].allowController, nullptr, 130.0f)) {
                 showToast("Permission updated");
             }
 
@@ -2035,19 +2232,13 @@ void DesktopApplication::renderGuiSettingsDialog() {
         if (fontTitle_) ImGui::PopFont();
         ImGui::Spacing();
 
-        // 1. Theme Segmented Radio
+        // 1. Theme Segmented Button (M3)
         if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextColored(c.ink, "Theme");
         if (fontBold_) ImGui::PopFont();
         ImGui::Spacing();
 
-        if (ImGui::RadioButton("Light##ThemeLight", settingsTheme_ == 0)) {
-            settingsTheme_ = 0;
-            applyActiveTheme();
-        }
-        ImGui::SameLine(0, 24.0f);
-        if (ImGui::RadioButton("Dark##ThemeDark", settingsTheme_ == 1)) {
-            settingsTheme_ = 1;
+        if (renderM3SegmentedButton("ThemeSeg", { "Light Theme", "Dark Theme" }, &settingsTheme_)) {
             applyActiveTheme();
         }
 
@@ -2055,19 +2246,13 @@ void DesktopApplication::renderGuiSettingsDialog() {
         ImGui::Separator();
         ImGui::Spacing();
 
-        // 2. Contrast Segmented Radio
+        // 2. Contrast Segmented Button (M3)
         if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextColored(c.ink, "Contrast");
         if (fontBold_) ImGui::PopFont();
         ImGui::Spacing();
 
-        if (ImGui::RadioButton("Standard##ContrastStd", settingsContrast_ == 0)) {
-            settingsContrast_ = 0;
-            applyActiveTheme();
-        }
-        ImGui::SameLine(0, 24.0f);
-        if (ImGui::RadioButton("High##ContrastHigh", settingsContrast_ == 1)) {
-            settingsContrast_ = 1;
+        if (renderM3SegmentedButton("ContrastSeg", { "Standard", "High Contrast" }, &settingsContrast_)) {
             applyActiveTheme();
         }
 
@@ -2075,20 +2260,12 @@ void DesktopApplication::renderGuiSettingsDialog() {
         ImGui::Separator();
         ImGui::Spacing();
 
-        // 3. Compact View Checkbox
-        ImGui::Checkbox("Compact view", &settingsCompactView_);
-        if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextColored(c.mute, "Smaller cards and tiles");
-        if (fontSmall_) ImGui::PopFont();
-
+        // 3. Compact View Switch (M3)
+        renderM3Switch("CompactViewSwitch", "Compact view", &settingsCompactView_, "Smaller cards and tiles");
         ImGui::Spacing();
 
-        // 4. Animated Shapes Checkbox
-        ImGui::Checkbox("Animated shapes", &settingsAnimatedShapes_);
-        if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextColored(c.mute, "Shapes drifting behind the interface");
-        if (fontSmall_) ImGui::PopFont();
-
+        // 4. Animated Shapes Switch (M3)
+        renderM3Switch("AnimatedShapesSwitch", "Animated shapes", &settingsAnimatedShapes_, "Parametric fluid shapes drifting behind the interface");
         ImGui::Spacing();
 
         // 5. Shapes Shuffle Button
@@ -2100,19 +2277,22 @@ void DesktopApplication::renderGuiSettingsDialog() {
         }
 
         ImGui::Spacing();
-
-        // 6. Maximum Video Bitrate Slider
-        std::string capLabel = "Maximum video bitrate: " + std::to_string(settingsMaxBitrateMbps_) + " Mbps";
-        if (fontRegular_) ImGui::PushFont(fontRegular_);
-        ImGui::TextColored(c.ink, "%s", capLabel.c_str());
-        if (fontRegular_) ImGui::PopFont();
-        ImGui::SliderInt("##MaxBitrateSlider", &settingsMaxBitrateMbps_, 3, 40, "%d Mbps");
-
+        ImGui::Separator();
         ImGui::Spacing();
 
-        // 7. Frame Rate Select
-        const char* frameRates[] = { "60 frames per second", "30 frames per second" };
-        ImGui::Combo("Frame rate", &settingsFrameRate_, frameRates, IM_ARRAYSIZE(frameRates));
+        // 6. Maximum Video Bitrate Slider (M3)
+        renderM3Slider("MaxBitrateSlider", "Maximum video bitrate", &settingsMaxBitrateMbps_, 3, 40, "Mbps");
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // 7. Frame Rate Select (M3 Segmented Button)
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(c.ink, "Frame rate");
+        if (fontBold_) ImGui::PopFont();
+        ImGui::Spacing();
+        renderM3SegmentedButton("FpsSeg", { "60 FPS (Ultra Smooth)", "30 FPS (Low Bandwidth)" }, &settingsFrameRate_);
 
         ImGui::Spacing();
         ImGui::Spacing();

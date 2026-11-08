@@ -106,6 +106,13 @@ private:
     void renderChip(const char* text, int statusType = 0) const; // 0=neutral, 1=ok, 2=warn, 3=bad
     void renderMetricBox(const char* label, const char* value, const char* sublabel = nullptr) const;
     bool renderPillButton(const char* label, bool primary = false, bool danger = false, const ImVec2& size = ImVec2(0, 40.0f), const char* iconName = nullptr);
+    
+    // Material Design 3 Native Components (m3.material.io)
+    bool renderM3Switch(const char* id, const char* label, bool* v, const char* sublabel = nullptr, float width = 0.0f);
+    bool renderM3TextField(const char* id, const char* label, char* buf, size_t bufSize, const char* hint = nullptr, float width = 0.0f);
+    bool renderM3SegmentedButton(const char* id, const std::vector<const char*>& options, int* selectedIndex, float width = 0.0f);
+    bool renderM3Slider(const char* id, const char* label, int* v, int vMin, int vMax, const char* unit = "Mbps");
+
     void showToast(const std::string& message);
     void triggerError(const std::string& title, const std::string& message,
                       const std::string& suggestion = "", const std::string& code = "ERR_GENERIC",
