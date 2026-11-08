@@ -3,35 +3,35 @@
   "duration_sec": 10,
   "frames_encoded": 602,
   "frames_dropped": 0,
-  "actual_fps": 59.899,
-  "bitrate_kbps": 11527.6,
-  "packets_sent": 2208,
-  "bytes_sent": 14740503,
-  "audio_packets_sent": 1606,
-  "audio_bytes_sent": 258566,
-  "input_packets_received": 181,
-  "input_events_processed": 179,
+  "actual_fps": 59.8989,
+  "bitrate_kbps": 11541.9,
+  "packets_sent": 2237,
+  "bytes_sent": 14504805,
+  "audio_packets_sent": 1635,
+  "audio_bytes_sent": 4905,
+  "input_packets_received": 182,
+  "input_events_processed": 180,
   "input_events_dropped": 0,
   "video": {
     "frames_acquired": 603,
     "frames_encoded": 602,
     "frames_dropped": 0,
-    "actual_fps": 59.899,
-    "average_bitrate_kbps": 11527.6
+    "actual_fps": 59.8989,
+    "average_bitrate_kbps": 11541.9
   },
   "audio": {
-    "opus_packets_generated": 1606,
-    "rtp_packets_sent": 1606,
-    "rtp_bytes_sent": 258566
+    "opus_packets_generated": 1635,
+    "rtp_packets_sent": 1635,
+    "rtp_bytes_sent": 4905
   },
   "input": {
-    "packets_received": 181,
-    "events_processed": 179,
+    "packets_received": 182,
+    "events_processed": 180,
     "events_dropped": 0
   },
   "network": {
-    "total_packets_sent": 2208,
-    "total_bytes_sent": 14740503,
+    "total_packets_sent": 2237,
+    "total_bytes_sent": 14504805,
     "rtt_ms": 0,
     "jitter_ms": 0
   }

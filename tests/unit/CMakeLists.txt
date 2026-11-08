@@ -41,6 +41,7 @@ target_include_directories(mist_unit_tests PRIVATE
 )
 
 target_link_libraries(mist_unit_tests PRIVATE
+    mist_imgui
     mist_common
     mist_session
     mist_capture
