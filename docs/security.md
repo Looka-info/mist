@@ -51,6 +51,22 @@ Mist handles desktop capture, input injection, and low-latency network streaming
 - **Resampler Numerical Stability & NaN Injection:** Corrupted audio samples destabilizing floating-point math.
   - *Mitigation:* `AudioResampler` validates input sample rates against sanity bounds (8,000 Hz to 192,000 Hz) and channel counts (1 to 8). Downmixing clamps floating-point values to `[-1.0, 1.0]`, preventing clipping and NaN propagation.
 
+### 2.6 Remote Input Attack Surfaces & Host Sovereignty (Milestone 5)
+- **Unauthorized Remote Control & Session Hijacking:** Unauthenticated remote peers attempting to inject synthetic keyboard or mouse commands.
+  - *Mitigation:* Remote input is **disabled by default** (`InputPermissionState::Disabled`). Control requires affirmative host authorization via `InputPermissionManager`. Packets must match the active session ID; cross-session inputs are immediately dropped and logged.
+- **Physical Host Sovereignty & Local Override:** Malicious or rogue clients attempting to lock out the local host user.
+  - *Mitigation:* The local physical user maintains absolute sovereignty. Any local host physical input activity takes precedence, and local CLI/GUI controls can revoke remote permissions instantly (`revokePermissions()`).
+- **Input Flooding & Denial-of-Service (DoS):** Compromised clients flooding high-frequency input packets to overwhelm the host OS event loop.
+  - *Mitigation:* Packets are regulated by a sliding-window rate limiter enforcing a maximum of 2,000 events/second per session. Ingress queues are bounded to 64 items with oldest-item dropping and relative delta coalescing.
+- **Arithmetic Anomalies & Malformed Payloads:** Exploiting deserialization logic via out-of-range coordinates or invalid enums.
+  - *Mitigation:* Strict binary packet size verification (`48 <= size <= 256`). Floating-point coordinates are sanitized with `std::isnan()` and `std::isinf()` and clamped to `[0.0, 1.0]`. Enum discriminators undergo strict range checks.
+- **Windows User Interface Privilege Isolation (UIPI):** Remote synthetic input interacting with elevated UAC administrator prompts.
+  - *Mitigation:* Mist strictly adheres to Windows UIPI security boundaries. Standard user-mode host processes cannot inject input into higher-integrity processes. Mist does not attempt fragile, dangerous UIPI bypasses or DLL injection.
+- **Kernel-Mode Driver Safety:** Third-party driver installation vulnerabilities.
+  - *Mitigation:* Mist **never** executes silent or unattended kernel driver installations. Virtual controller support uses pluggable dynamic probing (`HostVirtualGamepad`) and falls back gracefully when ViGEmBus is absent.
+- **Exclusion of Remote Execution Capabilities:**
+  - *Mitigation:* The input protocol strictly encapsulates discrete hardware scan codes, mouse deltas, and controller states. It contains **zero** shell execution, process spawning, file transfer, or clipboard sharing capabilities.
+
 ---
 
 ## 3. Cryptographic & Device Authorization Requirements

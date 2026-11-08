@@ -55,7 +55,7 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 | `engine/render` | `mist_render` | Direct3D 11 Presentation Renderer (`D3D11Renderer`), DXGI Flip-Model swap chain (`DXGI_SWAP_EFFECT_FLIP_DISCARD`), D3D11 Video Processor NV12-to-RGB conversion, letterboxing. | **Implemented & Verified** (M2) |
 | `engine/transport`| `mist_transport`| WebRTC peer connection manager, H.264 video track sender/receiver, SCTP data channels, RTCP PLI handling, transport statistics. | **Implemented & Verified** (M3) |
 | `engine/audio` | `mist_audio` | Windows WASAPI loopback capture (`WasapiAudioCapture`), audio endpoint enumeration (`AudioDeviceEnumerator`), multi-channel ITU-R downmix & fractional resampler (`AudioResampler`), official Xiph Opus encoder/decoder (`OpusAudioEncoder`, `OpusAudioDecoder`), and client playout (`WasapiAudioPlayback`). | **Implemented & Verified** (M4) |
-| `engine/input` | `mist_input` | Abstract input injection and polling contracts (`IInputManager`, input variant events). | **Interface Only** (Milestone 5) |
+| `engine/input` | `mist_input` | Remote input capture, compact binary protocol v1, input permission state machine, rate limiter, bounded dispatch queue, Win32 `SendInput` keyboard/mouse injectors, XInput capture, pluggable virtual gamepad (`IVirtualGamepad`). | **Implemented & Verified** (M5) |
 | `services` | `mist_services` | Signaling client interface (`ISignalingClient`, `SignalingMessage`, `WebSocketSignalingClient`) and Rust WebSocket signaling microservice (`mist-signaling`). | **Implemented & Verified** (M3) |
 | `apps/host` | `mist_host` | Host executable entry point, CLI diagnostics (`--list-displays`, `--capture-test`, `--encode-test`, `--capture-encode-test`), self-test. | **Implemented & Verified** (M0/M1) |
 | `apps/client` | `mist_client` | Client executable entry point, CLI diagnostics (`--decoder-info`, `--decode-test`, `--present-test`, `--decode-benchmark`), self-test. | **Implemented & Verified** (M0/M2) |
@@ -97,7 +97,7 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 - **Milestone 2:** Client-Side Hardware Video Decoding (D3D11 Video MFT / D3D11VA) & Direct3D 11 Low-Latency Presentation (DXGI Flip-Model & Video Processor Blit). (**Complete & Hardware Verified**)
 - **Milestone 3:** Native WebRTC Transport (DataChannels, SRTP Video Streaming, STUN/TURN, Rust WebSocket Signaling). (**Complete & Hardware Verified**)
 - **Milestone 4:** Low-Latency Audio Streaming (WASAPI Loopback Capture, Opus 48kHz Codec, WebRTC RTP Audio Track, WASAPI Playback, A/V Sync). (**Complete & Hardware Verified**)
-- **Milestone 5:** Low-Latency Input Streaming (Raw Input Polling, Virtual Gamepad, SendInput Injection).
+- **Milestone 5:** Low-Latency Remote Input Control (Windows SendInput Keyboard/Mouse Injection, XInput Client Capture, Pluggable Virtual Gamepad, Dual DataChannels, Input Permission Manager). (**Complete & Hardware Verified**)
 
 ---
 
@@ -192,3 +192,68 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 
 ### ADR 0021: Audio/Video Synchronization and Skew Mitigation
 - **Decision:** Correlate video Direct3D 11 present events and audio WASAPI playout events against a monotonic clock epoch, bounding p95 presentation skew to < 40 ms.
+
+---
+
+## 10. Remote Input Architecture (Milestone 5)
+
+```
+[Client Window / User]
+         │ (Win32 keyboard, mouse, wheel messages)
+         ▼
+[ClientInputCapture] ──> (Scan code mapping, modifier masks, normalized coords, focus loss reset)
+         │
+[ClientGamepadCapture]──> (Dynamic XInput polling, deadzones 7849/8689, trigger thresholds)
+         │
+         ├──> [input-events DataChannel] (SCTP Reliable, Ordered: keys, clicks, wheels, resets, permissions)
+         └──> [input-state DataChannel]  (SCTP Unordered, 50ms lifetime: mouse deltas, gamepad state)
+                         │
+═════════════════════════╪══════════════ [WebRTC SCTP DataChannels] ═════════════════════════
+                         │
+                         ▼
+                  [InputReceiver] ──> (Header/magic/version checks, NaN sanitization, length bounds)
+                         │
+                         ▼
+            [InputPermissionManager] ──> (State: Disabled/Requested/Granted/Revoked, 2000 ev/s rate limit)
+                         │
+                         ▼
+                [InputDispatcher]   ──> (Bounded queue 64 max, delta coalescing, worker thread)
+                         │
+         ┌───────────────┼───────────────┐
+         ▼               ▼               ▼
+[WindowsKeyboardInjector] [WindowsMouseInjector] [HostVirtualGamepad]
+(Win32 SendInput        (Win32 SendInput       (Dynamic ViGEmBus probe,
+ hardware scan codes,    relative & absolute    graceful driver fallback)
+ held key tracking)      virtual desktop coords)
+         │               │               │
+         └───────────────┴───────────────┘
+                         │
+                         ▼
+                 [Windows Host OS]
+```
+
+### Key Input Design Properties
+1. **Host Sovereignty & Explicit Consent:** Input injection is disabled by default; remote control requires explicit host authorization via `InputPermissionManager`. The physical host operator can override or revoke remote control instantly at any time.
+2. **Dual-Channel Transport Isolation:** State-critical events (keys, buttons, resets) utilize reliable ordered SCTP (`input-events`), while high-frequency motion (mouse deltas, analog thumbsticks) utilizes unordered time-bounded SCTP (`input-state`, `maxPacketLifeTime = 50ms`).
+3. **Hardware Scan Code Gaming Support:** Keystrokes are translated to hardware scan codes with `KEYEVENTF_SCANCODE`, ensuring consistent WASD movement regardless of host keyboard layout.
+4. **Virtual Desktop Absolute & Relative Mapping:** Full multi-monitor absolute coordinate scaling via `MOUSEEVENTF_VIRTUALDESK` for desktop navigation, paired with raw integer relative motion for 3D/FPS gaming.
+5. **Driver Graceful Degradation:** Virtual controller emulation probes for ViGEmBus dynamically; if the driver is not installed, the platform falls back gracefully without interrupting video, audio, or keyboard/mouse controls.
+
+---
+
+## 11. Remote Input Architecture Decision Records (ADRs)
+
+### ADR 0022: Dual WebRTC DataChannels for Low-Latency Input Transport
+- **Decision:** Establish two dedicated SCTP channels (`input-events` reliable-ordered and `input-state` unordered 50ms time-bounded) to prevent key desync under loss while eliminating cursor bufferbloat.
+
+### ADR 0023: Keyboard and Mouse Input Injection via Windows SendInput
+- **Decision:** Use Win32 `SendInput` with hardware scan codes, relative and multi-monitor virtual desktop coordinates, held key/button tracking, and emergency release on disconnect.
+
+### ADR 0024: Input Authorization and Permission Lifecycle
+- **Decision:** Implement a four-state permission machine (`Disabled`, `Requested`, `Granted`, `Revoked`) with sliding-window rate limiting (2000 events/sec), host sovereignty override, and session binding.
+
+### ADR 0025: Compact Input Protocol and State Synchronization
+- **Decision:** Enforce a fixed 48-byte binary header with strict size bounds (48-256 bytes), float `NaN` sanitization, a bounded 64-item dispatch queue with delta coalescing, and client focus-loss reset synchronization.
+
+### ADR 0026: Gamepad Capture and Virtual Controller Architecture
+- **Decision:** Capture client gamepads via dynamic XInput with deadzone filtering, evaluate VHF vs ViGEmBus, and provide dynamic ViGEmBus probing with truthful fallback when kernel drivers are absent.

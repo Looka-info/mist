@@ -23,7 +23,10 @@ enum class HostCommandMode {
     StreamLive,
     AudioDevices,
     AudioTest,
-    AudioEncodeTest
+    AudioEncodeTest,
+    InputInfo,
+    InputTest,
+    GamepadTest
 };
 
 struct HostCommandLineOptions {
@@ -42,6 +45,7 @@ struct HostCommandLineOptions {
     std::string authToken{"mist-dev-token"};
     bool enableAudio{false};
     std::string audioDevice;
+    bool allowRemoteInput{false};
 };
 
 class HostApplication {
@@ -69,6 +73,9 @@ private:
     [[nodiscard]] int executeAudioDevices();
     [[nodiscard]] int executeAudioTest();
     [[nodiscard]] int executeAudioEncodeTest();
+    [[nodiscard]] int executeInputInfo();
+    [[nodiscard]] int executeInputTest();
+    [[nodiscard]] int executeGamepadTest();
 
     common::AppConfig config_;
     HostCommandLineOptions options_;

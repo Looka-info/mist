@@ -24,6 +24,8 @@ Mist employs a multi-tiered real-time protocol architecture combining out-of-ban
   |  - RTCP Feedback: RFC 4585 PLI & Unified CNAME `mist-stream`        |
   |  - SCTP DataChannel: `session-control` (Reliable Ordered)           |
   |  - SCTP DataChannel: `diagnostics` (Unreliable Unordered)           |
+  |  - SCTP DataChannel: `input-events` (Reliable Ordered)              |
+  |  - SCTP DataChannel: `input-state` (Unreliable Unordered, 50ms max) |
   +─────────────────────────────────────────────────────────────────────+
 ```
 
@@ -153,3 +155,31 @@ This enables the client media engine to correlate the independent 90 kHz video c
 |---|---|---|---|---|
 | `session-control` | Reliable | Ordered | 0 | Client connection requests, pause, resume, bitrate caps. |
 | `diagnostics` | Unreliable | Unordered | 1 | Real-time round-trip latency, frame loss stats, host telemetry. |
+| `input-events` | Reliable | Ordered | 2 | Discrete keyboard, mouse button, wheel, permission, and reset packets. |
+| `input-state` | Unreliable (50ms) | Unordered | 3 | Continuous relative mouse deltas and gamepad state snapshots. |
+
+---
+
+## 7. Remote Input Protocol (Binary v1.0)
+
+See [docs/input-protocol.md](file:///c:/Users/mumer/OneDrive/Desktop/mist/docs/input-protocol.md) for the complete byte-level wire layout.
+
+### 7.1 Framing Structure
+All input messages begin with a fixed 48-byte `InputPacketHeader`:
+- Magic: `0x5453494D` (`"MIST"` in ASCII)
+- Version: `0x0100` (Version 1.0)
+- Monotonic 64-bit Sequence Number
+- 64-bit Microsecond Capture Timestamp
+- 32-bit Session ID
+- 16-bit Payload Type
+- 16-bit Payload Size
+- 16-byte Reserved Alignment Padding
+
+### 7.2 Message Types
+1. `KeyEvent` (Type 1, 16 bytes): Hardware scan code, virtual key, action (down/up), extended key flag, modifier mask.
+2. `MouseMoveEvent` (Type 2, 24 bytes): Integer relative deltas (dx, dy) and normalized coordinates [0.0, 1.0].
+3. `MouseButtonEvent` (Type 3, 16 bytes): Button index (Left, Right, Middle, X1, X2), action, click coordinates.
+4. `MouseWheelEvent` (Type 4, 16 bytes): Horizontal and vertical wheel scroll deltas.
+5. `GamepadState` (Type 5, 20 bytes): Slot index (0-3), connection status, digital button mask, analog triggers (0-255), thumbsticks (-32768 to 32767).
+6. `ResetState` (Type 6, 0 bytes): Emergency clear signal for all active keys and buttons.
+7. `PermissionMessage` (Type 7, 16 bytes): Action (Request, Grant, Deny, Revoke), feature mask (Keyboard, Mouse, Gamepad).

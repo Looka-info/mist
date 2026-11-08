@@ -24,6 +24,11 @@ add_executable(mist_unit_tests
     TestOpusCodec.cpp
     TestWasapiAudio.cpp
     TestAudioWebRtc.cpp
+    TestInputProtocol.cpp
+    TestInputState.cpp
+    TestInputPermission.cpp
+    TestInputDispatcher.cpp
+    TestGamepadCapture.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

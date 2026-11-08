@@ -16,6 +16,7 @@ target_link_libraries(mist_client PRIVATE
     mist_decode
     mist_render
     mist_audio
+    mist_input
     mist_transport
     mist_services
     mist_warnings

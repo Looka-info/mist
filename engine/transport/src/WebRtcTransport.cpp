@@ -88,8 +88,12 @@ common::Result<void> WebRtcTransport::initializeWebRtc(
     }
 
     if (dcManager_) {
-        dcManager_->setMessageCallback([this](const std::string& /*label*/, std::span<const uint8_t> data) {
-            if (genericDataCb_) {
+        dcManager_->setMessageCallback([this](const std::string& label, std::span<const uint8_t> data) {
+            if (label == "input-events" || label == "input-state") {
+                if (inputDataCb_) {
+                    inputDataCb_(label, data);
+                }
+            } else if (genericDataCb_) {
                 genericDataCb_(TransportChannel::Control, data);
             }
         });
@@ -317,6 +321,18 @@ void WebRtcTransport::setAudioFrameCallback(AudioFrameCallback cb) {
             }
         });
     }
+}
+
+common::Result<void> WebRtcTransport::sendInputData(const std::string& label, std::span<const uint8_t> data) {
+    if (!dcManager_) {
+        return common::Error(common::SubsystemId::Transport, common::ErrorCode::NotInitialized, "DataChannelManager is null");
+    }
+    return dcManager_->sendData(label, data);
+}
+
+void WebRtcTransport::setInputDataCallback(InputDataCallback cb) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    inputDataCb_ = std::move(cb);
 }
 
 void WebRtcTransport::setDataReceivedCallback(DataReceivedCallback callback) {

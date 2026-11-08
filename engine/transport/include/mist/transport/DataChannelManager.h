@@ -42,6 +42,8 @@ private:
     bool isHost_{true};
     std::shared_ptr<rtc::DataChannel> controlChannel_;
     std::shared_ptr<rtc::DataChannel> diagChannel_;
+    std::shared_ptr<rtc::DataChannel> inputEventsChannel_;
+    std::shared_ptr<rtc::DataChannel> inputStateChannel_;
     DataChannelMessageCallback messageCb_;
 };
 

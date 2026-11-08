@@ -11,6 +11,16 @@
 #include "mist/audio/WasapiAudioCapture.h"
 #include "mist/audio/OpusAudioEncoder.h"
 #include "mist/audio/AudioDeviceEnumerator.h"
+#include "mist/input/InputTypes.h"
+#include "mist/input/InputProtocol.h"
+#include "mist/input/InputState.h"
+#include "mist/input/InputPermissionManager.h"
+#include "mist/input/KeyboardInput.h"
+#include "mist/input/MouseInput.h"
+#include "mist/input/GamepadInput.h"
+#include "mist/input/InputDispatcher.h"
+#include "mist/input/InputReceiver.h"
+#include "mist/input/ClientInputCapture.h"
 #include "mist/telemetry/Metrics.h"
 #include <iostream>
 #include <fstream>
@@ -59,7 +69,18 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
                       << "  --stream-live                       Stream live desktop capture over WebRTC\n"
                       << "    --signaling-url <url>             WebSocket signaling URL (default: ws://127.0.0.1:8080)\n"
                       << "    --session-id <id>                 Session/room identifier (default: mist-session-1)\n"
-                      << "    --auth-token <token>              Session authentication token (default: mist-dev-token)\n";
+                      << "    --auth-token <token>              Session authentication token (default: mist-dev-token)\n\n"
+                      << "Milestone 4 Audio:\n"
+                      << "  --audio-devices                     Enumerate audio rendering devices\n"
+                      << "  --audio-test                        Run WASAPI loopback audio capture test\n"
+                      << "  --audio-encode-test                 Run WASAPI capture and Opus compression test\n"
+                      << "  --audio                             Enable audio streaming alongside video\n"
+                      << "  --audio-device <name>               Select audio device (default: default endpoint)\n\n"
+                      << "Milestone 5 Remote Input Control:\n"
+                      << "  --input-info                        Query host input subsystem and driver status\n"
+                      << "  --input-test                        Run host input receiver and dispatcher verification\n"
+                      << "  --gamepad-test                      Query virtual gamepad and driver availability\n"
+                      << "  --allow-remote-input                Grant remote control permissions to client\n";
             return std::optional<int>(0);
         } else if (arg == "--version" || arg == "-v") {
             std::cout << "mist_host version 0.1.0\n";
@@ -88,6 +109,14 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
             options_.mode = HostCommandMode::AudioTest;
         } else if (arg == "--audio-encode-test") {
             options_.mode = HostCommandMode::AudioEncodeTest;
+        } else if (arg == "--input-info") {
+            options_.mode = HostCommandMode::InputInfo;
+        } else if (arg == "--input-test") {
+            options_.mode = HostCommandMode::InputTest;
+        } else if (arg == "--gamepad-test") {
+            options_.mode = HostCommandMode::GamepadTest;
+        } else if (arg == "--allow-remote-input") {
+            options_.allowRemoteInput = true;
         } else if (arg == "--audio") {
             options_.enableAudio = true;
         } else if (arg == "--audio-device" && i + 1 < argc) {
@@ -162,6 +191,12 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
             return std::optional<int>(executeAudioTest());
         case HostCommandMode::AudioEncodeTest:
             return std::optional<int>(executeAudioEncodeTest());
+        case HostCommandMode::InputInfo:
+            return std::optional<int>(executeInputInfo());
+        case HostCommandMode::InputTest:
+            return std::optional<int>(executeInputTest());
+        case HostCommandMode::GamepadTest:
+            return std::optional<int>(executeGamepadTest());
         case HostCommandMode::SelfTest:
             return std::optional<int>(runSelfTest().hasValue() ? 0 : 1);
         case HostCommandMode::Normal:
@@ -601,9 +636,30 @@ int HostApplication::executeStreamTest() {
         }
     }
 
+    // Input subsystem setup
+    auto permManager = std::make_shared<input::InputPermissionManager>(options_.sessionId);
+    if (options_.allowRemoteInput) {
+        permManager->grantPermission(0x07);
+    }
+    auto keyboard = std::make_shared<input::WindowsKeyboardInjector>(/*simulationOnly=*/true);
+    auto mouse = std::make_shared<input::WindowsMouseInjector>(/*simulationOnly=*/true);
+    auto gamepad = std::make_shared<input::HostVirtualGamepad>(/*simulationOnly=*/true);
+    auto dispatcher = std::make_shared<input::InputDispatcher>(keyboard, mouse, gamepad);
+    (void)dispatcher->initialize();
+
+    auto receiver = std::make_shared<input::InputReceiver>(permManager, dispatcher);
+    permManager->setStateReleaseCallback([dispatcher]() {
+        (void)dispatcher->reset();
+    });
+
+    rtcTransport.setInputDataCallback([receiver](const std::string& label, std::span<const uint8_t> data) {
+        (void)receiver->processPacket(label, data);
+    });
+
     auto connRes = rtcTransport.connect();
     if (!connRes) {
         std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
+        (void)dispatcher->shutdown();
         if (audioRunning.load()) {
             audioRunning.store(false);
             if (audioThread.joinable()) audioThread.join();
@@ -613,9 +669,13 @@ int HostApplication::executeStreamTest() {
 
     std::cout << "Host streaming session active for " << options_.durationSeconds
               << "s (Session: " << options_.sessionId << ", Signaling: " << options_.signalingUrl
-              << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled") << ")\n";
+              << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled")
+              << (options_.allowRemoteInput ? ", Input: Allowed" : ", Input: Disabled") << ")\n";
 
     auto runRes = pipeline.runForDuration(options_.durationSeconds, options_.outputPath);
+
+    permManager->revokePermission();
+    (void)dispatcher->shutdown();
 
     if (audioRunning.load()) {
         audioRunning.store(false);
@@ -658,7 +718,10 @@ int HostApplication::executeStreamTest() {
                 << "  \"packets_sent\": " << stats.packetsSent << ",\n"
                 << "  \"bytes_sent\": " << stats.bytesSent << ",\n"
                 << "  \"audio_packets_sent\": " << audioPacketsSent.load() << ",\n"
-                << "  \"audio_bytes_sent\": " << audioBytesSent.load() << "\n"
+                << "  \"audio_bytes_sent\": " << audioBytesSent.load() << ",\n"
+                << "  \"input_packets_received\": " << receiver->getPacketsReceived() << ",\n"
+                << "  \"input_events_processed\": " << dispatcher->getEventsProcessed() << ",\n"
+                << "  \"input_events_dropped\": " << dispatcher->getEventsDropped() << "\n"
                 << "}\n";
         }
     }
@@ -784,9 +847,30 @@ int HostApplication::executeStreamLive() {
         }
     }
 
+    // Input subsystem setup
+    auto permManager = std::make_shared<input::InputPermissionManager>(options_.sessionId);
+    if (options_.allowRemoteInput) {
+        permManager->grantPermission(0x07);
+    }
+    auto keyboard = std::make_shared<input::WindowsKeyboardInjector>(/*simulationOnly=*/false);
+    auto mouse = std::make_shared<input::WindowsMouseInjector>(/*simulationOnly=*/false);
+    auto gamepad = std::make_shared<input::HostVirtualGamepad>(/*simulationOnly=*/false);
+    auto dispatcher = std::make_shared<input::InputDispatcher>(keyboard, mouse, gamepad);
+    (void)dispatcher->initialize();
+
+    auto receiver = std::make_shared<input::InputReceiver>(permManager, dispatcher);
+    permManager->setStateReleaseCallback([dispatcher]() {
+        (void)dispatcher->reset();
+    });
+
+    rtcTransport.setInputDataCallback([receiver](const std::string& label, std::span<const uint8_t> data) {
+        (void)receiver->processPacket(label, data);
+    });
+
     auto connRes = rtcTransport.connect();
     if (!connRes) {
         std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
+        (void)dispatcher->shutdown();
         if (audioRunning.load()) {
             audioRunning.store(false);
             if (audioThread.joinable()) audioThread.join();
@@ -796,9 +880,13 @@ int HostApplication::executeStreamLive() {
 
     std::cout << "Live desktop streaming started for " << options_.durationSeconds
               << "s (Display " << options_.displayIndex << ", Session: " << options_.sessionId
-              << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled") << ")\n";
+              << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled")
+              << (options_.allowRemoteInput ? ", Input: Allowed" : ", Input: Disabled") << ")\n";
 
     auto runRes = pipeline.runForDuration(options_.durationSeconds);
+
+    permManager->revokePermission();
+    (void)dispatcher->shutdown();
 
     if (audioRunning.load()) {
         audioRunning.store(false);
@@ -837,7 +925,10 @@ int HostApplication::executeStreamLive() {
                 << "  \"packets_sent\": " << stats.packetsSent << ",\n"
                 << "  \"bytes_sent\": " << stats.bytesSent << ",\n"
                 << "  \"audio_packets_sent\": " << audioPacketsSent.load() << ",\n"
-                << "  \"audio_bytes_sent\": " << audioBytesSent.load() << "\n"
+                << "  \"audio_bytes_sent\": " << audioBytesSent.load() << ",\n"
+                << "  \"input_packets_received\": " << receiver->getPacketsReceived() << ",\n"
+                << "  \"input_events_processed\": " << dispatcher->getEventsProcessed() << ",\n"
+                << "  \"input_events_dropped\": " << dispatcher->getEventsDropped() << "\n"
                 << "}\n";
         }
     }
@@ -1011,6 +1102,122 @@ int HostApplication::executeAudioEncodeTest() {
               << "  \"avgEncodeUs\": " << avgEncodeUs << ",\n"
               << "  \"packetRate\": " << (static_cast<double>(totalPackets) / durationSec) << "\n"
               << "}\n";
+    return 0;
+}
+
+int HostApplication::executeInputInfo() {
+    std::cout << "=== Mist Host Input Subsystem Information ===\n"
+              << "Subsystem Status:           Ready\n"
+              << "Protocol Version:           " << input::INPUT_PROTOCOL_VERSION << "\n"
+              << "Keyboard Injector:          Win32 SendInput (ScanCodes & Extended Keys)\n"
+              << "Mouse Injector:             Win32 SendInput (Absolute [0..65535] Virtual Desktop & Relative Deltas)\n";
+
+    input::HostVirtualGamepad vigem;
+    (void)vigem.initialize();
+    std::cout << "Virtual Gamepad Driver:     " << vigem.getDriverStatus() << "\n"
+              << "Permission Model:           Disabled by default (Host Approval / --allow-remote-input)\n"
+              << "Local Host Override:        Supported (Immediate remote input suspension)\n"
+              << "Emergency Reset:            Supported (Immediate release of all held keys/buttons on disconnect)\n";
+    return 0;
+}
+
+int HostApplication::executeInputTest() {
+    std::cout << "Running Host Input Subsystem self-test...\n";
+    std::string sess = options_.sessionId.empty() ? "test-input-session" : options_.sessionId;
+
+    auto permManager = std::make_shared<input::InputPermissionManager>(sess);
+    if (!permManager) return 1;
+
+    // Verify disabled by default
+    if (permManager->isInputAllowed(input::InputType::KeyEvent, sess)) {
+        std::cerr << "FAILED: Input should be disabled by default!\n";
+        return 1;
+    }
+
+    auto keyboard = std::make_shared<input::WindowsKeyboardInjector>(/*simulationOnly=*/true);
+    auto mouse = std::make_shared<input::WindowsMouseInjector>(/*simulationOnly=*/true);
+    auto gamepad = std::make_shared<input::HostVirtualGamepad>(/*simulationOnly=*/true);
+    auto dispatcher = std::make_shared<input::InputDispatcher>(keyboard, mouse, gamepad);
+    (void)dispatcher->initialize();
+
+    auto receiver = std::make_shared<input::InputReceiver>(permManager, dispatcher);
+    permManager->setStateReleaseCallback([dispatcher]() {
+        (void)dispatcher->reset();
+    });
+
+    // Client capture simulation
+    input::ClientInputCapture client(sess);
+    client.onWindowFocusChanged(true);
+
+    uint64_t clientPacketsSent = 0;
+    client.setSendCallback([&](const std::string& label, std::span<const uint8_t> data) {
+        clientPacketsSent++;
+        (void)receiver->processPacket(label, data);
+    });
+
+    // 1. Send permission request & grant
+    client.sendPermissionRequest(0x07);
+    permManager->grantPermission(0x07);
+
+    if (!permManager->isInputAllowed(input::InputType::KeyEvent, sess)) {
+        std::cerr << "FAILED: Input should be allowed after grant!\n";
+        return 1;
+    }
+
+    // 2. Send key press and release
+    client.onKeyDown(0x41, 0x1E, false); // 'A'
+    client.onKeyUp(0x41, 0x1E, false);
+
+    // 3. Send mouse moves and clicks
+    client.onMouseMove(10, -5, false);
+    client.onMouseMove(0, 0, true, 0.5f, 0.5f);
+    client.onMouseButton(input::MouseButton::Left, true);
+    client.onMouseButton(input::MouseButton::Left, false);
+    client.onMouseWheel(0, 120);
+
+    // 4. Send gamepad state
+    input::GamepadState gState{};
+    gState.isConnected = true;
+    gState.buttons = 0x1000;
+    gState.leftTrigger = 128;
+    gState.thumbLX = 15000;
+    input::InputPacketHeader gHdr{};
+    gHdr.version = input::INPUT_PROTOCOL_VERSION;
+    gHdr.sequenceNumber = client.getNextSequenceNumber();
+    std::strncpy(gHdr.sessionId, sess.c_str(), sizeof(gHdr.sessionId) - 1);
+    auto gBytes = input::InputProtocol::serializeGamepadState(gHdr, gState);
+    (void)receiver->processPacket("input-state", gBytes);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    if (dispatcher->getEventsProcessed() == 0) {
+        std::cerr << "FAILED: No input events were processed by dispatcher!\n";
+        return 1;
+    }
+
+    // 5. Test emergency reset & revocation
+    client.onKeyDown(0x42, 0x30, false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    permManager->revokePermission();
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    if (keyboard->getHeldScanCodes().size() > 0) {
+        std::cerr << "FAILED: Revocation did not release held keys!\n";
+        return 1;
+    }
+
+    (void)dispatcher->shutdown();
+    std::cout << "Host Input Subsystem self-test PASSED (Packets: " << clientPacketsSent
+              << ", Processed: " << dispatcher->getEventsProcessed() << ")\n";
+    return 0;
+}
+
+int HostApplication::executeGamepadTest() {
+    std::cout << "=== Mist Gamepad Diagnostic Probe ===\n";
+    input::HostVirtualGamepad vigem;
+    (void)vigem.initialize();
+    std::cout << "Virtual Gamepad Status: " << vigem.getDriverStatus() << "\n";
+    std::cout << "Driver Available:       " << (vigem.isDriverAvailable() ? "YES" : "NO (Optional backend)") << "\n";
     return 0;
 }
 

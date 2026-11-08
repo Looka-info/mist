@@ -41,6 +41,11 @@ Mist employs a multi-tiered automated testing strategy:
 | `OpusCodecTest` | `TestOpusCodec.cpp` | Opus encoder lifecycle, restricted low-delay configuration, 10 ms / 20 ms frame encoding, encode-decode round trip with RMS preservation, Packet Loss Concealment (PLC). |
 | `WasapiAudioTest` | `TestWasapiAudio.cpp` | Audio endpoint enumeration, default device resolution, WASAPI loopback capture lifecycle, silence handling, WASAPI playback client initialization and underrun tracking. |
 | `AudioWebRtcTest` | `TestAudioWebRtc.cpp` | `AudioTrackSender` and `AudioTrackReceiver` lifecycle, RFC 7587 Opus RTP packetization, unified WebRtcTransport audio/video track multiplexing. |
+| `InputProtocolTest` | `TestInputProtocol.cpp` | Binary v1 serialization/deserialization, 48-byte header magic/version verification, payload size bounds (48-256B), NaN/Inf sanitization, enum range checks. |
+| `InputStateTest` | `TestInputState.cpp` | Thread-safe tracking of held scan codes and mouse buttons, normalized coordinates, relative deltas, snapshot creation, emergency state reset. |
+| `InputPermissionTest` | `TestInputPermission.cpp` | Permission state machine (Disabled/Requested/Granted/Revoked), feature bitmask, session matching, sliding-window rate limiter (2000 ev/s), emergency release callbacks. |
+| `InputDispatcherTest` | `TestInputDispatcher.cpp` | Decoupled worker thread, bounded queue (max 64, drop oldest on overflow), relative mouse displacement coalescing, dispatch latency telemetry recording. |
+| `GamepadCaptureTest` | `TestGamepadCapture.cpp` | Dynamic XInput loader, thumbstick deadzones (7849/8689), trigger thresholds (30), virtual gamepad dynamic probe and graceful fallback. |
 
 ### 2.2 Smoke Tests (CTest)
 
@@ -57,6 +62,31 @@ Mist employs a multi-tiered automated testing strategy:
 ---
 
 ## 3. Running Tests
+
+### Automated Milestone 5 Verification Suite
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-milestone-5.ps1 -BenchmarkSeconds 10
+```
+
+### Milestone 5 Input CLI Diagnostic Commands
+```powershell
+# Query input injector capabilities & virtual gamepad driver status
+./build/apps/host/mist_host.exe --input-info
+./build/apps/client/mist_client.exe --input-info
+
+# Run internal input injection & queue loopback self-test
+./build/apps/host/mist_host.exe --input-test
+./build/apps/client/mist_client.exe --input-test
+
+# Query and test XInput game controller polling
+./build/apps/client/mist_client.exe --gamepad-test
+./build/apps/host/mist_host.exe --gamepad-test
+
+# Run live 1080p60 WebRTC streaming with synchronized audio and remote input
+./bin/mist-signaling.exe --port 8080
+./build/apps/client/mist_client.exe --receive-test --audio --enable-input --signaling-url ws://127.0.0.1:8080 --session-id m5-test --duration 10 --headless --report artifacts/client-m5.json
+./build/apps/host/mist_host.exe --stream-test --audio --allow-remote-input --signaling-url ws://127.0.0.1:8080 --session-id m5-test --duration 10 --report artifacts/host-m5.json
+```
 
 ### Automated Milestone 4 Verification Suite
 ```powershell

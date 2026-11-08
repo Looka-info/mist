@@ -8,6 +8,10 @@
 #include "mist/audio/WasapiAudioPlayback.h"
 #include "mist/audio/OpusAudioDecoder.h"
 #include "mist/audio/AudioDeviceEnumerator.h"
+#include "mist/input/InputTypes.h"
+#include "mist/input/InputProtocol.h"
+#include "mist/input/GamepadInput.h"
+#include "mist/input/ClientInputCapture.h"
 #include "mist/telemetry/Metrics.h"
 #include <iostream>
 #include <fstream>
@@ -48,6 +52,11 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
                       << "    --signaling-url <url>   WebSocket signaling URL (default: ws://127.0.0.1:8080)\n"
                       << "    --session-id <id>       Session identifier (default: mist-session-1)\n"
                       << "    --auth-token <token>    Session authentication token (default: mist-dev-token)\n\n"
+                      << "  --audio                   Enable synchronized audio playout\n\n"
+                      << "Milestone 5 Remote Input Diagnostics:\n"
+                      << "  --input-test              Run client input capture and protocol self-test\n"
+                      << "  --gamepad-test            Poll and report local physical gamepads (XInput)\n"
+                      << "  --enable-input            Enable transmitting client input to the host\n\n"
                       << "Diagnostic Parameters:\n"
                       << "  --input <path>            Input H.264 bitstream file (e.g. artifacts/test.h264)\n"
                       << "  --report <path>           Output benchmark JSON file path\n"
@@ -83,6 +92,12 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
             options_.mode = ClientCommandMode::AudioPlaybackTest;
         } else if (arg == "--audio-receive-test") {
             options_.mode = ClientCommandMode::AudioReceiveTest;
+        } else if (arg == "--input-test") {
+            options_.mode = ClientCommandMode::InputTest;
+        } else if (arg == "--gamepad-test") {
+            options_.mode = ClientCommandMode::GamepadTest;
+        } else if (arg == "--enable-input" || arg == "--remote-input") {
+            options_.enableInput = true;
         } else if (arg == "--audio") {
             options_.enableAudio = true;
         } else if (arg == "--signaling-url" && i + 1 < argc) {
@@ -172,6 +187,10 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
             return std::optional<int>(executeAudioPlaybackTest());
         case ClientCommandMode::AudioReceiveTest:
             return std::optional<int>(executeAudioReceiveTest());
+        case ClientCommandMode::InputTest:
+            return std::optional<int>(executeInputTest());
+        case ClientCommandMode::GamepadTest:
+            return std::optional<int>(executeGamepadTest());
         case ClientCommandMode::SelfTest:
             return std::optional<int>(runSelfTest().hasValue() ? 0 : 1);
         case ClientCommandMode::Normal:
@@ -600,6 +619,17 @@ int ClientApplication::executeReceiveStream() {
         });
     }
 
+    // Input capture setup
+    auto clientInput = std::make_shared<input::ClientInputCapture>(options_.sessionId);
+    clientInput->setSendCallback([&rtcTransport](const std::string& label, std::span<const uint8_t> data) {
+        (void)rtcTransport.sendInputData(label, data);
+    });
+
+    if (options_.enableInput) {
+        clientInput->onWindowFocusChanged(true);
+        clientInput->sendPermissionRequest(0x07);
+    }
+
     auto connRes = rtcTransport.connect();
     if (!connRes) {
         std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
@@ -612,9 +642,12 @@ int ClientApplication::executeReceiveStream() {
     std::cout << "Client stream receive started for " << options_.durationSeconds
               << "s (Session: " << options_.sessionId << ", Signaling: " << options_.signalingUrl
               << (options_.headless ? ", Headless" : ", GUI Window")
-              << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled") << ")...\n";
+              << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled")
+              << (options_.enableInput ? ", Input: Enabled" : ", Input: Disabled") << ")...\n";
 
     auto startTime = std::chrono::steady_clock::now();
+    uint64_t inputTicks = 0;
+
     while (true) {
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - startTime).count();
         if (elapsed >= options_.durationSeconds) {
@@ -629,7 +662,24 @@ int ClientApplication::executeReceiveStream() {
             }
         }
 
+        // When remote input is enabled during benchmarks, periodically transmit test input traffic
+        if (options_.enableInput && (inputTicks % 4 == 0)) { // ~50 Hz
+            int32_t dx = static_cast<int32_t>((inputTicks % 20) - 10);
+            int32_t dy = static_cast<int32_t>(10 - (inputTicks % 20));
+            clientInput->onMouseMove(dx, dy, false);
+            if (inputTicks % 40 == 0) {
+                clientInput->onKeyDown(0x41, 0x1E, false);
+                clientInput->onKeyUp(0x41, 0x1E, false);
+            }
+        }
+
+        inputTicks++;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+
+    if (options_.enableInput) {
+        clientInput->sendResetState();
+        clientInput->onWindowFocusChanged(false);
     }
 
     if (options_.enableAudio) {
@@ -679,7 +729,9 @@ int ClientApplication::executeReceiveStream() {
                 << "  \"audio_packets_received\": " << audioPacketsReceived.load() << ",\n"
                 << "  \"audio_frames_decoded\": " << audioFramesDecoded.load() << ",\n"
                 << "  \"audio_underruns\": " << pbStats.underrunCount << ",\n"
-                << "  \"av_skew_p95_ms\": " << p95SkewMs << "\n"
+                << "  \"av_skew_p95_ms\": " << p95SkewMs << ",\n"
+                << "  \"input_enabled\": " << (options_.enableInput ? "true" : "false") << ",\n"
+                << "  \"input_packets_sent\": " << (options_.enableInput ? (clientInput->getNextSequenceNumber() - 1) : 0) << "\n"
                 << "}\n";
         }
     }
@@ -836,6 +888,92 @@ int ClientApplication::executeAudioReceiveTest() {
               << "  \"audioFramesDecoded\": " << audioFramesDecoded.load() << ",\n"
               << "  \"underruns\": " << pbStats.underrunCount << "\n"
               << "}\n";
+    return 0;
+}
+
+int ClientApplication::executeInputTest() {
+    std::cout << "Running Client Input Subsystem self-test...\n";
+    std::string sess = options_.sessionId.empty() ? "test-client-input" : options_.sessionId;
+
+    input::ClientInputCapture client(sess);
+    client.onWindowFocusChanged(true);
+
+    uint64_t sentPackets = 0;
+    client.setSendCallback([&](const std::string& label, std::span<const uint8_t> data) {
+        sentPackets++;
+        auto desRes = input::InputProtocol::deserialize(data);
+        if (!desRes) {
+            std::cerr << "Deserialization failed for " << label << "\n";
+            return;
+        }
+    });
+
+    client.sendPermissionRequest(0x07);
+    client.onKeyDown(0x41, 0x1E, false);
+    client.onKeyUp(0x41, 0x1E, false);
+    client.onMouseMove(50, -20, false);
+    client.onMouseMove(0, 0, true, 0.25f, 0.75f);
+    client.onMouseButton(input::MouseButton::Left, true);
+    client.onMouseButton(input::MouseButton::Left, false);
+    client.onMouseWheel(0, 120);
+
+    // Test dead zone filter
+    input::GamepadState raw{};
+    raw.thumbLX = 5000; // Under dead zone 7849
+    raw.thumbLY = 10000; // Above dead zone
+    raw.leftTrigger = 20; // Under threshold 30
+    raw.rightTrigger = 50; // Above threshold
+    auto filtered = input::ClientGamepadCapture::applyDeadZones(raw);
+
+    if (filtered.thumbLX != 0) {
+        std::cerr << "FAILED: ThumbLX dead zone filter failed!\n";
+        return 1;
+    }
+    if (filtered.thumbLY != 10000) {
+        std::cerr << "FAILED: ThumbLY dead zone filter failed!\n";
+        return 1;
+    }
+    if (filtered.leftTrigger != 0) {
+        std::cerr << "FAILED: Left trigger threshold filter failed!\n";
+        return 1;
+    }
+    if (filtered.rightTrigger != 50) {
+        std::cerr << "FAILED: Right trigger threshold filter failed!\n";
+        return 1;
+    }
+
+    client.sendResetState();
+
+    std::cout << "Client Input Subsystem self-test PASSED (Packets serialized/deserialized: " << sentPackets << ")\n";
+    return 0;
+}
+
+int ClientApplication::executeGamepadTest() {
+    std::cout << "=== Client Gamepad Diagnostic Probe ===\n";
+    input::ClientGamepadCapture cap;
+    auto initRes = cap.initialize();
+    if (!initRes) {
+        std::cout << "XInput Initialization: Failed (" << initRes.error().format() << ")\n";
+        return 1;
+    }
+
+    std::cout << "XInput Subsystem: Available\n";
+    bool anyFound = false;
+    for (uint32_t i = 0; i < 4; ++i) {
+        auto pRes = cap.pollState(i);
+        if (pRes && pRes.value().isConnected) {
+            anyFound = true;
+            const auto& st = pRes.value();
+            std::cout << "  Controller [" << i << "]: Connected\n"
+                      << "    Buttons: 0x" << std::hex << st.buttons << std::dec << "\n"
+                      << "    Left Stick: (" << st.thumbLX << ", " << st.thumbLY << ")\n"
+                      << "    Right Stick: (" << st.thumbRX << ", " << st.thumbRY << ")\n"
+                      << "    Triggers: L=" << static_cast<int>(st.leftTrigger) << " R=" << static_cast<int>(st.rightTrigger) << "\n";
+        }
+    }
+    if (!anyFound) {
+        std::cout << "  No physical XInput controllers currently connected (Indices 0..3 probed)\n";
+    }
     return 0;
 }
 

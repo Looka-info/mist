@@ -28,6 +28,15 @@ common::Result<void> DataChannelManager::initialize(
 
             diagChannel_ = pc->createDataChannel("diagnostics");
             registerChannelCallbacks(diagChannel_);
+
+            inputEventsChannel_ = pc->createDataChannel("input-events");
+            registerChannelCallbacks(inputEventsChannel_);
+
+            rtc::DataChannelInit init;
+            init.reliability.unordered = true;
+            init.reliability.maxPacketLifeTime = std::chrono::milliseconds(50);
+            inputStateChannel_ = pc->createDataChannel("input-state", init);
+            registerChannelCallbacks(inputStateChannel_);
         } else {
             pc->onDataChannel([this](std::shared_ptr<rtc::DataChannel> dc) {
                 std::lock_guard<std::mutex> innerLock(mutex_);
@@ -39,6 +48,12 @@ common::Result<void> DataChannelManager::initialize(
                 } else if (label == "diagnostics") {
                     diagChannel_ = dc;
                     registerChannelCallbacks(diagChannel_);
+                } else if (label == "input-events") {
+                    inputEventsChannel_ = dc;
+                    registerChannelCallbacks(inputEventsChannel_);
+                } else if (label == "input-state") {
+                    inputStateChannel_ = dc;
+                    registerChannelCallbacks(inputStateChannel_);
                 } else {
                     registerChannelCallbacks(dc);
                 }
@@ -84,7 +99,17 @@ void DataChannelManager::registerChannelCallbacks(std::shared_ptr<rtc::DataChann
 
 common::Result<void> DataChannelManager::sendData(const std::string& label, std::span<const uint8_t> data) {
     std::lock_guard<std::mutex> lock(mutex_);
-    std::shared_ptr<rtc::DataChannel> target = (label == "diagnostics") ? diagChannel_ : controlChannel_;
+    std::shared_ptr<rtc::DataChannel> target;
+    if (label == "diagnostics") {
+        target = diagChannel_;
+    } else if (label == "input-events") {
+        target = inputEventsChannel_;
+    } else if (label == "input-state") {
+        target = inputStateChannel_;
+    } else {
+        target = controlChannel_;
+    }
+
     if (!target || !target->isOpen()) {
         return common::Error(common::SubsystemId::Transport, common::ErrorCode::InvalidState, "DataChannel [" + label + "] is not open");
     }
@@ -107,22 +132,38 @@ bool DataChannelManager::isChannelOpen(const std::string& label) const noexcept 
     if (label == "diagnostics") {
         return diagChannel_ && diagChannel_->isOpen();
     }
+    if (label == "input-events") {
+        return inputEventsChannel_ && inputEventsChannel_->isOpen();
+    }
+    if (label == "input-state") {
+        return inputStateChannel_ && inputStateChannel_->isOpen();
+    }
     return controlChannel_ && controlChannel_->isOpen();
 }
 
 void DataChannelManager::close() noexcept {
     std::shared_ptr<rtc::DataChannel> ctrl;
     std::shared_ptr<rtc::DataChannel> diag;
+    std::shared_ptr<rtc::DataChannel> inEvents;
+    std::shared_ptr<rtc::DataChannel> inState;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         ctrl = std::move(controlChannel_);
         diag = std::move(diagChannel_);
+        inEvents = std::move(inputEventsChannel_);
+        inState = std::move(inputStateChannel_);
     }
     if (ctrl) {
         try { ctrl->close(); } catch (...) {}
     }
     if (diag) {
         try { diag->close(); } catch (...) {}
+    }
+    if (inEvents) {
+        try { inEvents->close(); } catch (...) {}
+    }
+    if (inState) {
+        try { inState->close(); } catch (...) {}
     }
 }
 

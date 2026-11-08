@@ -21,7 +21,9 @@ enum class ClientCommandMode {
     StreamReceive,
     AudioDevices,
     AudioPlaybackTest,
-    AudioReceiveTest
+    AudioReceiveTest,
+    InputTest,
+    GamepadTest
 };
 
 struct ClientCliOptions {
@@ -39,6 +41,7 @@ struct ClientCliOptions {
     bool headless{false};
     bool vsync{false};
     bool enableAudio{false};
+    bool enableInput{false};
 };
 
 class ClientApplication {
@@ -64,6 +67,8 @@ private:
     [[nodiscard]] int executeAudioDevices();
     [[nodiscard]] int executeAudioPlaybackTest();
     [[nodiscard]] int executeAudioReceiveTest();
+    [[nodiscard]] int executeInputTest();
+    [[nodiscard]] int executeGamepadTest();
     [[nodiscard]] common::Result<void> runSelfTest();
 
     common::AppConfig config_;

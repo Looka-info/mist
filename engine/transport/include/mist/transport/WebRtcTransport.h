@@ -43,6 +43,10 @@ public:
     void setFrameReceivedCallback(FrameReceivedCallback cb);
     void setAudioFrameCallback(AudioFrameCallback cb);
 
+    using InputDataCallback = std::function<void(const std::string& label, std::span<const uint8_t> data)>;
+    [[nodiscard]] common::Result<void> sendInputData(const std::string& label, std::span<const uint8_t> data);
+    void setInputDataCallback(InputDataCallback cb);
+
     [[nodiscard]] TransportStatsSnapshot getStatsSnapshot() const noexcept;
     [[nodiscard]] const WebRtcTransportConfig& getConfig() const noexcept { return config_; }
 
@@ -71,6 +75,7 @@ private:
     std::shared_ptr<TransportStatistics> stats_;
     DataReceivedCallback genericDataCb_;
     AudioFrameCallback audioFrameCb_;
+    InputDataCallback inputDataCb_;
     bool isInitialized_{false};
 };
 
