@@ -81,6 +81,7 @@ private:
     void renderGuiDeviceManagementScreen();
 
     // GUI Visual Components
+    void renderSleekMintLogo(float size = 36.0f) const;
     void renderBadge(const char* text, bool isSuccess = true) const;
     void renderMetricBox(const char* label, const char* value, const char* sublabel = nullptr) const;
 

@@ -1,6 +1,7 @@
 add_executable(mist_host
     src/HostApplication.cpp
     src/main.cpp
+    ${CMAKE_SOURCE_DIR}/resources/mist.rc
 )
 
 target_include_directories(mist_host PRIVATE

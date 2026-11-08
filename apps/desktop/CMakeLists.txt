@@ -30,6 +30,7 @@ target_link_libraries(mist_imgui PUBLIC
 add_executable(mist_desktop
     src/DesktopApplication.cpp
     src/main.cpp
+    ${CMAKE_SOURCE_DIR}/resources/mist.rc
 )
 
 target_include_directories(mist_desktop PRIVATE

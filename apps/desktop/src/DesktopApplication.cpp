@@ -438,11 +438,18 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     HINSTANCE hInstance = GetModuleHandleW(nullptr);
     const wchar_t* className = L"MistDesktopGuiWindow";
 
+    HICON hIcon = LoadIconW(hInstance, L"IDI_MIST_ICON");
+    if (!hIcon) {
+        hIcon = static_cast<HICON>(LoadImageW(nullptr, L"resources/mist.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE));
+    }
+
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = DesktopWndProc;
     wc.hInstance = hInstance;
+    wc.hIcon = hIcon;
+    wc.hIconSm = hIcon;
     wc.hCursor = LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
     wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
     wc.lpszClassName = className;
@@ -466,6 +473,11 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
 
     if (!hwnd_) {
         return platform::windows::win32ErrorToMistError(GetLastError(), common::SubsystemId::DesktopApp, "CreateWindowExW failed");
+    }
+
+    if (hIcon) {
+        SendMessageW(hwnd_, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+        SendMessageW(hwnd_, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
     }
 
     SetWindowLongPtrW(hwnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -616,6 +628,60 @@ common::Result<void> DesktopApplication::runGuiLoop() {
     return common::Result<void>::success();
 }
 
+void DesktopApplication::renderSleekMintLogo(float size) const {
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // 1. Base Squircle Badge with Dark Slate (#0F172A) & Subtle Glow
+    ImVec2 pMin = pos;
+    ImVec2 pMax = ImVec2(pos.x + size, pos.y + size);
+    float rounding = size * 0.22f;
+
+    drawList->AddRectFilled(pMin, pMax, IM_COL32(15, 23, 42, 255), rounding);
+    drawList->AddCircleFilled(ImVec2(pos.x + size * 0.50f, pos.y + size * 0.44f), size * 0.26f, IM_COL32(16, 185, 129, 50));
+    drawList->AddRect(pMin, pMax, IM_COL32(16, 185, 129, 255), rounding, 0, 1.8f);
+
+    // 2. Broadcast Velocity Stream Arc above crest
+    drawList->PathClear();
+    drawList->PathArcTo(ImVec2(pos.x + size * 0.50f, pos.y + size * 0.30f), size * 0.16f, 3.40f, 6.02f);
+    drawList->PathStroke(IM_COL32(110, 231, 183, 210), 0, 1.5f);
+
+    // 3. Sleek Geometric "M" Wings
+    // Left Wing (Bright Mint #34D399)
+    const ImVec2 leftPts[5] = {
+        ImVec2(pos.x + size * 0.22f, pos.y + size * 0.74f),
+        ImVec2(pos.x + size * 0.22f, pos.y + size * 0.38f),
+        ImVec2(pos.x + size * 0.35f, pos.y + size * 0.32f),
+        ImVec2(pos.x + size * 0.46f, pos.y + size * 0.52f),
+        ImVec2(pos.x + size * 0.32f, pos.y + size * 0.74f)
+    };
+    drawList->AddConvexPolyFilled(leftPts, 5, IM_COL32(52, 211, 153, 255));
+
+    // Right Wing (Vibrant Mint #10B981)
+    const ImVec2 rightPts[5] = {
+        ImVec2(pos.x + size * 0.78f, pos.y + size * 0.74f),
+        ImVec2(pos.x + size * 0.78f, pos.y + size * 0.38f),
+        ImVec2(pos.x + size * 0.65f, pos.y + size * 0.32f),
+        ImVec2(pos.x + size * 0.54f, pos.y + size * 0.52f),
+        ImVec2(pos.x + size * 0.68f, pos.y + size * 0.74f)
+    };
+    drawList->AddConvexPolyFilled(rightPts, 5, IM_COL32(16, 185, 129, 255));
+
+    // Center Core Nexus Diamond (High Mint #A7F3D0)
+    const ImVec2 diamondPts[4] = {
+        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.38f),
+        ImVec2(pos.x + size * 0.58f, pos.y + size * 0.54f),
+        ImVec2(pos.x + size * 0.50f, pos.y + size * 0.66f),
+        ImVec2(pos.x + size * 0.42f, pos.y + size * 0.54f)
+    };
+    drawList->AddConvexPolyFilled(diamondPts, 4, IM_COL32(167, 243, 208, 255));
+
+    // Center Core White Spark
+    drawList->AddCircleFilled(ImVec2(pos.x + size * 0.50f, pos.y + size * 0.53f), size * 0.045f, IM_COL32(255, 255, 255, 255));
+
+    ImGui::Dummy(ImVec2(size, size));
+}
+
 void DesktopApplication::renderBadge(const char* text, bool isSuccess) const {
     ImVec2 textSize = ImGui::CalcTextSize(text);
     ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -666,7 +732,9 @@ void DesktopApplication::renderGuiHeader() {
 
     ImGui::BeginChild("HeaderBar", ImVec2(0, 56.0f), true, ImGuiWindowFlags_NoScrollbar);
 
-    // Left: Brand Logo and Version Pill
+    // Left: Sleek Mint Brand Logo, Title and Version Pill
+    renderSleekMintLogo(34.0f);
+    ImGui::SameLine(0, 10.0f);
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "MIST");
     ImGui::SameLine();
@@ -729,7 +797,21 @@ void DesktopApplication::renderGuiNavRail() {
 
     ImGui::BeginChild("NavRail", ImVec2(railWidth, 0), true, ImGuiWindowFlags_NoScrollbar);
 
-    if (ImGui::Button(isNavRailExpanded_ ? "  << Collapse  " : " >> ", ImVec2(isNavRailExpanded_ ? 194.0f : 52.0f, 32.0f))) {
+    // Sleek Mint Logo Branding at top of Rail
+    if (isNavRailExpanded_) {
+        renderSleekMintLogo(34.0f);
+        ImGui::SameLine(0, 10.0f);
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.0f), "MIST STUDIO");
+        ImGui::TextDisabled("Direct3D 11");
+        ImGui::EndGroup();
+        ImGui::Spacing();
+    } else {
+        renderSleekMintLogo(32.0f);
+        ImGui::Spacing();
+    }
+
+    if (ImGui::Button(isNavRailExpanded_ ? "  << Collapse  " : " >> ", ImVec2(isNavRailExpanded_ ? 194.0f : 52.0f, 30.0f))) {
         isNavRailExpanded_ = !isNavRailExpanded_;
     }
     ImGui::Spacing();
@@ -793,9 +875,17 @@ void DesktopApplication::renderGuiNavRail() {
 }
 
 void DesktopApplication::renderGuiHomeScreen() {
-    // Page Title
-    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "Host Discovery & Management Dashboard");
-    ImGui::TextDisabled("Discover nearby Mist host streaming nodes, verify network latency, and manage remote gameplay sessions.");
+    // Sleek Mint Hero Banner Card
+    BeginM3Card("HeroBannerCard", ImVec2(0, 92.0f));
+    renderSleekMintLogo(60.0f);
+    ImGui::SameLine(0, 16.0f);
+    ImGui::BeginGroup();
+    ImGui::TextColored(ImVec4(0.063f, 0.725f, 0.506f, 1.00f), "MIST HIGH-PERFORMANCE GAME STREAMING");
+    ImGui::TextUnformatted("Ultra low-latency Direct3D 11 hardware capture, NVENC encoding & WebRTC transport.");
+    ImGui::TextDisabled("Discover nearby host streaming nodes, verify network latency, and manage remote gameplay sessions.");
+    ImGui::EndGroup();
+    EndM3Card();
+
     ImGui::Spacing();
 
     // 3 KPI Metric Cards
