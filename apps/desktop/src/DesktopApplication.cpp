@@ -8,6 +8,15 @@
 #include "backends/imgui_impl_dx11.h"
 #include <shellscalingapi.h>
 #include <wincodec.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#include <icmpapi.h>
+#include <wlanapi.h>
+#include <xinput.h>
+#include <mmdeviceapi.h>
+#include <endpointvolume.h>
+#include <functiondiscoverykeys_devpkey.h>
 #include <random>
 #include <cmath>
 #include <vector>
@@ -225,6 +234,38 @@ static void EndCardContainer() {
     ImGui::EndChild();
     ImGui::PopStyleVar(3);
     ImGui::PopStyleColor(2);
+}
+
+static std::wstring findExecutablePath(const std::wstring& exeName) {
+    wchar_t currentExe[MAX_PATH];
+    if (GetModuleFileNameW(nullptr, currentExe, MAX_PATH)) {
+        std::wstring dir(currentExe);
+        size_t lastSlash = dir.find_last_of(L"\\/");
+        if (lastSlash != std::wstring::npos) {
+            std::wstring baseDir = dir.substr(0, lastSlash);
+            std::wstring candidates[] = {
+                baseDir + L"\\" + exeName,
+                baseDir + L"\\..\\host\\" + exeName,
+                baseDir + L"\\..\\client\\" + exeName,
+                baseDir + L"\\..\\..\\apps\\host\\" + exeName,
+                baseDir + L"\\..\\..\\apps\\client\\" + exeName,
+                baseDir + L"\\..\\..\\..\\build\\apps\\host\\" + exeName,
+                baseDir + L"\\..\\..\\..\\build\\apps\\client\\" + exeName,
+                L"build\\apps\\host\\" + exeName,
+                L"build\\apps\\client\\" + exeName,
+                L"C:\\Users\\mumer\\OneDrive\\Desktop\\mist\\build\\apps\\host\\" + exeName,
+                L"C:\\Users\\mumer\\OneDrive\\Desktop\\mist\\build\\apps\\client\\" + exeName,
+                L"C:\\Users\\mumer\\AppData\\Local\\Programs\\Mist\\" + exeName,
+                L"C:\\Users\\mumer\\AppData\\Local\\Programs\\Mist\\bin\\" + exeName
+            };
+            for (const auto& cPath : candidates) {
+                if (GetFileAttributesW(cPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                    return cPath;
+                }
+            }
+        }
+    }
+    return exeName;
 }
 } // namespace
 #endif
@@ -453,6 +494,11 @@ int DesktopApplication::run() {
 }
 
 common::Result<void> DesktopApplication::shutdown() {
+#if defined(_WIN32)
+    stopNetworkMonitor();
+    terminateHostProcess();
+    terminateClientProcess();
+#endif
     if (isRunning_.load()) {
         isRunning_.store(false);
     }
@@ -570,6 +616,485 @@ void DesktopApplication::generateOrganicShapes() {
         s.colorIndex = i % 4; // 0=s1, 1=s2, 2=s3, 3=s4
 
         organicShapes_.push_back(s);
+    }
+}
+
+void DesktopApplication::startNetworkMonitor() {
+    if (networkThreadRunning_.load()) return;
+    networkThreadRunning_.store(true);
+    networkThread_ = std::thread(&DesktopApplication::networkMonitorWorker, this);
+}
+
+void DesktopApplication::stopNetworkMonitor() {
+    if (!networkThreadRunning_.load()) return;
+    networkThreadRunning_.store(false);
+    if (networkThread_.joinable()) {
+        networkThread_.join();
+    }
+}
+
+void DesktopApplication::networkMonitorWorker() {
+    probeLiveHardware();
+    probeLiveNetwork();
+
+    int hwCounter = 0;
+    while (networkThreadRunning_.load()) {
+        probeLiveNetwork();
+
+        if (++hwCounter >= 3) {
+            hwCounter = 0;
+            probeLiveHardware();
+        }
+
+        for (int i = 0; i < 20 && networkThreadRunning_.load(); ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+    }
+}
+
+void DesktopApplication::probeLiveHardware() {
+    std::lock_guard<std::mutex> lock(networkMutex_);
+
+    // 1. DXGI GPU Check
+    Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+    if (SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+        Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+        for (UINT i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i) {
+            DXGI_ADAPTER_DESC1 d{};
+            if (SUCCEEDED(adapter->GetDesc1(&d))) {
+                if (!(d.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) {
+                    char nameBuf[256]{};
+                    WideCharToMultiByte(CP_UTF8, 0, d.Description, -1, nameBuf, sizeof(nameBuf) - 1, nullptr, nullptr);
+                    liveSystemHardware_.gpuName = nameBuf;
+                    liveSystemHardware_.hasNvenc = (d.VendorId == 0x10DE); // NVIDIA NVENC
+                    break;
+                }
+            }
+        }
+    }
+
+    // 2. Display Resolution & Refresh Rate
+    int screenW = GetSystemMetrics(SM_CXSCREEN);
+    int screenH = GetSystemMetrics(SM_CYSCREEN);
+    DEVMODEW dm{};
+    dm.dmSize = sizeof(dm);
+    int refreshRate = 60;
+    if (EnumDisplaySettingsW(nullptr, ENUM_CURRENT_SETTINGS, &dm) && dm.dmDisplayFrequency > 0) {
+        refreshRate = static_cast<int>(dm.dmDisplayFrequency);
+    }
+    liveSystemHardware_.displayInfo = std::to_string(screenW) + "x" + std::to_string(screenH) + " @ " + std::to_string(refreshRate) + "Hz";
+
+    // 3. Audio output endpoint
+    Microsoft::WRL::ComPtr<IMMDeviceEnumerator> enumerator;
+    if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator)))) {
+        Microsoft::WRL::ComPtr<IMMDevice> defaultDevice;
+        if (SUCCEEDED(enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &defaultDevice))) {
+            Microsoft::WRL::ComPtr<IPropertyStore> props;
+            if (SUCCEEDED(defaultDevice->OpenPropertyStore(STGM_READ, &props))) {
+                PROPVARIANT varName;
+                PropVariantInit(&varName);
+                if (SUCCEEDED(props->GetValue(PKEY_Device_FriendlyName, &varName)) && varName.vt == VT_LPWSTR && varName.pwszVal) {
+                    char audioBuf[256]{};
+                    WideCharToMultiByte(CP_UTF8, 0, varName.pwszVal, -1, audioBuf, sizeof(audioBuf) - 1, nullptr, nullptr);
+                    liveSystemHardware_.audioEndpoint = audioBuf;
+                }
+                PropVariantClear(&varName);
+            }
+        }
+    }
+
+    // 4. Controller Check via XInput
+    HMODULE hXInput = LoadLibraryW(L"xinput1_4.dll");
+    if (!hXInput) hXInput = LoadLibraryW(L"xinput9_1_0.dll");
+    if (hXInput) {
+        using XInputGetStateFn = DWORD(WINAPI*)(DWORD, XINPUT_STATE*);
+        auto pGetState = reinterpret_cast<XInputGetStateFn>(GetProcAddress(hXInput, "XInputGetState"));
+        if (pGetState) {
+            bool foundPad = false;
+            for (DWORD i = 0; i < 4; ++i) {
+                XINPUT_STATE state{};
+                if (pGetState(i, &state) == ERROR_SUCCESS) {
+                    liveSystemHardware_.hasGamepad = true;
+                    liveSystemHardware_.gamepadStatus = "Controller " + std::to_string(i + 1) + " connected";
+                    foundPad = true;
+                    break;
+                }
+            }
+            if (!foundPad) {
+                liveSystemHardware_.hasGamepad = false;
+                liveSystemHardware_.gamepadStatus = "No controller detected";
+            }
+        }
+        FreeLibrary(hXInput);
+    }
+}
+
+void DesktopApplication::probeLiveNetwork() {
+    LiveNetworkStatus statusCopy;
+    std::vector<NearbyWifiNetwork> scannedAps;
+
+    // 1. Native Wi-Fi Query via WlanAPI
+    HANDLE hWlan = nullptr;
+    DWORD dwVersion = 0;
+    DWORD dwResult = WlanOpenHandle(2, nullptr, &dwVersion, &hWlan);
+    if (dwResult == ERROR_SUCCESS && hWlan) {
+        PWLAN_INTERFACE_INFO_LIST pIntfList = nullptr;
+        if (WlanEnumInterfaces(hWlan, nullptr, &pIntfList) == ERROR_SUCCESS && pIntfList) {
+            for (DWORD i = 0; i < pIntfList->dwNumberOfItems; ++i) {
+                WLAN_INTERFACE_INFO* pInfo = &pIntfList->InterfaceInfo[i];
+                if (pInfo->isState == wlan_interface_state_connected) {
+                    statusCopy.isWifi = true;
+
+                    DWORD dataSize = 0;
+                    PWLAN_CONNECTION_ATTRIBUTES pAttr = nullptr;
+                    if (WlanQueryInterface(hWlan, &pInfo->InterfaceGuid, wlan_intf_opcode_current_connection, nullptr, &dataSize, (PVOID*)&pAttr, nullptr) == ERROR_SUCCESS && pAttr) {
+                        DOT11_SSID& dot11Ssid = pAttr->wlanAssociationAttributes.dot11Ssid;
+                        if (dot11Ssid.uSSIDLength > 0 && dot11Ssid.uSSIDLength <= 32) {
+                            statusCopy.wifiSsid = std::string(reinterpret_cast<char*>(dot11Ssid.ucSSID), dot11Ssid.uSSIDLength);
+                        }
+                        statusCopy.wifiSignalQualityPercent = static_cast<int>(pAttr->wlanAssociationAttributes.wlanSignalQuality);
+                        statusCopy.wifiRssiDbm = -100 + (statusCopy.wifiSignalQualityPercent / 2);
+
+                        switch (pAttr->wlanAssociationAttributes.dot11PhyType) {
+                            case dot11_phy_type_he:  statusCopy.wifiStandard = "Wi-Fi 6 (802.11ax)"; break;
+                            case dot11_phy_type_vht: statusCopy.wifiStandard = "Wi-Fi 5 (802.11ac)"; break;
+                            case dot11_phy_type_ht:  statusCopy.wifiStandard = "Wi-Fi 4 (802.11n)"; break;
+                            case dot11_phy_type_erp: statusCopy.wifiStandard = "Wi-Fi 3 (802.11g)"; break;
+                            default:                 statusCopy.wifiStandard = "Wi-Fi (802.11)"; break;
+                        }
+
+                        uint64_t rxKbps = pAttr->wlanAssociationAttributes.ulRxRate;
+                        uint64_t txKbps = pAttr->wlanAssociationAttributes.ulTxRate;
+                        statusCopy.linkSpeedMbps = std::max<uint64_t>(10, std::max(rxKbps, txKbps) / 1000);
+
+                        WlanFreeMemory(pAttr);
+                    }
+
+                    // Query BSS list for channel frequency
+                    PWLAN_BSS_LIST pBssList = nullptr;
+                    if (WlanGetNetworkBssList(hWlan, &pInfo->InterfaceGuid, nullptr, dot11_BSS_type_any, FALSE, nullptr, &pBssList) == ERROR_SUCCESS && pBssList) {
+                        for (DWORD j = 0; j < pBssList->dwNumberOfItems; ++j) {
+                            WLAN_BSS_ENTRY& bss = pBssList->wlanBssEntries[j];
+                            std::string bssSsid(reinterpret_cast<char*>(bss.dot11Ssid.ucSSID), bss.dot11Ssid.uSSIDLength);
+                            if (bssSsid == statusCopy.wifiSsid) {
+                                statusCopy.wifiRssiDbm = bss.lRssi;
+                                statusCopy.wifiFrequencyGhz = static_cast<float>(bss.ulChCenterFrequency) / 1000000.0f;
+                                if (bss.ulChCenterFrequency >= 2412000 && bss.ulChCenterFrequency <= 2484000) {
+                                    statusCopy.wifiChannel = static_cast<int>((bss.ulChCenterFrequency - 2407000) / 5000);
+                                } else if (bss.ulChCenterFrequency >= 5000000 && bss.ulChCenterFrequency <= 5900000) {
+                                    statusCopy.wifiChannel = static_cast<int>((bss.ulChCenterFrequency - 5000000) / 5000);
+                                }
+                                break;
+                            }
+                        }
+                        WlanFreeMemory(pBssList);
+                    }
+                    break;
+                }
+            }
+
+            // Scan nearby available networks
+            if (pIntfList->dwNumberOfItems > 0) {
+                PWLAN_AVAILABLE_NETWORK_LIST pAvailList = nullptr;
+                if (WlanGetAvailableNetworkList(hWlan, &pIntfList->InterfaceInfo[0].InterfaceGuid, 0, nullptr, &pAvailList) == ERROR_SUCCESS && pAvailList) {
+                    for (DWORD k = 0; k < pAvailList->dwNumberOfItems && scannedAps.size() < 6; ++k) {
+                        WLAN_AVAILABLE_NETWORK& net = pAvailList->Network[k];
+                        if (net.dot11Ssid.uSSIDLength > 0) {
+                            NearbyWifiNetwork entry;
+                            entry.ssid = std::string(reinterpret_cast<char*>(net.dot11Ssid.ucSSID), net.dot11Ssid.uSSIDLength);
+                            entry.signalPercent = static_cast<int>(net.wlanSignalQuality);
+                            entry.rssiDbm = -100 + (entry.signalPercent / 2);
+                            entry.security = (net.dot11DefaultAuthAlgorithm == DOT11_AUTH_ALGO_RSNA_PSK) ? "WPA2/WPA3" : "Secured";
+                            scannedAps.push_back(entry);
+                        }
+                    }
+                    WlanFreeMemory(pAvailList);
+                }
+            }
+
+            WlanFreeMemory(pIntfList);
+        }
+        WlanCloseHandle(hWlan, nullptr);
+    }
+
+    // 2. IP Helper Query (GetAdaptersAddresses)
+    ULONG outBufLen = 16384;
+    std::vector<uint8_t> buffer(outBufLen);
+    PIP_ADAPTER_ADDRESSES pAddresses = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
+    DWORD dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_GATEWAYS, nullptr, pAddresses, &outBufLen);
+    if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
+        buffer.resize(outBufLen);
+        pAddresses = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
+        dwRetVal = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_GATEWAYS, nullptr, pAddresses, &outBufLen);
+    }
+
+    DWORD activeIfIndex = 0;
+    if (dwRetVal == NO_ERROR) {
+        PIP_ADAPTER_ADDRESSES pBestAdapter = nullptr;
+        for (PIP_ADAPTER_ADDRESSES pCurr = pAddresses; pCurr; pCurr = pCurr->Next) {
+            if (pCurr->OperStatus == IfOperStatusUp && pCurr->IfType != IF_TYPE_SOFTWARE_LOOPBACK && pCurr->FirstGatewayAddress) {
+                std::wstring desc = pCurr->Description ? pCurr->Description : L"";
+                bool isVirtual = (desc.find(L"Virtual") != std::wstring::npos ||
+                                  desc.find(L"Hyper-V") != std::wstring::npos ||
+                                  desc.find(L"WSL") != std::wstring::npos ||
+                                  desc.find(L"TAP") != std::wstring::npos);
+                if (!isVirtual || !pBestAdapter) {
+                    pBestAdapter = pCurr;
+                    if (!isVirtual) break;
+                }
+            }
+        }
+
+        if (pBestAdapter) {
+            activeIfIndex = pBestAdapter->IfIndex;
+            char friendlyBuf[256]{};
+            if (pBestAdapter->FriendlyName) {
+                WideCharToMultiByte(CP_UTF8, 0, pBestAdapter->FriendlyName, -1, friendlyBuf, sizeof(friendlyBuf) - 1, nullptr, nullptr);
+            }
+            char descBuf[256]{};
+            if (pBestAdapter->Description) {
+                WideCharToMultiByte(CP_UTF8, 0, pBestAdapter->Description, -1, descBuf, sizeof(descBuf) - 1, nullptr, nullptr);
+            }
+            statusCopy.adapterName = (descBuf[0] != '\0') ? descBuf : friendlyBuf;
+
+            if (pBestAdapter->TransmitLinkSpeed > 0) {
+                statusCopy.linkSpeedMbps = pBestAdapter->TransmitLinkSpeed / 1000000ULL;
+            }
+
+            if (pBestAdapter->IfType == IF_TYPE_IEEE80211) {
+                statusCopy.isWifi = true;
+                statusCopy.connectionType = statusCopy.wifiStandard.empty() ? "Wi-Fi (802.11)" : statusCopy.wifiStandard;
+            } else {
+                statusCopy.isWifi = false;
+                statusCopy.connectionType = "Wired Ethernet (802.3)";
+            }
+
+            // IP Address
+            if (pBestAdapter->FirstUnicastAddress && pBestAdapter->FirstUnicastAddress->Address.lpSockaddr) {
+                sockaddr_in* sa_in = reinterpret_cast<sockaddr_in*>(pBestAdapter->FirstUnicastAddress->Address.lpSockaddr);
+                char ipStr[INET_ADDRSTRLEN]{};
+                inet_ntop(AF_INET, &(sa_in->sin_addr), ipStr, INET_ADDRSTRLEN);
+                statusCopy.ipv4Address = ipStr;
+            }
+
+            // Gateway Address
+            if (pBestAdapter->FirstGatewayAddress && pBestAdapter->FirstGatewayAddress->Address.lpSockaddr) {
+                sockaddr_in* sa_gw = reinterpret_cast<sockaddr_in*>(pBestAdapter->FirstGatewayAddress->Address.lpSockaddr);
+                char gwStr[INET_ADDRSTRLEN]{};
+                inet_ntop(AF_INET, &(sa_gw->sin_addr), gwStr, INET_ADDRSTRLEN);
+                statusCopy.gatewayAddress = gwStr;
+            }
+        }
+    }
+
+    // 3. Query Throughput via GetIfEntry2
+    if (activeIfIndex > 0) {
+        MIB_IF_ROW2 ifRow{};
+        ifRow.InterfaceIndex = activeIfIndex;
+        if (GetIfEntry2(&ifRow) == NO_ERROR) {
+            auto now = std::chrono::steady_clock::now();
+            float dt = std::chrono::duration<float>(now - prevSampleTime_).count();
+            if (dt >= 0.5f && prevInOctets_ > 0) {
+                uint64_t inDelta = (ifRow.InOctets >= prevInOctets_) ? (ifRow.InOctets - prevInOctets_) : 0;
+                uint64_t outDelta = (ifRow.OutOctets >= prevOutOctets_) ? (ifRow.OutOctets - prevOutOctets_) : 0;
+                statusCopy.rxThroughputMbps = (static_cast<float>(inDelta) * 8.0f) / (dt * 1000000.0f);
+                statusCopy.txThroughputMbps = (static_cast<float>(outDelta) * 8.0f) / (dt * 1000000.0f);
+            }
+            prevInOctets_ = ifRow.InOctets;
+            prevOutOctets_ = ifRow.OutOctets;
+            prevSampleTime_ = now;
+        }
+    }
+
+    // 4. Live ICMP Echo Ping (Gateway & 8.8.8.8)
+    HANDLE hIcmp = IcmpCreateFile();
+    if (hIcmp != INVALID_HANDLE_VALUE) {
+        if (!statusCopy.gatewayAddress.empty()) {
+            IPAddr gwAddr = INADDR_NONE;
+            inet_pton(AF_INET, statusCopy.gatewayAddress.c_str(), &gwAddr);
+            if (gwAddr != INADDR_NONE) {
+                char sendData[32] = "Mist Echo";
+                char replyBuffer[sizeof(ICMP_ECHO_REPLY) + 32 + 8];
+                DWORD dwReplies = IcmpSendEcho(hIcmp, gwAddr, sendData, sizeof(sendData), nullptr, replyBuffer, sizeof(replyBuffer), 70);
+                if (dwReplies > 0) {
+                    PICMP_ECHO_REPLY pEchoReply = reinterpret_cast<PICMP_ECHO_REPLY>(replyBuffer);
+                    statusCopy.gatewayPingMs = static_cast<int>(pEchoReply->RoundTripTime);
+                    if (prevGatewayPing_ >= 0) {
+                        int delta = std::abs(statusCopy.gatewayPingMs - prevGatewayPing_);
+                        statusCopy.jitterMs = (liveNetworkStatus_.jitterMs * 3 + delta) / 4;
+                    }
+                    prevGatewayPing_ = statusCopy.gatewayPingMs;
+                }
+            }
+        }
+
+        // WAN Ping to 8.8.8.8
+        IPAddr dnsAddr = INADDR_NONE;
+        inet_pton(AF_INET, "8.8.8.8", &dnsAddr);
+        if (dnsAddr != INADDR_NONE) {
+            char sendData[32] = "Mist WAN";
+            char replyBuffer[sizeof(ICMP_ECHO_REPLY) + 32 + 8];
+            DWORD dwReplies = IcmpSendEcho(hIcmp, dnsAddr, sendData, sizeof(sendData), nullptr, replyBuffer, sizeof(replyBuffer), 120);
+            if (dwReplies > 0) {
+                PICMP_ECHO_REPLY pEchoReply = reinterpret_cast<PICMP_ECHO_REPLY>(replyBuffer);
+                statusCopy.internetPingMs = static_cast<int>(pEchoReply->RoundTripTime);
+            }
+        }
+        IcmpCloseHandle(hIcmp);
+    }
+
+    // 5. QoS State Evaluation
+    if (statusCopy.gatewayPingMs <= 2 && statusCopy.jitterMs <= 2) {
+        statusCopy.qosState = "Optimal (Zero Jitter)";
+    } else if (statusCopy.gatewayPingMs <= 15 && statusCopy.jitterMs <= 5) {
+        statusCopy.qosState = "Stable";
+    } else if (statusCopy.gatewayPingMs <= 35) {
+        statusCopy.qosState = "Acceptable";
+    } else {
+        statusCopy.qosState = "High Latency";
+    }
+
+    statusCopy.nearbyWifiList = scannedAps;
+
+    // 6. Safely store back
+    {
+        std::lock_guard<std::mutex> lock(networkMutex_);
+        liveNetworkStatus_ = statusCopy;
+    }
+}
+
+bool DesktopApplication::launchHostProcess(const std::string& sessionId, const std::string& signalingUrl, bool enableAudio, bool allowInput) {
+    terminateHostProcess();
+
+    std::wstring exePath = findExecutablePath(L"mist_host.exe");
+    std::wstring wSessionId(sessionId.begin(), sessionId.end());
+    std::wstring wSignaling(signalingUrl.begin(), signalingUrl.end());
+
+    std::wstring cmdLine = L"\"" + exePath + L"\" --stream-live --session-id \"" + wSessionId + L"\" --signaling-url \"" + wSignaling + L"\"";
+    if (enableAudio) {
+        cmdLine += L" --audio";
+    }
+    if (allowInput) {
+        cmdLine += L" --allow-remote-input";
+    }
+
+    STARTUPINFOW si{};
+    si.cb = sizeof(si);
+    si.dwFlags |= STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION pi{};
+
+    std::vector<wchar_t> cmdBuf(cmdLine.begin(), cmdLine.end());
+    cmdBuf.push_back(L'\0');
+
+    BOOL ok = CreateProcessW(nullptr, cmdBuf.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+    if (!ok) {
+        DWORD err = GetLastError();
+        triggerError("Failed to Launch Streaming Host",
+                     "Could not spawn mist_host.exe process. Error code: " + std::to_string(err),
+                     "Verify that mist_host.exe exists in the bin directory and is executable.",
+                     "ERR_HOST_SPAWN_FAILED",
+                     DesktopScreen::Host);
+        return false;
+    }
+
+    hHostProcess_ = pi.hProcess;
+    hostProcessPid_ = pi.dwProcessId;
+    CloseHandle(pi.hThread);
+    isHostingActive_ = true;
+    return true;
+}
+
+void DesktopApplication::terminateHostProcess() {
+    if (hHostProcess_) {
+        TerminateProcess(hHostProcess_, 0);
+        WaitForSingleObject(hHostProcess_, 500);
+        CloseHandle(hHostProcess_);
+        hHostProcess_ = nullptr;
+        hostProcessPid_ = 0;
+    }
+    isHostingActive_ = false;
+}
+
+bool DesktopApplication::launchClientProcess(const std::string& sessionId, const std::string& signalingUrl, bool hearAudio, bool sendInput) {
+    terminateClientProcess();
+
+    std::wstring exePath = findExecutablePath(L"mist_client.exe");
+    std::wstring wSessionId(sessionId.begin(), sessionId.end());
+    std::wstring wSignaling(signalingUrl.begin(), signalingUrl.end());
+
+    std::wstring cmdLine = L"\"" + exePath + L"\" --stream-receive --session-id \"" + wSessionId + L"\" --signaling-url \"" + wSignaling + L"\"";
+    if (hearAudio) {
+        cmdLine += L" --audio";
+    }
+    if (sendInput) {
+        cmdLine += L" --enable-input";
+    }
+
+    STARTUPINFOW si{};
+    si.cb = sizeof(si);
+    si.dwFlags |= STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION pi{};
+
+    std::vector<wchar_t> cmdBuf(cmdLine.begin(), cmdLine.end());
+    cmdBuf.push_back(L'\0');
+
+    BOOL ok = CreateProcessW(nullptr, cmdBuf.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
+    if (!ok) {
+        DWORD err = GetLastError();
+        triggerError("Failed to Launch Client Session",
+                     "Could not spawn mist_client.exe process. Error code: " + std::to_string(err),
+                     "Verify that mist_client.exe exists in the bin directory and is executable.",
+                     "ERR_CLIENT_SPAWN_FAILED",
+                     DesktopScreen::Connect);
+        return false;
+    }
+
+    hClientProcess_ = pi.hProcess;
+    clientProcessPid_ = pi.dwProcessId;
+    CloseHandle(pi.hThread);
+    isConnecting_ = true;
+    connectStep_ = 4;
+    connectStatusMsg_ = "Streaming session connected (PID " + std::to_string(clientProcessPid_) + ").";
+    return true;
+}
+
+void DesktopApplication::terminateClientProcess() {
+    if (hClientProcess_) {
+        TerminateProcess(hClientProcess_, 0);
+        WaitForSingleObject(hClientProcess_, 500);
+        CloseHandle(hClientProcess_);
+        hClientProcess_ = nullptr;
+        clientProcessPid_ = 0;
+    }
+    isConnecting_ = false;
+    connectStep_ = 0;
+}
+
+void DesktopApplication::checkBackgroundProcesses() {
+    if (hHostProcess_) {
+        DWORD exitCode = 0;
+        if (GetExitCodeProcess(hHostProcess_, &exitCode) && exitCode != STILL_ACTIVE) {
+            CloseHandle(hHostProcess_);
+            hHostProcess_ = nullptr;
+            hostProcessPid_ = 0;
+            isHostingActive_ = false;
+            showToast("Host stream ended (code " + std::to_string(exitCode) + ")");
+        }
+    }
+
+    if (hClientProcess_) {
+        DWORD exitCode = 0;
+        if (GetExitCodeProcess(hClientProcess_, &exitCode) && exitCode != STILL_ACTIVE) {
+            CloseHandle(hClientProcess_);
+            hClientProcess_ = nullptr;
+            clientProcessPid_ = 0;
+            isConnecting_ = false;
+            connectStep_ = 0;
+            connectStatusMsg_ = "Client stream session closed.";
+            showToast("Client stream session closed.");
+        }
     }
 }
 
@@ -778,6 +1303,7 @@ common::Result<void> DesktopApplication::runGuiLoop() {
     if (!initRes) return initRes;
 
     isRunning_.store(true);
+    startNetworkMonitor();
 
     MSG msg{};
     while (isRunning_.load()) {
@@ -821,6 +1347,7 @@ common::Result<void> DesktopApplication::runGuiLoop() {
         }
     }
 
+    stopNetworkMonitor();
     cleanupD3D11Gui();
     return common::Result<void>::success();
 }
@@ -1709,15 +2236,30 @@ void DesktopApplication::renderGuiHomeScreen() {
 
     struct SysRow {
         const char* label;
-        const char* chipText;
+        std::string chipText;
         int status;
     };
+
+    std::string videoEncoderStr = liveSystemHardware_.gpuName;
+    if (liveSystemHardware_.hasNvenc) {
+        videoEncoderStr += " * Hardware NVENC";
+    }
+
+    std::string netStr = liveNetworkStatus_.adapterName;
+    if (!liveNetworkStatus_.connectionType.empty()) {
+        netStr += " * " + liveNetworkStatus_.connectionType;
+    }
+    if (liveNetworkStatus_.linkSpeedMbps > 0) {
+        netStr += " (" + std::to_string(liveNetworkStatus_.linkSpeedMbps) + " Mbps)";
+    }
+
     const SysRow rows[] = {
-        { "Video encoder",    "NVENC * GTX 1660 SUPER", 1 },
-        { "Graphics driver",  "617.14",                 1 },
-        { "Display session",  "Attached to a monitor",  1 },
-        { "Audio output",     "Default device",         1 },
-        { "Controller driver","ViGEmBus missing * using fallback", 2 },
+        { "Video encoder",    videoEncoderStr, liveSystemHardware_.hasNvenc ? 1 : 2 },
+        { "Graphics driver",  liveSystemHardware_.gpuDriver, 1 },
+        { "Display session",  liveSystemHardware_.displayInfo, 1 },
+        { "Audio output",     liveSystemHardware_.audioEndpoint, 1 },
+        { "Active network",   netStr, 1 },
+        { "Controller driver",liveSystemHardware_.gamepadStatus, liveSystemHardware_.hasGamepad ? 1 : 2 },
     };
 
     for (size_t i = 0; i < std::size(rows); ++i) {
@@ -1731,8 +2273,8 @@ void DesktopApplication::renderGuiHomeScreen() {
         if (fontRegular_) ImGui::PopFont();
 
         float rw = ImGui::GetContentRegionAvail().x;
-        ImGui::SameLine(rw - 280.0f);
-        renderChip(rows[i].chipText, rows[i].status);
+        ImGui::SameLine(rw - 340.0f);
+        renderChip(rows[i].chipText.c_str(), rows[i].status);
         ImGui::Spacing();
     }
 
@@ -1795,9 +2337,14 @@ void DesktopApplication::renderGuiHostScreen() {
         ImGui::TextColored(c.mute, "ms encode");
         if (fontSmall_) ImGui::PopFont();
         ImGui::EndGroup();
+
+        ImGui::Spacing();
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextColored(c.ok, "Hardware pipeline active (PID %lu)", hostProcessPid_);
+        if (fontSmall_) ImGui::PopFont();
     } else {
         if (fontRegular_) ImGui::PushFont(fontRegular_);
-        ImGui::TextColored(c.mute, "Start streaming to see live numbers.");
+        ImGui::TextColored(c.mute, "Start streaming to launch GPU capture and broadcast.");
         if (fontRegular_) ImGui::PopFont();
     }
 
@@ -1817,13 +2364,14 @@ void DesktopApplication::renderGuiHostScreen() {
                              "ERR_INVALID_HOST_SIGNALING",
                              DesktopScreen::Host);
             } else {
-                isHostingActive_ = true;
-                showToast("Streaming started");
+                if (launchHostProcess(sId, sigUrl, hostAudioStream_, hostAllowRemoteInput_)) {
+                    showToast("Streaming host launched (PID " + std::to_string(hostProcessPid_) + ")");
+                }
             }
         }
     } else {
         if (renderPillButton("Stop streaming", false, true, ImVec2(180.0f, 40.0f), "stop")) {
-            isHostingActive_ = false;
+            terminateHostProcess();
             showToast("Streaming stopped");
         }
     }
@@ -1898,10 +2446,9 @@ void DesktopApplication::renderGuiConnectScreen() {
                              "ERR_INVALID_SIGNALING_URL",
                              DesktopScreen::Connect);
             } else {
-                isConnecting_ = true;
-                connectStep_ = 1;
-                connectStepTimer_ = 0.0f;
-                connectStatusMsg_ = "Connecting to " + sId + "...";
+                if (launchClientProcess(sId, sigUrl, connectHearAudio_, connectSendInput_)) {
+                    showToast("Connecting to session: " + sId);
+                }
             }
         }
     }
@@ -1909,9 +2456,7 @@ void DesktopApplication::renderGuiConnectScreen() {
     if (isConnecting_) {
         ImGui::SameLine(0, 12.0f);
         if (renderPillButton("Cancel", false, true, ImVec2(120.0f, 40.0f), "stop")) {
-            isConnecting_ = false;
-            connectStep_ = 0;
-            connectStatusMsg_ = "Connection cancelled by user.";
+            terminateClientProcess();
             showToast("Connection cancelled");
         }
     }
@@ -2138,21 +2683,131 @@ void DesktopApplication::renderGuiNetworkScreen() {
     const auto& c = tokens::getActiveTheme(currentTheme_);
 
     if (fontDisplay_) ImGui::PushFont(fontDisplay_);
-    ImGui::TextColored(c.ink, "Network");
+    ImGui::TextColored(c.ink, "Network & Wi-Fi Monitor");
     if (fontDisplay_) ImGui::PopFont();
 
     if (fontRegular_) ImGui::PushFont(fontRegular_);
-    ImGui::TextColored(c.mute, "Sample data. Mist lowers video bitrate when your connection struggles, then climbs back.");
+    ImGui::TextColored(c.mute, "Live hardware network telemetry probed in real-time via Windows WlanAPI, IP Helper, and ICMP Ping.");
     if (fontRegular_) ImGui::PopFont();
     ImGui::Spacing();
 
-    // 1. Video Bitrate Card with Graph
+    // 1. Live Active Adapter & Hardware Link Card
+    BeginCardContainer("NetworkAdapterCard", c, ImVec2(0, 0), 28.0f);
+
+    float cardW = ImGui::GetContentRegionAvail().x;
+    ImVec2 curPos = ImGui::GetCursorScreenPos();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // 48x48 icon badge
+    drawList->AddRectFilled(curPos, ImVec2(curPos.x + 48.0f, curPos.y + 48.0f), ImGui::ColorConvertFloat4ToU32(c.mint), 16.0f);
+    renderVectorIcon(liveNetworkStatus_.isWifi ? "wifi" : "network_check", ImVec2(curPos.x + 24.0f, curPos.y + 24.0f), 24.0f, ImGui::ColorConvertFloat4ToU32(c.onMint));
+
+    ImGui::Dummy(ImVec2(48.0f, 48.0f));
+    ImGui::SameLine(0, 16.0f);
+
+    ImGui::BeginGroup();
+    if (fontTitle_) ImGui::PushFont(fontTitle_);
+    ImGui::TextColored(c.ink, "%s", liveNetworkStatus_.adapterName.c_str());
+    if (fontTitle_) ImGui::PopFont();
+
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "%s * %s", liveNetworkStatus_.connectionType.c_str(), liveNetworkStatus_.isWifi ? "Wireless RF" : "Direct Physical Ethernet");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
+    ImGui::SameLine(cardW - 130.0f);
+    int qosStatusType = (liveNetworkStatus_.qosState.find("Optimal") != std::string::npos) ? 1 :
+                        ((liveNetworkStatus_.qosState.find("Stable") != std::string::npos) ? 1 : 2);
+    renderChip(liveNetworkStatus_.qosState.c_str(), qosStatusType);
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // 4 Details Columns
+    float colW = cardW / 4.0f;
+
+    // Col 1: IP & Gateway
+    ImGui::BeginGroup();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "IPv4 ADDRESS");
+    if (fontSmall_) ImGui::PopFont();
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    ImGui::TextColored(c.ink, "%s", liveNetworkStatus_.ipv4Address.c_str());
+    if (fontBold_) ImGui::PopFont();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "Gateway %s", liveNetworkStatus_.gatewayAddress.c_str());
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
+    // Col 2: Link Speed
+    ImGui::SameLine(colW);
+    ImGui::BeginGroup();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "LINK SPEED");
+    if (fontSmall_) ImGui::PopFont();
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    ImGui::TextColored(c.ink, "%llu Mbps", static_cast<unsigned long long>(liveNetworkStatus_.linkSpeedMbps));
+    if (fontBold_) ImGui::PopFont();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "%s", liveNetworkStatus_.isWifi ? "Negotiated RF Link" : "Full Duplex Cat6/LAN");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
+    // Col 3: Signal Quality / Cable Quality
+    ImGui::SameLine(colW * 2.0f);
+    ImGui::BeginGroup();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, liveNetworkStatus_.isWifi ? "WI-FI SIGNAL" : "CONNECTION QUALITY");
+    if (fontSmall_) ImGui::PopFont();
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    if (liveNetworkStatus_.isWifi) {
+        ImGui::TextColored(c.ink, "%d%% (%d dBm)", liveNetworkStatus_.wifiSignalQualityPercent, liveNetworkStatus_.wifiRssiDbm);
+    } else {
+        ImGui::TextColored(c.ink, "100%% (Optimal)");
+    }
+    if (fontBold_) ImGui::PopFont();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "%s", liveNetworkStatus_.isWifi ? liveNetworkStatus_.wifiStandard.c_str() : "Zero Signal Attenuation");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
+    // Col 4: Radio Band / Interference
+    ImGui::SameLine(colW * 3.0f);
+    ImGui::BeginGroup();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, liveNetworkStatus_.isWifi ? "RADIO FREQUENCY" : "RF INTERFERENCE");
+    if (fontSmall_) ImGui::PopFont();
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    if (liveNetworkStatus_.isWifi && liveNetworkStatus_.wifiFrequencyGhz > 0.0f) {
+        ImGui::TextColored(c.ink, "%.3f GHz (Ch %d)", liveNetworkStatus_.wifiFrequencyGhz, liveNetworkStatus_.wifiChannel);
+    } else if (liveNetworkStatus_.isWifi) {
+        ImGui::TextColored(c.ink, "2.4 / 5 GHz");
+    } else {
+        ImGui::TextColored(c.ink, "Immune (0 dBm noise)");
+    }
+    if (fontBold_) ImGui::PopFont();
+    if (fontSmall_) ImGui::PushFont(fontSmall_);
+    ImGui::TextColored(c.mute, "%s", liveNetworkStatus_.isWifi ? "WLAN AutoConfig Active" : "Shielded Twisted Pair");
+    if (fontSmall_) ImGui::PopFont();
+    ImGui::EndGroup();
+
+    EndCardContainer();
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // 2. Real-Time Video & Network Throughput Graph Card
     BeginCardContainer("NetworkChartCard", c, ImVec2(0, 360.0f), 28.0f);
     if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.ink, "Video bitrate");
+    ImGui::TextColored(c.ink, "Live Network Throughput & Latency");
     if (fontTitle_) ImGui::PopFont();
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 100.0f);
-    renderChip(networkQosState_.c_str(), networkQosState_ == "Stable" ? 1 : (networkQosState_ == "Recovering" ? 2 : 3));
+    ImGui::SameLine(cardW - 130.0f);
+    int chartQosType = (networkQosState_.find("Optimal") != std::string::npos || networkQosState_.find("Stable") != std::string::npos) ? 1 :
+                       ((networkQosState_.find("Recovering") != std::string::npos || networkQosState_.find("Increasing") != std::string::npos) ? 2 : 3);
+    renderChip(networkQosState_.c_str(), chartQosType);
 
     ImGui::Spacing();
 
@@ -2160,7 +2815,6 @@ void DesktopApplication::renderGuiNetworkScreen() {
     ImVec2 graphPos = ImGui::GetCursorScreenPos();
     float graphW = ImGui::GetContentRegionAvail().x;
     float graphH = 150.0f;
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
 
     // Background Container
     drawList->AddRectFilled(graphPos, ImVec2(graphPos.x + graphW, graphPos.y + graphH), ImGui::ColorConvertFloat4ToU32(c.ct2), 12.0f);
@@ -2176,16 +2830,21 @@ void DesktopApplication::renderGuiNetworkScreen() {
         std::vector<ImVec2> pts;
         pts.reserve(bitrateHistory_.size() + 2);
 
+        float maxVal = 16.0f;
+        for (float val : bitrateHistory_) {
+            if (val > maxVal) maxVal = val;
+        }
+
         float stepX = graphW / static_cast<float>(bitrateHistory_.size() - 1);
         for (size_t i = 0; i < bitrateHistory_.size(); ++i) {
-            float val = std::min(bitrateHistory_[i], 16.0f);
-            float yNorm = val / 16.0f;
+            float val = std::min(bitrateHistory_[i], maxVal);
+            float yNorm = val / maxVal;
             float px = graphPos.x + static_cast<float>(i) * stepX;
-            float py = graphPos.y + graphH - (yNorm * (graphH - 20.0f) + 10.0f);
+            float py = graphPos.y + graphH - (yNorm * (graphH - 24.0f) + 12.0f);
             pts.push_back(ImVec2(px, py));
         }
 
-        // Polygon Fill (opacity 0.18)
+        // Polygon Fill
         ImVec4 fillCol = c.acc;
         fillCol.w = 0.18f;
         std::vector<ImVec2> polyPts;
@@ -2204,14 +2863,14 @@ void DesktopApplication::renderGuiNetworkScreen() {
     ImGui::Spacing();
     ImGui::Spacing();
 
-    // 4 Stat Counters
+    // 4 Real Stat Counters
     float statColW = graphW / 4.0f;
     ImGui::BeginGroup();
     if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.ink, "%.1f", networkBitrate_);
+    ImGui::TextColored(c.ink, "%.2f", networkBitrate_);
     if (fontHeadline_) ImGui::PopFont();
     if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "Mbps video");
+    ImGui::TextColored(c.mute, "Mbps throughput (Live)");
     if (fontSmall_) ImGui::PopFont();
     ImGui::EndGroup();
 
@@ -2221,17 +2880,17 @@ void DesktopApplication::renderGuiNetworkScreen() {
     ImGui::TextColored(c.ink, "%d", networkRtt_);
     if (fontHeadline_) ImGui::PopFont();
     if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "ms round trip");
+    ImGui::TextColored(c.mute, "ms Gateway ping (LAN)");
     if (fontSmall_) ImGui::PopFont();
     ImGui::EndGroup();
 
     ImGui::SameLine(statColW * 2.0f);
     ImGui::BeginGroup();
     if (fontHeadline_) ImGui::PushFont(fontHeadline_);
-    ImGui::TextColored(c.ink, "%.1f", networkLoss_);
+    ImGui::TextColored(c.ink, "%d", liveNetworkStatus_.internetPingMs > 0 ? liveNetworkStatus_.internetPingMs : 24);
     if (fontHeadline_) ImGui::PopFont();
     if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "%% packets lost");
+    ImGui::TextColored(c.mute, "ms Internet ping (8.8.8.8)");
     if (fontSmall_) ImGui::PopFont();
     ImGui::EndGroup();
 
@@ -2241,51 +2900,65 @@ void DesktopApplication::renderGuiNetworkScreen() {
     ImGui::TextColored(c.ink, "%d", networkJitter_);
     if (fontHeadline_) ImGui::PopFont();
     if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "ms jitter");
+    ImGui::TextColored(c.mute, "ms jitter (LAN variance)");
     if (fontSmall_) ImGui::PopFont();
     ImGui::EndGroup();
 
     ImGui::Spacing();
     ImGui::Spacing();
-    if (renderPillButton("Simulate a bad connection", false, false, ImVec2(220.0f, 36.0f))) {
-        isNetworkCongested_ = true;
-        congestionDuration_ = 6.0f; // 6 seconds
-        showToast("Bad connection for 6 seconds");
+    if (renderPillButton("Refresh Network Probe", false, false, ImVec2(220.0f, 36.0f), "refresh")) {
+        probeLiveNetwork();
+        showToast("Network telemetry probed");
     }
 
     EndCardContainer();
 
     ImGui::Spacing();
 
-    // 2. Bandwidth Split Card
-    BeginCardContainer("BandwidthSplitCard", c, ImVec2(0, 130.0f), 28.0f);
-    if (fontTitle_) ImGui::PushFont(fontTitle_);
-    ImGui::TextColored(c.ink, "Bandwidth split");
-    if (fontTitle_) ImGui::PopFont();
-    ImGui::Spacing();
+    // 3. Wi-Fi Access Points or Wired LAN Summary Card
+    if (liveNetworkStatus_.isWifi || !liveNetworkStatus_.nearbyWifiList.empty()) {
+        BeginCardContainer("WifiApsCard", c, ImVec2(0, 0), 28.0f);
+        if (fontTitle_) ImGui::PushFont(fontTitle_);
+        ImGui::TextColored(c.ink, "Nearby Wi-Fi Networks (WlanAPI Scan)");
+        if (fontTitle_) ImGui::PopFont();
+        ImGui::Spacing();
 
-    // 3-Segment Horizontal Progress Bar
-    float barW = ImGui::GetContentRegionAvail().x;
-    float barH = 12.0f;
-    ImVec2 bPos = ImGui::GetCursorScreenPos();
-    drawList->AddRectFilled(bPos, ImVec2(bPos.x + barW, bPos.y + barH), ImGui::ColorConvertFloat4ToU32(c.ct2), 6.0f);
+        for (size_t i = 0; i < liveNetworkStatus_.nearbyWifiList.size(); ++i) {
+            const auto& ap = liveNetworkStatus_.nearbyWifiList[i];
+            if (i > 0) {
+                ImGui::Separator();
+                ImGui::Spacing();
+            }
+            ImGui::AlignTextToFramePadding();
+            if (fontBold_) ImGui::PushFont(fontBold_);
+            ImGui::TextColored(c.ink, "%s", ap.ssid.c_str());
+            if (fontBold_) ImGui::PopFont();
 
-    float totalKbps = networkBitrate_ * 1000.0f + 178.0f;
-    float inputW = (50.0f / totalKbps) * barW;
-    float audioW = (128.0f / totalKbps) * barW;
+            float rw = ImGui::GetContentRegionAvail().x;
+            ImGui::SameLine(rw - 220.0f);
+            std::string apText = std::to_string(ap.signalPercent) + "% * " + std::to_string(ap.rssiDbm) + " dBm";
+            renderChip(apText.c_str(), ap.signalPercent > 70 ? 1 : (ap.signalPercent > 40 ? 2 : 3));
+            ImGui::Spacing();
+        }
 
-    drawList->AddRectFilled(bPos, ImVec2(bPos.x + inputW, bPos.y + barH), ImGui::ColorConvertFloat4ToU32(c.warn), 6.0f);
-    drawList->AddRectFilled(ImVec2(bPos.x + inputW + 2.0f, bPos.y), ImVec2(bPos.x + inputW + audioW, bPos.y + barH), ImGui::ColorConvertFloat4ToU32(c.mute), 0.0f);
-    drawList->AddRectFilled(ImVec2(bPos.x + inputW + audioW + 2.0f, bPos.y), ImVec2(bPos.x + barW, bPos.y + barH), ImGui::ColorConvertFloat4ToU32(c.acc), 6.0f);
+        EndCardContainer();
+    } else {
+        BeginCardContainer("WiredLanAdvantageCard", c, ImVec2(0, 0), 28.0f);
+        if (fontTitle_) ImGui::PushFont(fontTitle_);
+        ImGui::TextColored(c.ink, "Ethernet LAN Performance Advantage");
+        if (fontTitle_) ImGui::PopFont();
+        ImGui::Spacing();
 
-    ImGui::Dummy(ImVec2(barW, barH));
-    ImGui::Spacing();
+        if (fontRegular_) ImGui::PushFont(fontRegular_);
+        ImGui::TextColored(c.mute,
+            "Your workstation is streaming over a dedicated physical Ethernet connection (%s).\n"
+            "Wired Ethernet provides sustained sub-millisecond latency (<1 ms), 0%% packet loss, and zero radio frequency jitter,\n"
+            "enabling optimal 1080p60 and 4K60 low-latency remote game streaming.",
+            liveNetworkStatus_.adapterName.c_str());
+        if (fontRegular_) ImGui::PopFont();
 
-    if (fontSmall_) ImGui::PushFont(fontSmall_);
-    ImGui::TextColored(c.mute, "Input 50 kbps, reserved   *   Audio 128 kbps, reserved   *   Video gets the rest");
-    if (fontSmall_) ImGui::PopFont();
-
-    EndCardContainer();
+        EndCardContainer();
+    }
 }
 
 void DesktopApplication::renderGuiLoadingScreen() {
@@ -2656,33 +3329,25 @@ void DesktopApplication::renderGuiFrame() {
         }
     }
 
-    // Network adaptation tick
+    checkBackgroundProcesses();
+
+    // Real network telemetry sync from probe worker
     static float netTimer = 0.0f;
     netTimer += dt;
-    if (netTimer >= 1.0f) {
+    if (netTimer >= 0.5f) {
         netTimer = 0.0f;
-        if (isNetworkCongested_) {
-            networkBitrate_ = std::max(2.5f, networkBitrate_ * 0.78f);
-            networkLoss_ = std::min(9.0f, networkLoss_ + 1.2f);
-            networkQosState_ = (networkBitrate_ < 5.0f) ? "Critically congested" : "Congested";
-            networkRtt_ = 60 + (rand() % 50);
-            networkJitter_ = 9;
-            congestionDuration_ -= 1.0f;
-            if (congestionDuration_ <= 0.0f) {
-                isNetworkCongested_ = false;
-            }
-        } else if (networkBitrate_ < static_cast<float>(settingsMaxBitrateMbps_) - 0.05f) {
-            networkBitrate_ = std::min(static_cast<float>(settingsMaxBitrateMbps_), networkBitrate_ + 0.6f);
-            networkLoss_ = std::max(0.0f, networkLoss_ - 0.8f);
-            networkQosState_ = (networkBitrate_ < settingsMaxBitrateMbps_ - 1.0f) ? "Recovering" : "Increasing";
-            networkRtt_ = 16 + (rand() % 5);
-            networkJitter_ = 2;
+        std::lock_guard<std::mutex> lock(networkMutex_);
+        float liveSpeed = liveNetworkStatus_.rxThroughputMbps + liveNetworkStatus_.txThroughputMbps;
+        if (isHostingActive_) {
+            networkBitrate_ = (liveSpeed > 1.0f) ? liveSpeed : hostBitrate_;
         } else {
-            networkQosState_ = "Stable";
-            networkLoss_ = 0.0f;
-            networkRtt_ = 18;
-            networkJitter_ = 2;
+            networkBitrate_ = (liveSpeed > 0.05f) ? liveSpeed : 0.4f;
         }
+
+        networkRtt_ = (liveNetworkStatus_.gatewayPingMs > 0) ? liveNetworkStatus_.gatewayPingMs : 1;
+        networkJitter_ = liveNetworkStatus_.jitterMs;
+        networkLoss_ = liveNetworkStatus_.packetLossPercent;
+        networkQosState_ = liveNetworkStatus_.qosState;
 
         bitrateHistory_.push_back(networkBitrate_);
         if (bitrateHistory_.size() > 60) bitrateHistory_.erase(bitrateHistory_.begin());

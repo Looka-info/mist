@@ -46,5 +46,8 @@ target_link_libraries(mist_desktop PRIVATE
     mist_transport
     mist_platform_windows
     windowscodecs
+    wlanapi
+    iphlpapi
+    ws2_32
     mist_warnings
 )

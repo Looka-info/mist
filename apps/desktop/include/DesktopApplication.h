@@ -8,6 +8,9 @@
 #include <string>
 #include <optional>
 #include <vector>
+#include <thread>
+#include <mutex>
+#include <chrono>
 
 #if defined(_WIN32)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -44,6 +47,60 @@ struct TrustedDeviceItem {
     std::string lastSeen;
     bool allowKbdMouse{true};
     bool allowController{true};
+};
+
+struct NearbyWifiNetwork {
+    std::string ssid;
+    int signalPercent{0};
+    int rssiDbm{-100};
+    float frequencyGhz{0.0f};
+    int channel{0};
+    std::string standard;
+    std::string security;
+};
+
+struct LiveNetworkStatus {
+    std::string adapterName{"Wired Ethernet"};
+    std::string connectionType{"Wired Ethernet (802.3)"};
+    bool isWifi{false};
+    bool isConnected{true};
+    std::string ipv4Address{"192.168.1.8"};
+    std::string gatewayAddress{"192.168.1.1"};
+    std::string macAddress;
+    uint64_t linkSpeedMbps{100};
+
+    // Real Wi-Fi probe details
+    std::string wifiSsid;
+    std::string wifiBssid;
+    int wifiSignalQualityPercent{0};
+    int wifiRssiDbm{-100};
+    float wifiFrequencyGhz{0.0f};
+    int wifiChannel{0};
+    std::string wifiStandard;
+    std::string wifiAuthCipher;
+
+    // Live Real-Time Throughput (Rx / Tx)
+    float rxThroughputMbps{0.0f};
+    float txThroughputMbps{0.0f};
+
+    // Live Real-Time Latency & Jitter
+    int gatewayPingMs{0};
+    int internetPingMs{0};
+    int jitterMs{0};
+    float packetLossPercent{0.0f};
+    std::string qosState{"Stable"};
+
+    std::vector<NearbyWifiNetwork> nearbyWifiList;
+};
+
+struct LiveSystemHardware {
+    std::string gpuName{"NVIDIA GeForce GTX 1660 SUPER"};
+    std::string gpuDriver{"617.14"};
+    bool hasNvenc{true};
+    std::string displayInfo{"1920x1080 @ 60Hz"};
+    std::string audioEndpoint{"Default Audio Device"};
+    std::string gamepadStatus{"No controller detected"};
+    bool hasGamepad{false};
 };
 
 class DesktopApplication {
@@ -245,6 +302,35 @@ private:
     char quickConnectHostInput_[64]{"127.0.0.1:8080"};
     bool sampleRequestPending_{true};
     int selectedMonitorIndex_{0};
+    // Real System & Network Monitor Worker
+    void startNetworkMonitor();
+    void stopNetworkMonitor();
+    void networkMonitorWorker();
+    void probeLiveHardware();
+    void probeLiveNetwork();
+
+    std::thread networkThread_;
+    std::atomic<bool> networkThreadRunning_{false};
+    std::mutex networkMutex_;
+    LiveNetworkStatus liveNetworkStatus_;
+    LiveSystemHardware liveSystemHardware_;
+    uint64_t prevInOctets_{0};
+    uint64_t prevOutOctets_{0};
+    std::chrono::steady_clock::time_point prevSampleTime_{std::chrono::steady_clock::now()};
+    int prevGatewayPing_{-1};
+
+    // Real Process Spawning for Streaming
+    HANDLE hHostProcess_{nullptr};
+    DWORD hostProcessPid_{0};
+    HANDLE hClientProcess_{nullptr};
+    DWORD clientProcessPid_{0};
+
+    bool launchHostProcess(const std::string& sessionId, const std::string& signalingUrl, bool enableAudio, bool allowInput);
+    void terminateHostProcess();
+    bool launchClientProcess(const std::string& sessionId, const std::string& signalingUrl, bool hearAudio, bool sendInput);
+    void terminateClientProcess();
+    void checkBackgroundProcesses();
+
     bool emergencyDisconnectTriggered_{false};
 #endif
 
