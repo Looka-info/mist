@@ -1,6 +1,7 @@
 #include "mist/transport/VideoTrackSender.h"
 #include "mist/common/Logger.h"
 #include "rtc/rtc.hpp"
+#include "rtc/rembhandler.hpp"
 
 namespace mist::transport {
 
@@ -49,6 +50,14 @@ common::Result<void> VideoTrackSender::initialize(
             }
         });
         track_->chainMediaHandler(pliHandler);
+
+        auto rembHandler = std::make_shared<rtc::RembHandler>([this](unsigned int bitrate) {
+            MIST_LOG_INFO(common::SubsystemId::Transport, "Received RTCP REMB request: " + std::to_string(bitrate) + " bps");
+            if (rembCb_) {
+                rembCb_(static_cast<uint32_t>(bitrate));
+            }
+        });
+        track_->chainMediaHandler(rembHandler);
 
         track_->onOpen([this]() {
             isOpen_.store(true);

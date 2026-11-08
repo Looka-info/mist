@@ -12,6 +12,7 @@ target_link_libraries(mist_desktop PRIVATE
     mist_session
     mist_telemetry
     mist_security
+    mist_transport
     mist_platform_windows
     mist_warnings
 )

@@ -73,6 +73,10 @@ add_library(mist_transport STATIC
     src/DataChannelManager.cpp
     src/TransportStatistics.cpp
     src/WebRtcTransport.cpp
+    src/qos/NetworkQualityEstimator.cpp
+    src/qos/CongestionController.cpp
+    src/qos/QualityAdaptationManager.cpp
+    src/qos/AdaptiveBitrateController.cpp
 )
 
 target_include_directories(mist_transport PUBLIC

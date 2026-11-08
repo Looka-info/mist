@@ -51,6 +51,13 @@ common::Result<void> WebRtcTransport::initializeWebRtc(
         auto vRes = videoSender_->initialize(pc, config_);
         if (!vRes) return vRes;
 
+        qosController_ = std::make_shared<qos::AdaptiveBitrateController>();
+        videoSender_->setRembReceivedCallback([this](uint32_t bitrateBps) {
+            if (qosController_) {
+                qosController_->onRembReceived(bitrateBps);
+            }
+        });
+
         if (config_.enableAudio) {
             audioSender_ = std::make_shared<AudioTrackSender>();
             auto aRes = audioSender_->initialize(pc, config_);
@@ -342,6 +349,31 @@ void WebRtcTransport::setDataReceivedCallback(DataReceivedCallback callback) {
 
 bool WebRtcTransport::isConnected() const noexcept {
     return pcManager_ && pcManager_->isConnected();
+}
+
+common::Result<void> WebRtcTransport::requestVideoBitrate(uint32_t bitrateBps) {
+    std::shared_ptr<VideoTrackReceiver> vr;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        vr = videoReceiver_;
+    }
+    if (vr) {
+        vr->requestBitrate(bitrateBps);
+        return common::Result<void>::success();
+    }
+    return common::Error(common::SubsystemId::Transport, common::ErrorCode::InvalidState, "VideoTrackReceiver unavailable");
+}
+
+common::Result<void> WebRtcTransport::restartIce() {
+    std::shared_ptr<PeerConnectionManager> pcm;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        pcm = pcManager_;
+    }
+    if (pcm) {
+        return pcm->restartIce();
+    }
+    return common::Error(common::SubsystemId::Transport, common::ErrorCode::InvalidState, "PeerConnectionManager unavailable");
 }
 
 TransportStatsSnapshot WebRtcTransport::getStatsSnapshot() const noexcept {

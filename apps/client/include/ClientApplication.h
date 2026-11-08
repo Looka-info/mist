@@ -23,7 +23,10 @@ enum class ClientCommandMode {
     AudioPlaybackTest,
     AudioReceiveTest,
     InputTest,
-    GamepadTest
+    GamepadTest,
+    SystemInfo,
+    NetworkInfo,
+    DependencyAudit
 };
 
 struct ClientCliOptions {
@@ -69,6 +72,9 @@ private:
     [[nodiscard]] int executeAudioReceiveTest();
     [[nodiscard]] int executeInputTest();
     [[nodiscard]] int executeGamepadTest();
+    [[nodiscard]] int executeSystemInfo();
+    [[nodiscard]] int executeNetworkInfo();
+    [[nodiscard]] int executeDependencyAudit();
     [[nodiscard]] common::Result<void> runSelfTest();
 
     common::AppConfig config_;

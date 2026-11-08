@@ -46,6 +46,9 @@ Mist employs a multi-tiered automated testing strategy:
 | `InputPermissionTest` | `TestInputPermission.cpp` | Permission state machine (Disabled/Requested/Granted/Revoked), feature bitmask, session matching, sliding-window rate limiter (2000 ev/s), emergency release callbacks. |
 | `InputDispatcherTest` | `TestInputDispatcher.cpp` | Decoupled worker thread, bounded queue (max 64, drop oldest on overflow), relative mouse displacement coalescing, dispatch latency telemetry recording. |
 | `GamepadCaptureTest` | `TestGamepadCapture.cpp` | Dynamic XInput loader, thumbstick deadzones (7849/8689), trigger thresholds (30), virtual gamepad dynamic probe and graceful fallback. |
+| `QosTest` | `TestCongestionControl.cpp` | EWMA loss/RTT/jitter smoothing, REMB tracking, candidate pair link classification (DirectLan, DirectWan, RelayedTurn), AIMD state machine transitions, bandwidth budgeting, adaptive bitrate delta gating. |
+| `PairingTest` | `TestPairing.cpp` | 6-character alphanumeric code generation, entropy check, expiration validation, 5-attempt rate-limiting lockout, granular permissions, atomic JSON persistence and reloading. |
+| `DesktopAppTest` | `TestDesktopApp.cpp` | Desktop application initialization, non-interactive `--self-test` mode, view navigation across all 6 screens, settings round-trip. |
 
 ### 2.2 Smoke Tests (CTest)
 
@@ -62,6 +65,44 @@ Mist employs a multi-tiered automated testing strategy:
 ---
 
 ## 3. Running Tests
+
+### Automated Milestone 6 Verification Suite
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\verify-milestone-6.ps1 -BenchmarkSeconds 10
+```
+
+### Production Installer & Packaging Build
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1 -SkipSigning
+# Or with release code-signing:
+powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
+```
+
+### Milestone 6 Diagnostics & Production Audit Commands
+```powershell
+# Host & Client System Information
+./build/apps/host/mist_host.exe --system-info
+./build/apps/client/mist_client.exe --system-info
+
+# Stream Capabilities Audit
+./build/apps/host/mist_host.exe --stream-capabilities
+./build/apps/client/mist_client.exe --stream-capabilities
+
+# Network & Relay Traversal Info
+./build/apps/host/mist_host.exe --network-info
+./build/apps/client/mist_client.exe --network-info
+
+# Hardware Encoder & Decoder Info
+./build/apps/host/mist_host.exe --encoder-info
+./build/apps/client/mist_client.exe --decoder-info
+
+# Dependency & Dynamic Library Audit
+./build/apps/host/mist_host.exe --dependency-audit
+./build/apps/client/mist_client.exe --dependency-audit
+
+# Desktop Management Application Self-Test
+./build/apps/desktop/mist_desktop.exe --self-test
+```
 
 ### Automated Milestone 5 Verification Suite
 ```powershell

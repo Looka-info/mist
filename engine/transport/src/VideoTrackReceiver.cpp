@@ -1,6 +1,7 @@
 #include "mist/transport/VideoTrackReceiver.h"
 #include "mist/common/Logger.h"
 #include "rtc/rtc.hpp"
+#include "rtc/rtcpreceivingsession.hpp"
 #include <cstring>
 
 namespace mist::transport {
@@ -48,6 +49,9 @@ void VideoTrackReceiver::attachTrack(std::shared_ptr<rtc::Track> track) {
     auto depacketizer = std::make_shared<rtc::H264RtpDepacketizer>(rtc::NalUnit::Separator::StartSequence);
     track->setMediaHandler(depacketizer);
 
+    auto rtcpSession = std::make_shared<rtc::RtcpReceivingSession>();
+    track->chainMediaHandler(rtcpSession);
+
     track->onOpen([this]() {
         isOpen_.store(true);
         MIST_LOG_INFO(common::SubsystemId::Transport, "VideoTrackReceiver opened and ready.");
@@ -87,6 +91,16 @@ void VideoTrackReceiver::requestKeyframe() noexcept {
         try {
             track_->requestKeyframe();
             MIST_LOG_DEBUG(common::SubsystemId::Transport, "Sent RTCP PLI request for IDR keyframe");
+        } catch (...) {}
+    }
+}
+
+void VideoTrackReceiver::requestBitrate(uint32_t bitrateBps) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (track_ && isOpen_.load()) {
+        try {
+            track_->requestBitrate(bitrateBps);
+            MIST_LOG_DEBUG(common::SubsystemId::Transport, "Sent RTCP REMB request: " + std::to_string(bitrateBps) + " bps");
         } catch (...) {}
     }
 }

@@ -33,6 +33,7 @@ public:
 
     void setFrameReceivedCallback(FrameReceivedCallback cb) { frameCb_ = std::move(cb); }
     void requestKeyframe() noexcept;
+    void requestBitrate(uint32_t bitrateBps) noexcept;
 
     [[nodiscard]] bool isTrackOpen() const noexcept;
     [[nodiscard]] uint64_t getFramesReceived() const noexcept { return framesReceived_.load(std::memory_order_relaxed); }

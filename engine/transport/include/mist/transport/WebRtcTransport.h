@@ -9,6 +9,7 @@
 #include "mist/transport/AudioTrackSender.h"
 #include "mist/transport/AudioTrackReceiver.h"
 #include "mist/transport/DataChannelManager.h"
+#include "mist/transport/qos/AdaptiveBitrateController.h"
 #include "mist/services/ISignalingClient.h"
 #include <memory>
 #include <mutex>
@@ -56,6 +57,10 @@ public:
     [[nodiscard]] std::shared_ptr<AudioTrackSender> getAudioSender() const noexcept { return audioSender_; }
     [[nodiscard]] std::shared_ptr<AudioTrackReceiver> getAudioReceiver() const noexcept { return audioReceiver_; }
     [[nodiscard]] std::shared_ptr<DataChannelManager> getDataChannelManager() const noexcept { return dcManager_; }
+    [[nodiscard]] std::shared_ptr<qos::AdaptiveBitrateController> getQosController() const noexcept { return qosController_; }
+
+    [[nodiscard]] common::Result<void> requestVideoBitrate(uint32_t bitrateBps);
+    [[nodiscard]] common::Result<void> restartIce();
 
 private:
     void setupSignalingRouting();
@@ -70,6 +75,7 @@ private:
     std::shared_ptr<AudioTrackSender> audioSender_;
     std::shared_ptr<AudioTrackReceiver> audioReceiver_;
     std::shared_ptr<DataChannelManager> dcManager_;
+    std::shared_ptr<qos::AdaptiveBitrateController> qosController_;
     std::shared_ptr<services::ISignalingClient> signalingClient_;
 
     std::shared_ptr<TransportStatistics> stats_;

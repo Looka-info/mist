@@ -53,13 +53,13 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 | `engine/encode` | `mist_encode` | NVIDIA NVENC Hardware Video Encoder (`NvencVideoEncoder`), dynamic SDK loader, capability discovery, low-latency CBR tuning. | **Implemented & Verified** (M1) |
 | `engine/decode` | `mist_decode` | Direct3D 11 Hardware Video Decoder (`D3D11VideoDecoder`), Annex-B parser (`H264Parser`, `AnnexBReader`), DXGI device manager binding, and `DecodePresentPipeline`. | **Implemented & Verified** (M2) |
 | `engine/render` | `mist_render` | Direct3D 11 Presentation Renderer (`D3D11Renderer`), DXGI Flip-Model swap chain (`DXGI_SWAP_EFFECT_FLIP_DISCARD`), D3D11 Video Processor NV12-to-RGB conversion, letterboxing. | **Implemented & Verified** (M2) |
-| `engine/transport`| `mist_transport`| WebRTC peer connection manager, H.264 video track sender/receiver, SCTP data channels, RTCP PLI handling, transport statistics. | **Implemented & Verified** (M3) |
+| `engine/transport`| `mist_transport`| WebRTC peer connection manager, H.264 video track sender/receiver, SCTP data channels, RTCP PLI/REMB handling, transport statistics, and QoS subsystem (`NetworkQualityEstimator`, `CongestionController`, `AdaptiveBitrateController`, `QualityAdaptationManager`). | **Implemented & Verified** (M3/M6) |
 | `engine/audio` | `mist_audio` | Windows WASAPI loopback capture (`WasapiAudioCapture`), audio endpoint enumeration (`AudioDeviceEnumerator`), multi-channel ITU-R downmix & fractional resampler (`AudioResampler`), official Xiph Opus encoder/decoder (`OpusAudioEncoder`, `OpusAudioDecoder`), and client playout (`WasapiAudioPlayback`). | **Implemented & Verified** (M4) |
 | `engine/input` | `mist_input` | Remote input capture, compact binary protocol v1, input permission state machine, rate limiter, bounded dispatch queue, Win32 `SendInput` keyboard/mouse injectors, XInput capture, pluggable virtual gamepad (`IVirtualGamepad`). | **Implemented & Verified** (M5) |
 | `services` | `mist_services` | Signaling client interface (`ISignalingClient`, `SignalingMessage`, `WebSocketSignalingClient`) and Rust WebSocket signaling microservice (`mist-signaling`). | **Implemented & Verified** (M3) |
-| `apps/host` | `mist_host` | Host executable entry point, CLI diagnostics (`--list-displays`, `--capture-test`, `--encode-test`, `--capture-encode-test`), self-test. | **Implemented & Verified** (M0/M1) |
-| `apps/client` | `mist_client` | Client executable entry point, CLI diagnostics (`--decoder-info`, `--decode-test`, `--present-test`, `--decode-benchmark`), self-test. | **Implemented & Verified** (M0/M2) |
-| `apps/desktop` | `mist_desktop` | Unified desktop shell boundary. | **Implemented & Verified** (M0) |
+| `apps/host` | `mist_host` | Host executable entry point, CLI diagnostics (`--list-displays`, `--capture-test`, `--encode-test`, `--system-info`, `--dependency-audit`), self-test. | **Implemented & Verified** (M0/M1/M6) |
+| `apps/client` | `mist_client` | Client executable entry point, CLI diagnostics (`--decoder-info`, `--decode-test`, `--system-info`, `--dependency-audit`), self-test. | **Implemented & Verified** (M0/M2/M6) |
+| `apps/desktop` | `mist_desktop` | Native Windows C++20 desktop management shell (Home, Pairing, Host Management, Stream Settings, Live Session Telemetry, Device Management). | **Implemented & Verified** (M6) |
 
 ---
 
@@ -98,6 +98,7 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 - **Milestone 3:** Native WebRTC Transport (DataChannels, SRTP Video Streaming, STUN/TURN, Rust WebSocket Signaling). (**Complete & Hardware Verified**)
 - **Milestone 4:** Low-Latency Audio Streaming (WASAPI Loopback Capture, Opus 48kHz Codec, WebRTC RTP Audio Track, WASAPI Playback, A/V Sync). (**Complete & Hardware Verified**)
 - **Milestone 5:** Low-Latency Remote Input Control (Windows SendInput Keyboard/Mouse Injection, XInput Client Capture, Pluggable Virtual Gamepad, Dual DataChannels, Input Permission Manager). (**Complete & Hardware Verified**)
+- **Milestone 6:** Adaptive Streaming, Network QoS, Device Pairing & Production Hardening (Media-path REMB/RTCP telemetry, AIMD congestion control, dynamic NVENC bitrate adaptation, 6-character pairing codes, native desktop UI, Authenticode signing, and Windows installer). (**Complete & Hardware Verified**)
 
 ---
 
@@ -257,3 +258,87 @@ The codebase is strictly separated into independent sub-libraries to ensure clea
 
 ### ADR 0026: Gamepad Capture and Virtual Controller Architecture
 - **Decision:** Capture client gamepads via dynamic XInput with deadzone filtering, evaluate VHF vs ViGEmBus, and provide dynamic ViGEmBus probing with truthful fallback when kernel drivers are absent.
+
+---
+
+## 12. Network QoS, Device Pairing & Native Desktop Management UI (Milestone 6)
+
+### 12.1 Adaptive Streaming & Congestion Control Architecture
+Milestone 6 introduces closed-loop network adaptation, dynamically matching video encoding bitrate to real-time network conditions while preserving absolute priority for input events and audio packets:
+
+```
+[WebRTC Media Channel] ──> (RTP stats, RTCP Receiver Reports, REMB feedback)
+                                          │
+                                          ▼
+                             [NetworkQualityEstimator]
+                             - Loss EWMA (alpha = 0.20)
+                             - RTT EWMA (alpha = 0.15)
+                             - Jitter EWMA (alpha = 0.20)
+                             - Active Candidate Pair Inspection (Host / Srflx / Relay)
+                                          │
+                                          ▼
+                              [CongestionController]
+                             - 5-State Machine: Stable, Increasing, Congested, Recovering, CriticallyCongested
+                             - Additive Increase / Multiplicative Decrease (AIMD)
+                             - 1000 ms Probe Cooldown, 20% Backoff on Congestion, 50% Emergency Cut
+                                          │
+                                          ▼
+                            [QualityAdaptationManager]
+                             - Profiles: Performance (720p60), Balanced (1080p60), Quality (1080p60), Adaptive
+                             - Bandwidth Budgeting: Input (50 kbps) > Audio (128 kbps) > Headroom > Video
+                                          │
+                                          ▼
+                            [AdaptiveBitrateController]
+                             - Delta Gating (>= 250 kbps threshold to prevent encoder thrashing)
+                                          │
+                                          ▼
+                           [NvencEncoder::reconfigure()]
+                             - In-flight dynamic bitrate updates via nvEncReconfigureEncoder
+                             - Zero pipeline teardown, zero VRAM recreation, zero frame interruption
+```
+
+### 12.2 Device Pairing & Granular Host Authorization
+- **Alphanumeric Pairing Codes:** Ephemeral, high-entropy 6-character uppercase codes (`23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, excluding ambiguous characters like `0`/`O` and `1`/`I`) generated via cryptographically secure RNG.
+- **Brute-Force Lockout:** Failed attempts trigger progressive delays; 5 failed attempts enforce an automatic 300-second lockout.
+- **Constant-Time Verification:** String comparisons utilize `constantTimeEquals` to prevent side-channel timing attacks.
+- **Granular Capability Permissions:** The host grants separate boolean permissions per paired device: `allowVideo`, `allowAudio`, `allowKeyboard`, `allowMouse`, and `allowGamepad`.
+- **Atomic Persistence:** Trusted devices are stored in `trusted_devices.json` using atomic file writes to prevent corruption during unexpected power loss.
+
+### 12.3 Native Windows Desktop Shell (`apps/desktop`)
+- High-performance native C++20 management interface with zero Electron or web framework overhead.
+- Features 6 specialized screens: Home / Status, Device Pairing, Host Management, Stream Settings, Live Session Telemetry, and Device Permissions.
+- Supports both interactive console operation and non-interactive automated testing (`--self-test`).
+
+### 12.4 Distribution, Packaging & Authenticode Signing
+- **Production Package:** Automated generation of `dist/mist-v0.1.0-windows-x64.zip` containing all binaries, assets, documentation, and installation scripts.
+- **Lifecycle Scripts:** `install.ps1` with `%LOCALAPPDATA%\Mist` installation, PATH registration, firewall rule configuration; `uninstall.ps1` for clean removal.
+- **Code Signing:** `scripts/sign-release.ps1` signs executables using Windows Authenticode (`signtool.exe`), falling back to a self-signed development certificate if no enterprise HSM/CA certificate is present.
+- **Cryptographic Release Manifest:** Authoritative `release-manifest.json` with SHA-256 hashes, file sizes, version metadata, and build timestamps.
+
+---
+
+## 13. Milestone 6 Architecture Decision Records (ADRs)
+
+### ADR 0027: Media-Path Network Telemetry and Congestion Control
+- **Decision:** Extract real-time transport metrics directly from media tracks via `rtc::RembHandler` and `rtc::RtcpReceivingSession`, apply EWMA smoothing, and drive a 5-state AIMD congestion controller without external probing daemons.
+
+### ADR 0028: Adaptive Video Bitrate with NVENC Dynamic Reconfiguration
+- **Decision:** Dynamically update `NV_ENC_CONFIG` bitrate parameters in-flight via `nvEncReconfigureEncoder` rather than recreating encoder contexts, eliminating video glitches during bandwidth fluctuations.
+
+### ADR 0029: Multi-Tier Quality Adaptation Policies
+- **Decision:** Implement 4 distinct quality profiles (`Performance`, `Balanced`, `Quality`, `Adaptive`) with prioritized bandwidth partitioning where interactive input and audio take precedence over video bitrate.
+
+### ADR 0030: STUN/TURN Relay Selection and Candidate Pair Reporting
+- **Decision:** Configure standard STUN and TURN URIs (`turn:`, `turns:` over UDP, TCP, and TLS), inspect active candidate pairs (`rtc::PeerConnection::getSelectedCandidatePair()`), and classify link types (`DirectLan`, `DirectWan`, `RelayedTurn`).
+
+### ADR 0031: Cryptographic Device Pairing and Granular Authorization
+- **Decision:** Use 6-character single-use alphanumeric codes with 5-attempt rate-limiting lockout, host approval, granular feature bitmasks, and persistent JSON storage.
+
+### ADR 0032: Native Desktop Management UI Architecture
+- **Decision:** Build a lean native C++20 desktop shell (`mist_desktop.exe`) with dedicated views for pairing, hosting, settings, and telemetry, avoiding heavy runtime frameworks like Electron or webviews.
+
+### ADR 0033: Windows Application Distribution and Installer Architecture
+- **Decision:** Package a self-contained ZIP archive with automated PowerShell installation and uninstallation scripts managing per-user installation, environment paths, and firewall rules.
+
+### ADR 0034: Release Code Signing and Update Integrity Verification
+- **Decision:** Sign all distributed binaries with Authenticode (supporting enterprise certs with transparent dev-cert fallback) and publish an authoritative SHA-256 `release-manifest.json` for tamper verification.

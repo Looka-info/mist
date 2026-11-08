@@ -37,6 +37,8 @@ public:
     [[nodiscard]] std::shared_ptr<rtc::PeerConnection> getPeerConnection() const noexcept;
     [[nodiscard]] WebRtcState getState() const noexcept { return state_; }
     [[nodiscard]] bool isConnected() const noexcept { return state_ == WebRtcState::Connected; }
+    [[nodiscard]] bool getSelectedCandidatePair(std::string* localType, std::string* remoteType) const;
+    [[nodiscard]] common::Result<void> restartIce();
 
 private:
     mutable std::mutex mutex_;

@@ -67,6 +67,16 @@ Mist handles desktop capture, input injection, and low-latency network streaming
 - **Exclusion of Remote Execution Capabilities:**
   - *Mitigation:* The input protocol strictly encapsulates discrete hardware scan codes, mouse deltas, and controller states. It contains **zero** shell execution, process spawning, file transfer, or clipboard sharing capabilities.
 
+### 2.7 Device Pairing Security & Granular Authorization (Milestone 6)
+- **Brute-Force Pairing Code Enumeration:** Attackers guessing pairing codes on local or remote networks.
+  - *Mitigation:* Codes are 6 characters drawn from a 32-symbol alphanumeric alphabet (`32^6 = 1,073,741,824` combinations) excluding ambiguous characters (`0`, `O`, `1`, `I`). Codes expire after 300 seconds (single-use). 5 consecutive failed attempts trigger an immediate 300-second lockout.
+- **Timing Side Channels in Pairing Verification:**
+  - *Mitigation:* Verification uses `mist::security::constantTimeEquals` across all comparison paths.
+- **Overprivileged Remote Client Capabilities:** Clients granted stream viewing obtaining unintended access to host input or audio.
+  - *Mitigation:* Granular capability permissions (`allowVideo`, `allowAudio`, `allowKeyboard`, `allowMouse`, `allowGamepad`) are explicitly configured and stored per paired device. Viewing video does not grant input or audio capture access.
+- **Trusted Devices Store Tampering & Crash Corruption:**
+  - *Mitigation:* `PairingManager` uses atomic file replacement (`trusted_devices.json.tmp` renamed to `trusted_devices.json`) to prevent partial writes during crashes or unexpected termination.
+
 ---
 
 ## 3. Cryptographic & Device Authorization Requirements
@@ -90,3 +100,15 @@ Mist handles desktop capture, input injection, and low-latency network streaming
    - Engine subsystems (`engine/*`) remain pure, portable C++20 without direct includes of `<windows.h>`.
 2. **Error Translation:**
    - System error codes are cleanly translated into typed `mist::common::Error` structs with clear subsystem ownership, eliminating opaque numeric return codes.
+
+---
+
+## 5. Code Signing & Release Integrity Verification (Milestone 6)
+
+1. **Authenticode Signatures (`scripts/sign-release.ps1`):**
+   - Distributed Windows binaries (`mist_host.exe`, `mist_client.exe`, `mist_desktop.exe`, `mist-signaling.exe`) are signed with Windows Authenticode using Microsoft `signtool.exe`.
+   - Incorporates trusted timestamping (`http://timestamp.digicert.com`) to preserve signature validity after certificate expiration.
+   - For local development and testing, automatically creates and signs with an isolated development code-signing certificate (`CN=Mist Development Code Signing`).
+2. **Release Manifest (`release-manifest.json`):**
+   - Every distribution archive includes a cryptographically verifiable release manifest recording SHA-256 hashes, file sizes, version metadata, and build timestamps.
+   - Installers and update verifiers check file integrity against the manifest before execution.

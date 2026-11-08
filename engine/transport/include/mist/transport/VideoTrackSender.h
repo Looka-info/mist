@@ -17,6 +17,7 @@ class RtpPacketizationConfig;
 namespace mist::transport {
 
 using KeyframeRequestCallback = std::function<void()>;
+using RembReceivedCallback = std::function<void(uint32_t bitrateBps)>;
 
 class VideoTrackSender {
 public:
@@ -33,6 +34,7 @@ public:
     [[nodiscard]] common::Result<void> sendFrame(const encode::EncodedPacket& packet);
 
     void setKeyframeRequestCallback(KeyframeRequestCallback cb) { keyframeCb_ = std::move(cb); }
+    void setRembReceivedCallback(RembReceivedCallback cb) { rembCb_ = std::move(cb); }
     [[nodiscard]] bool isTrackOpen() const noexcept;
     [[nodiscard]] uint64_t getFramesSent() const noexcept { return framesSent_.load(std::memory_order_relaxed); }
     [[nodiscard]] uint64_t getFramesDropped() const noexcept { return framesDropped_.load(std::memory_order_relaxed); }
@@ -45,6 +47,7 @@ private:
     std::shared_ptr<rtc::Track> track_;
     std::shared_ptr<rtc::RtpPacketizationConfig> rtpConfig_;
     KeyframeRequestCallback keyframeCb_;
+    RembReceivedCallback rembCb_;
     uint64_t frameIndex_{0};
 
     std::atomic<uint64_t> framesSent_{0};

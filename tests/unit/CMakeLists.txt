@@ -29,6 +29,9 @@ add_executable(mist_unit_tests
     TestInputPermission.cpp
     TestInputDispatcher.cpp
     TestGamepadCapture.cpp
+    TestCongestionControl.cpp
+    TestPairing.cpp
+    TestDesktopApp.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE
@@ -55,10 +58,11 @@ target_link_libraries(mist_unit_tests PRIVATE
     mist_warnings
 )
 
-# Also compile the host and client application classes for lifecycle unit testing
+# Also compile the host, client and desktop application classes for lifecycle unit testing
 target_sources(mist_unit_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/apps/host/src/HostApplication.cpp
     ${CMAKE_SOURCE_DIR}/apps/client/src/ClientApplication.cpp
+    ${CMAKE_SOURCE_DIR}/apps/desktop/src/DesktopApplication.cpp
 )
 
 include(GoogleTest)

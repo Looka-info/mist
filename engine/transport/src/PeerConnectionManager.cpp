@@ -16,7 +16,41 @@ common::Result<void> PeerConnectionManager::initialize(const WebRtcTransportConf
 
     rtc::Configuration rtcConfig{};
     for (const auto& s : config_.iceServers) {
-        rtcConfig.iceServers.emplace_back(s.url);
+        if (!s.username.empty() || !s.credential.empty()) {
+            std::string url = s.url;
+            std::string hostPort = url;
+            if (url.starts_with("turn:")) {
+                hostPort = url.substr(5);
+            } else if (url.starts_with("turns:")) {
+                hostPort = url.substr(6);
+            }
+            // Strip any URI query params like ?transport=tcp
+            auto qPos = hostPort.find('?');
+            std::string query = (qPos != std::string::npos) ? hostPort.substr(qPos) : "";
+            if (qPos != std::string::npos) {
+                hostPort = hostPort.substr(0, qPos);
+            }
+            std::string host = hostPort;
+            uint16_t port = 3478;
+            auto colonPos = hostPort.find(':');
+            if (colonPos != std::string::npos) {
+                host = hostPort.substr(0, colonPos);
+                try {
+                    port = static_cast<uint16_t>(std::stoi(hostPort.substr(colonPos + 1)));
+                } catch (...) {
+                    port = 3478;
+                }
+            }
+            rtc::IceServer::RelayType relayType = rtc::IceServer::RelayType::TurnUdp;
+            if (query.find("transport=tcp") != std::string::npos) {
+                relayType = rtc::IceServer::RelayType::TurnTcp;
+            } else if (url.starts_with("turns:")) {
+                relayType = rtc::IceServer::RelayType::TurnTls;
+            }
+            rtcConfig.iceServers.emplace_back(host, port, s.username, s.credential, relayType);
+        } else {
+            rtcConfig.iceServers.emplace_back(s.url);
+        }
     }
     if (config_.minPort > 0 && config_.maxPort > config_.minPort) {
         rtcConfig.portRangeBegin = config_.minPort;
@@ -268,6 +302,59 @@ common::Result<void> PeerConnectionManager::close() {
 std::shared_ptr<rtc::PeerConnection> PeerConnectionManager::getPeerConnection() const noexcept {
     std::lock_guard<std::mutex> lock(mutex_);
     return pc_;
+}
+
+bool PeerConnectionManager::getSelectedCandidatePair(std::string* localType, std::string* remoteType) const {
+    std::shared_ptr<rtc::PeerConnection> pc;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        pc = pc_;
+    }
+    if (!pc) return false;
+
+    rtc::Candidate localCand;
+    rtc::Candidate remoteCand;
+    if (pc->getSelectedCandidatePair(&localCand, &remoteCand)) {
+        if (localType) {
+            switch (localCand.type()) {
+                case rtc::Candidate::Type::Host: *localType = "host"; break;
+                case rtc::Candidate::Type::ServerReflexive: *localType = "srflx"; break;
+                case rtc::Candidate::Type::PeerReflexive: *localType = "prflx"; break;
+                case rtc::Candidate::Type::Relayed: *localType = "relay"; break;
+                default: *localType = "unknown"; break;
+            }
+        }
+        if (remoteType) {
+            switch (remoteCand.type()) {
+                case rtc::Candidate::Type::Host: *remoteType = "host"; break;
+                case rtc::Candidate::Type::ServerReflexive: *remoteType = "srflx"; break;
+                case rtc::Candidate::Type::PeerReflexive: *remoteType = "prflx"; break;
+                case rtc::Candidate::Type::Relayed: *remoteType = "relay"; break;
+                default: *remoteType = "unknown"; break;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+common::Result<void> PeerConnectionManager::restartIce() {
+    std::shared_ptr<rtc::PeerConnection> pc;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        pc = pc_;
+    }
+    if (!pc) {
+        return common::Error(common::SubsystemId::Transport, common::ErrorCode::InvalidState, "PeerConnection is null");
+    }
+    try {
+        pc->setLocalDescription(rtc::Description::Type::Offer, {.iceUfrag = std::nullopt, .icePwd = std::nullopt});
+        MIST_LOG_INFO(common::SubsystemId::Transport, "ICE restart initiated.");
+        return common::Result<void>::success();
+    } catch (const std::exception& e) {
+        return common::Error(common::SubsystemId::Transport, common::ErrorCode::InternalError,
+                             "Failed to restart ICE: " + std::string(e.what()));
+    }
 }
 
 } // namespace mist::transport

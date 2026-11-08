@@ -26,7 +26,12 @@ enum class HostCommandMode {
     AudioEncodeTest,
     InputInfo,
     InputTest,
-    GamepadTest
+    GamepadTest,
+    SystemInfo,
+    StreamCapabilities,
+    NetworkInfo,
+    EncoderInfo,
+    DependencyAudit
 };
 
 struct HostCommandLineOptions {
@@ -76,6 +81,11 @@ private:
     [[nodiscard]] int executeInputInfo();
     [[nodiscard]] int executeInputTest();
     [[nodiscard]] int executeGamepadTest();
+    [[nodiscard]] int executeSystemInfo();
+    [[nodiscard]] int executeStreamCapabilities();
+    [[nodiscard]] int executeNetworkInfo();
+    [[nodiscard]] int executeEncoderInfo();
+    [[nodiscard]] int executeDependencyAudit();
 
     common::AppConfig config_;
     HostCommandLineOptions options_;

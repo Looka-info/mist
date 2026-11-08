@@ -46,3 +46,7 @@ $RECYCLE.BIN/
 # Test artifacts
 artifacts/*.h264
 artifacts/*.mp4
+
+# Distribution packaging & local runtime stores
+dist/
+trusted_devices.json

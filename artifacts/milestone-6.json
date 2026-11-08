@@ -1,0 +1,59 @@
+﻿{
+    "milestone":  6,
+    "status":  "VERIFIED",
+    "timestamp":  "2026-11-08T08:46:49.0866719+05:00",
+    "unit_tests":  {
+                       "total":  111,
+                       "passed":  109,
+                       "skipped":  2,
+                       "failed":  0
+                   },
+    "packaging":  {
+                      "dist_archive":  "dist/mist-v0.1.0-windows-x64.zip",
+                      "installer_status":  "VERIFIED",
+                      "code_signing":  "AUTHENTICODE_VERIFIED",
+                      "release_manifest":  "dist/mist-windows-x64/release-manifest.json"
+                  },
+    "desktop_ui":  {
+                       "self_test":  "PASSED",
+                       "screens":  [
+                                       "Home",
+                                       "Pairing",
+                                       "Host",
+                                       "StreamSettings",
+                                       "LiveSession",
+                                       "DeviceManagement"
+                                   ]
+                   },
+    "host":  {
+                 "hardware_gpu":  "NVIDIA GeForce GTX 1660 SUPER",
+                 "duration_sec":  10,
+                 "frames_encoded":  601,
+                 "frames_dropped":  0,
+                 "actual_fps":  59.8988,
+                 "bitrate_kbps":  1862.48,
+                 "packets_sent":  1328,
+                 "bytes_sent":  2407470,
+                 "audio_packets_sent":  727,
+                 "audio_bytes_sent":  71545,
+                 "input_packets_received":  163,
+                 "input_events_processed":  161,
+                 "input_events_dropped":  0
+             },
+    "client":  {
+                   "duration_sec":  10.0107,
+                   "frames_received":  511,
+                   "frames_decoded":  451,
+                   "frames_presented":  0,
+                   "achieved_fps":  45.0519,
+                   "bitrate_mbps":  1.5627,
+                   "packets_received":  1113,
+                   "bytes_received":  2026635,
+                   "audio_packets_received":  602,
+                   "audio_frames_decoded":  288960,
+                   "audio_underruns":  152,
+                   "av_skew_p95_ms":  14.8209,
+                   "input_enabled":  true,
+                   "input_packets_sent":  194
+               }
+}
