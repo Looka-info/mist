@@ -54,6 +54,7 @@ target_link_libraries(mist_unit_tests PRIVATE
     mist_telemetry
     mist_security
     mist_platform_windows
+    windowscodecs
     mist_services
     GTest::gtest_main
     mist_warnings

@@ -317,6 +317,15 @@ bool PerformUninstall(const std::wstring& installDir, bool silent) {
 }
 
 void DrawSleekMintLogoGdi(HDC hdc, int x, int y, int size) {
+    HICON hIcon = (HICON)LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1), IMAGE_ICON, size, size, LR_SHARED);
+    if (!hIcon) {
+        hIcon = (HICON)LoadImageA(nullptr, "mist.ico", IMAGE_ICON, size, size, LR_LOADFROMFILE);
+    }
+    if (hIcon) {
+        DrawIconEx(hdc, x, y, hIcon, size, size, 0, nullptr, DI_NORMAL);
+        return;
+    }
+
     HBRUSH hMintBrush = CreateSolidBrush(MINT_BRAND); // #46deb5
     HPEN hBorderPen = CreatePen(PS_SOLID, 1, BORDER_LINE);
 
@@ -377,6 +386,15 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
             ctx = reinterpret_cast<InstallerContext*>(cs->lpCreateParams);
             ctx->hWnd = hWnd;
             SetWindowLongPtrW(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(ctx));
+
+            HICON hAppIcon = (HICON)LoadImageW(ctx->hInstance, MAKEINTRESOURCEW(1), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
+            if (!hAppIcon) {
+                hAppIcon = (HICON)LoadImageA(nullptr, "mist.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
+            }
+            if (hAppIcon) {
+                SendMessageW(hWnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hAppIcon));
+                SendMessageW(hWnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hAppIcon));
+            }
 
             HFONT hFontMain = CreateFontW(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
             HFONT hFontBold = CreateFontW(16, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");

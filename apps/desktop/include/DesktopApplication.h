@@ -156,6 +156,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> d3d11Context_;
     Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain_;
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> rtv_;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> logoTextureSrv_;
 
     uint32_t guiWidth_{1280};
     uint32_t guiHeight_{800};

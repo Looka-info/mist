@@ -7,6 +7,7 @@
 #include "backends/imgui_impl_win32.h"
 #include "backends/imgui_impl_dx11.h"
 #include <shellscalingapi.h>
+#include <wincodec.h>
 #include <random>
 #include <cmath>
 #include <vector>
@@ -74,6 +75,84 @@ static std::string resolveFontPath(const std::string& filename) {
         }
     }
     return "";
+}
+
+static std::string resolveResourcePath(const std::string& filename) {
+    const std::vector<std::string> candidates = {
+        filename,
+        "resources/" + filename,
+        "../resources/" + filename,
+        "../../resources/" + filename,
+        "../../../resources/" + filename,
+        "C:/Users/mumer/AppData/Local/Programs/Mist/resources/" + filename,
+        "C:/Users/mumer/OneDrive/Desktop/mist/resources/" + filename,
+        "C:/Users/mumer/AppData/Local/Programs/Mist/" + filename
+    };
+    for (const auto& path : candidates) {
+        DWORD attrib = GetFileAttributesA(path.c_str());
+        if (attrib != INVALID_FILE_ATTRIBUTES && !(attrib & FILE_ATTRIBUTE_DIRECTORY)) {
+            return path;
+        }
+    }
+    return "";
+}
+
+static Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> loadTextureFromPngFile(ID3D11Device* device, const std::string& filename) {
+    if (!device || filename.empty()) return nullptr;
+
+    (void)CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
+    Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+    HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
+    if (FAILED(hr)) return nullptr;
+
+    std::wstring wFilename(filename.begin(), filename.end());
+    Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+    hr = factory->CreateDecoderFromFilename(wFilename.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder);
+    if (FAILED(hr)) return nullptr;
+
+    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+    hr = decoder->GetFrame(0, &frame);
+    if (FAILED(hr)) return nullptr;
+
+    UINT width = 0, height = 0;
+    frame->GetSize(&width, &height);
+    if (width == 0 || height == 0) return nullptr;
+
+    Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+    hr = factory->CreateFormatConverter(&converter);
+    if (FAILED(hr)) return nullptr;
+
+    hr = converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
+    if (FAILED(hr)) return nullptr;
+
+    std::vector<uint8_t> buffer(static_cast<size_t>(width) * height * 4);
+    hr = converter->CopyPixels(nullptr, width * 4, static_cast<UINT>(buffer.size()), buffer.data());
+    if (FAILED(hr)) return nullptr;
+
+    D3D11_TEXTURE2D_DESC desc{};
+    desc.Width = width;
+    desc.Height = height;
+    desc.MipLevels = 1;
+    desc.ArraySize = 1;
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+    D3D11_SUBRESOURCE_DATA subData{};
+    subData.pSysMem = buffer.data();
+    subData.SysMemPitch = width * 4;
+
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;
+    hr = device->CreateTexture2D(&desc, &subData, &texture);
+    if (FAILED(hr)) return nullptr;
+
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
+    hr = device->CreateShaderResourceView(texture.Get(), nullptr, &srv);
+    if (FAILED(hr)) return nullptr;
+
+    return srv;
 }
 
 static void BeginCardContainer(const char* id, const mist::desktop::tokens::ThemeColors& c, const ImVec2& size = ImVec2(0, 0), float rounding = 28.0f) {
@@ -445,6 +524,19 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     wc.hInstance = GetModuleHandleW(nullptr);
     wc.lpszClassName = L"MistDesktopGuiWindow";
     wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
+
+    HICON hAppIcon = (HICON)LoadImageW(wc.hInstance, MAKEINTRESOURCEW(1), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
+    if (!hAppIcon) {
+        std::string iconPath = resolveResourcePath("mist.ico");
+        if (!iconPath.empty()) {
+            hAppIcon = (HICON)LoadImageA(nullptr, iconPath.c_str(), IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
+        }
+    }
+    if (hAppIcon) {
+        wc.hIcon = hAppIcon;
+        wc.hIconSm = hAppIcon;
+    }
+
     RegisterClassExW(&wc);
 
     RECT wr = { 0, 0, static_cast<LONG>(guiWidth_), static_cast<LONG>(guiHeight_) };
@@ -464,6 +556,11 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
         std::string msg = "Failed to create application window (Win32 Error: " + std::to_string(err) + ").";
         MessageBoxA(nullptr, msg.c_str(), "Mist Desktop — Window Creation Error", MB_ICONERROR | MB_OK);
         return platform::windows::win32ErrorToMistError(err, common::SubsystemId::DesktopApp, "CreateWindowW failed");
+    }
+
+    if (hAppIcon) {
+        SendMessageW(hwnd_, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hAppIcon));
+        SendMessageW(hwnd_, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hAppIcon));
     }
 
     SetWindowLongPtrW(hwnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -533,6 +630,11 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
         }
     }
 
+    std::string logoPng = resolveResourcePath("mist-logo.png");
+    if (!logoPng.empty()) {
+        logoTextureSrv_ = loadTextureFromPngFile(d3d11Device_.Get(), logoPng);
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -599,6 +701,7 @@ void DesktopApplication::cleanupD3D11Gui() {
     fontSmall_ = nullptr;
     fontCode_ = nullptr;
 
+    logoTextureSrv_.Reset();
     rtv_.Reset();
     swapChain_.Reset();
     d3d11Context_.Reset();
@@ -664,6 +767,11 @@ common::Result<void> DesktopApplication::runGuiLoop() {
 }
 
 void DesktopApplication::renderSleekMintLogo(float size) const {
+    if (logoTextureSrv_) {
+        ImGui::Image(reinterpret_cast<ImTextureID>(logoTextureSrv_.Get()), ImVec2(size, size));
+        return;
+    }
+
     ImVec2 pos = ImGui::GetCursorScreenPos();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
@@ -671,31 +779,74 @@ void DesktopApplication::renderSleekMintLogo(float size) const {
     ImVec2 pMax = ImVec2(pos.x + size, pos.y + size);
     float rounding = size * 0.28f;
 
+    // Card background matching squircle
     ImU32 badgeBg = (currentTheme_ == tokens::ThemeMode::Light)
-        ? IM_COL32(70, 222, 181, 255)   // Vibrant Mint #46deb5
-        : IM_COL32(111, 220, 182, 255); // Dark Vibrant Mint #6fdcb6
-
+        ? IM_COL32(255, 255, 255, 255)
+        : IM_COL32(20, 38, 32, 255);
     drawList->AddRectFilled(pMin, pMax, badgeBg, rounding);
 
-    ImU32 inkCol = (currentTheme_ == tokens::ThemeMode::Light)
-        ? IM_COL32(3, 43, 32, 255)      // #032b20
-        : IM_COL32(0, 56, 42, 255);     // #00382a
+    ImU32 cardBorder = (currentTheme_ == tokens::ThemeMode::Light)
+        ? IM_COL32(164, 237, 224, 255)
+        : IM_COL32(35, 75, 62, 255);
+    drawList->AddRect(pMin, pMax, cardBorder, rounding, 0, 1.0f);
 
-    // Geometric 'M' streaming paths
-    float pad = size * 0.22f;
+    // Dynamic emerald/mint controller M with D-pad and Action buttons
+    ImU32 mColor = (currentTheme_ == tokens::ThemeMode::Light)
+        ? IM_COL32(23, 145, 96, 255)
+        : IM_COL32(70, 222, 181, 255);
+    ImU32 whiteColor = IM_COL32(255, 255, 255, 255);
+
+    float pad = size * 0.18f;
     float w = size - pad * 2.0f;
     float h = size - pad * 2.0f;
+    float midX = pos.x + size * 0.5f;
 
-    ImVec2 p1(pos.x + pad, pos.y + pad + h);
-    ImVec2 p2(pos.x + pad, pos.y + pad);
-    ImVec2 p3(pos.x + pad + w * 0.5f, pos.y + pad + h * 0.55f);
-    ImVec2 p4(pos.x + pad + w, pos.y + pad);
-    ImVec2 p5(pos.x + pad + w, pos.y + pad + h);
+    // Left Wing (M mountain 1 with D-pad)
+    ImVec2 ptsLeft[4] = {
+        ImVec2(pos.x + pad, pos.y + pad + h),
+        ImVec2(pos.x + pad, pos.y + pad + h * 0.25f),
+        ImVec2(pos.x + pad + w * 0.38f, pos.y + pad),
+        ImVec2(pos.x + pad + w * 0.38f, pos.y + pad + h)
+    };
+    drawList->AddConvexPolyFilled(ptsLeft, 4, mColor);
 
-    drawList->AddLine(p1, p2, inkCol, size * 0.12f);
-    drawList->AddLine(p2, p3, inkCol, size * 0.12f);
-    drawList->AddLine(p3, p4, inkCol, size * 0.12f);
-    drawList->AddLine(p4, p5, inkCol, size * 0.12f);
+    // Right Wing (M mountain 2 with action buttons)
+    ImVec2 ptsRight[4] = {
+        ImVec2(pos.x + pad + w * 0.62f, pos.y + pad),
+        ImVec2(pos.x + pad + w, pos.y + pad + h * 0.25f),
+        ImVec2(pos.x + pad + w, pos.y + pad + h),
+        ImVec2(pos.x + pad + w * 0.62f, pos.y + pad + h)
+    };
+    drawList->AddConvexPolyFilled(ptsRight, 4, mColor);
+
+    // Center Play Triangle pointing right
+    ImVec2 triPts[3] = {
+        ImVec2(midX - size * 0.08f, pos.y + pad + h * 0.28f),
+        ImVec2(midX + size * 0.10f, pos.y + pad + h * 0.50f),
+        ImVec2(midX - size * 0.08f, pos.y + pad + h * 0.72f)
+    };
+    drawList->AddTriangleFilled(triPts[0], triPts[1], triPts[2], whiteColor);
+
+    // Left D-pad (+)
+    float dpadX = pos.x + pad + w * 0.18f;
+    float dpadY = pos.y + pad + h * 0.60f;
+    float dpadR = size * 0.06f;
+    drawList->AddLine(ImVec2(dpadX - dpadR, dpadY), ImVec2(dpadX + dpadR, dpadY), whiteColor, 1.8f);
+    drawList->AddLine(ImVec2(dpadX, dpadY - dpadR), ImVec2(dpadX, dpadY + dpadR), whiteColor, 1.8f);
+
+    // Right Action Buttons (4 dots)
+    float actX = pos.x + pad + w * 0.82f;
+    float actY = pos.y + pad + h * 0.60f;
+    float dotOff = size * 0.045f;
+    float dotR = size * 0.022f;
+    drawList->AddCircleFilled(ImVec2(actX, actY - dotOff), dotR, whiteColor);
+    drawList->AddCircleFilled(ImVec2(actX, actY + dotOff), dotR, whiteColor);
+    drawList->AddCircleFilled(ImVec2(actX - dotOff, actY), dotR, whiteColor);
+    drawList->AddCircleFilled(ImVec2(actX + dotOff, actY), dotR, whiteColor);
+
+    // Orbital Swoosh Ring
+    ImU32 swooshCol = IM_COL32(70, 222, 181, 220);
+    drawList->AddCircle(ImVec2(midX, pos.y + size * 0.55f), size * 0.38f, swooshCol, 32, 2.0f);
 
     ImGui::Dummy(ImVec2(size, size));
 }

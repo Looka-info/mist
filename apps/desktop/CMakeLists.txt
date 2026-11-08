@@ -45,5 +45,6 @@ target_link_libraries(mist_desktop PRIVATE
     mist_security
     mist_transport
     mist_platform_windows
+    windowscodecs
     mist_warnings
 )
