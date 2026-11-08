@@ -259,6 +259,8 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
 
     if (!hasCliScreenFlag && !runSelfTest_ && !headlessMode_) {
         launchInteractive_ = true;
+    } else {
+        isInitialLoading_ = false;
     }
 
     auto valRes = config_.validate();
@@ -359,6 +361,40 @@ void DesktopApplication::showToast(const std::string& message) {
     toastTimer_ = 2.5f; // Display for 2.5 seconds
 }
 
+void DesktopApplication::triggerError(const std::string& title, const std::string& message,
+                                     const std::string& suggestion, const std::string& code,
+                                     DesktopScreen returnScreen) {
+    activeError_.hasError = true;
+    activeError_.title = title;
+    activeError_.message = message;
+    activeError_.suggestion = suggestion;
+    activeError_.code = code;
+    activeError_.returnScreen = returnScreen;
+    currentScreen_ = DesktopScreen::Error;
+    MIST_LOG_ERROR(common::SubsystemId::DesktopApp, "[" + code + "] " + title + ": " + message);
+}
+
+void DesktopApplication::clearError() {
+    DesktopScreen ret = activeError_.returnScreen;
+    activeError_ = ErrorInfo{};
+    currentScreen_ = (ret == DesktopScreen::Error) ? DesktopScreen::Home : ret;
+}
+
+void DesktopApplication::renderLoadingSpinner(const ImVec2& center, float radius, ImU32 color, float thickness) const {
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    float time = static_cast<float>(ImGui::GetTime());
+    constexpr int numSegments = 24;
+    float startAngle = time * 6.0f;
+    constexpr float sweepAngle = 2.2f;
+
+    drawList->PathClear();
+    for (int i = 0; i <= numSegments; ++i) {
+        float a = startAngle + (static_cast<float>(i) / static_cast<float>(numSegments)) * sweepAngle;
+        drawList->PathLineTo(ImVec2(center.x + std::cos(a) * radius, center.y + std::sin(a) * radius));
+    }
+    drawList->PathStroke(color, ImDrawFlags_None, thickness);
+}
+
 void DesktopApplication::generateOrganicShapes() {
     organicShapes_.clear();
     struct ShapeTemplate {
@@ -421,7 +457,10 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     );
 
     if (!hwnd_) {
-        return platform::windows::win32ErrorToMistError(GetLastError(), common::SubsystemId::DesktopApp, "CreateWindowW failed");
+        DWORD err = GetLastError();
+        std::string msg = "Failed to create application window (Win32 Error: " + std::to_string(err) + ").";
+        MessageBoxA(nullptr, msg.c_str(), "Mist Desktop — Window Creation Error", MB_ICONERROR | MB_OK);
+        return platform::windows::win32ErrorToMistError(err, common::SubsystemId::DesktopApp, "CreateWindowW failed");
     }
 
     SetWindowLongPtrW(hwnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -467,6 +506,9 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
     }
 
     if (FAILED(hr)) {
+        std::string msg = "Direct3D 11 initialization failed (HRESULT: 0x" + std::to_string(static_cast<uint32_t>(hr)) + ").\n\n"
+                          "Please ensure your graphics card driver is installed and supports Direct3D 11.";
+        MessageBoxA(nullptr, msg.c_str(), "Mist Desktop — Direct3D 11 Error", MB_ICONERROR | MB_OK);
         return platform::windows::hresultToMistError(hr, common::SubsystemId::DesktopApp, "D3D11CreateDeviceAndSwapChain failed");
     }
 
@@ -757,6 +799,31 @@ void DesktopApplication::renderVectorIcon(const char* name, const ImVec2& center
         drawList->AddCircleFilled(ImVec2(cx, cy), 1.6f, color);
         drawList->AddCircleFilled(ImVec2(cx - size * 0.16f, cy + size * 0.16f), 1.6f, color);
         drawList->AddCircleFilled(ImVec2(cx + size * 0.16f, cy + size * 0.16f), 1.6f, color);
+    } else if (icon == "warning" || icon == "error") {
+        // Triangle outline
+        ImVec2 tri[3] = {
+            ImVec2(cx, cy - size * 0.34f),
+            ImVec2(cx - size * 0.36f, cy + size * 0.30f),
+            ImVec2(cx + size * 0.36f, cy + size * 0.30f)
+        };
+        drawList->AddPolyline(tri, 3, color, ImDrawFlags_Closed, 2.2f);
+        // Exclamation mark
+        drawList->AddLine(ImVec2(cx, cy - size * 0.12f), ImVec2(cx, cy + size * 0.08f), color, 2.2f);
+        drawList->AddCircleFilled(ImVec2(cx, cy + size * 0.18f), 1.8f, color);
+    } else if (icon == "refresh" || icon == "sync") {
+        ImVec2 arcCenter(cx, cy);
+        drawList->PathClear();
+        drawList->PathArcTo(arcCenter, size * 0.28f, -2.4f, 2.2f);
+        drawList->PathStroke(color, ImDrawFlags_None, 2.2f);
+        // Arrow tip
+        float tipX = cx + std::cos(2.2f) * size * 0.28f;
+        float tipY = cy + std::sin(2.2f) * size * 0.28f;
+        drawList->AddLine(ImVec2(tipX, tipY), ImVec2(tipX + 3.0f, tipY - 5.0f), color, 2.2f);
+        drawList->AddLine(ImVec2(tipX, tipY), ImVec2(tipX + 5.0f, tipY + 1.0f), color, 2.2f);
+    } else if (icon == "arrow_back") {
+        drawList->AddLine(ImVec2(cx - size * 0.30f, cy), ImVec2(cx + size * 0.30f, cy), color, 2.2f);
+        drawList->AddLine(ImVec2(cx - size * 0.30f, cy), ImVec2(cx - size * 0.08f, cy - size * 0.22f), color, 2.2f);
+        drawList->AddLine(ImVec2(cx - size * 0.30f, cy), ImVec2(cx - size * 0.08f, cy + size * 0.22f), color, 2.2f);
     }
 }
 
@@ -937,6 +1004,7 @@ void DesktopApplication::renderGuiHeader() {
     ImVec2 devBtnPos = ImGui::GetCursorScreenPos();
 
     if (ImGui::Button("##TopDev", ImVec2(44.0f, 44.0f))) {
+        clearError();
         currentScreen_ = DesktopScreen::Devices;
     }
     renderVectorIcon("devices", ImVec2(devBtnPos.x + 22.0f, devBtnPos.y + 22.0f), 22.0f, ImGui::ColorConvertFloat4ToU32(c.ink));
@@ -1009,6 +1077,7 @@ void DesktopApplication::renderGuiNavRail() {
         std::string btnText = "      " + std::string(item.label);
         if (fontBold_) ImGui::PushFont(fontBold_);
         if (ImGui::Button(btnText.c_str(), ImVec2(railWidth - 24.0f, 52.0f))) {
+            clearError();
             currentScreen_ = item.screen;
         }
         if (fontBold_) ImGui::PopFont();
@@ -1150,6 +1219,7 @@ void DesktopApplication::renderGuiHomeScreen() {
 
         // Clickable surface
         if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(0)) {
+            clearError();
             currentScreen_ = tiles[i].target;
         }
 
@@ -1268,8 +1338,20 @@ void DesktopApplication::renderGuiHostScreen() {
 
     if (!isHostingActive_) {
         if (renderPillButton("Start streaming", true, false, ImVec2(180.0f, 40.0f), "play_arrow")) {
-            isHostingActive_ = true;
-            showToast("Streaming started");
+            std::string sId(hostSessionId_);
+            std::string sigUrl(hostSignalingServer_);
+            if (sId.empty()) {
+                showToast("Please enter a valid Session ID to host");
+            } else if (sigUrl.rfind("ws://", 0) != 0 && sigUrl.rfind("wss://", 0) != 0) {
+                triggerError("Invalid Signaling Server URL",
+                             "The host signaling address '" + sigUrl + "' is not a valid WebSocket URI.",
+                             "Host signaling requires 'ws://' or 'wss://' scheme, e.g. 'ws://127.0.0.1:8080'.",
+                             "ERR_INVALID_HOST_SIGNALING",
+                             DesktopScreen::Host);
+            } else {
+                isHostingActive_ = true;
+                showToast("Streaming started");
+            }
         }
     } else {
         if (renderPillButton("Stop streaming", false, true, ImVec2(180.0f, 40.0f), "stop")) {
@@ -1355,11 +1437,35 @@ void DesktopApplication::renderGuiConnectScreen() {
     ImGui::Spacing();
     ImGui::Spacing();
 
-    if (renderPillButton("Connect", true, false, ImVec2(160.0f, 40.0f))) {
-        isConnecting_ = true;
-        connectStep_ = 1;
-        connectStepTimer_ = 0.0f;
-        connectStatusMsg_ = "Connecting to " + std::string(connectSessionId_) + "...";
+    if (renderPillButton(isConnecting_ ? "Connecting..." : "Connect", true, false, ImVec2(160.0f, 40.0f), isConnecting_ ? "refresh" : "play_arrow")) {
+        if (!isConnecting_) {
+            std::string sId(connectSessionId_);
+            std::string sigUrl(connectSignalingServer_);
+            if (sId.empty()) {
+                showToast("Please enter a valid Session ID");
+            } else if (sigUrl.rfind("ws://", 0) != 0 && sigUrl.rfind("wss://", 0) != 0) {
+                triggerError("Invalid Signaling Server URL",
+                             "The signaling server address '" + sigUrl + "' is not a valid WebSocket address.",
+                             "Signaling addresses must use the WebSocket protocol scheme, e.g. 'ws://127.0.0.1:8080' or 'wss://signaling.example.com'.",
+                             "ERR_INVALID_SIGNALING_URL",
+                             DesktopScreen::Connect);
+            } else {
+                isConnecting_ = true;
+                connectStep_ = 1;
+                connectStepTimer_ = 0.0f;
+                connectStatusMsg_ = "Connecting to " + sId + "...";
+            }
+        }
+    }
+
+    if (isConnecting_) {
+        ImGui::SameLine(0, 12.0f);
+        if (renderPillButton("Cancel", false, true, ImVec2(120.0f, 40.0f), "stop")) {
+            isConnecting_ = false;
+            connectStep_ = 0;
+            connectStatusMsg_ = "Connection cancelled by user.";
+            showToast("Connection cancelled");
+        }
     }
 
     EndCardContainer();
@@ -1387,9 +1493,9 @@ void DesktopApplication::renderGuiConnectScreen() {
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 28.0f);
             ImGui::TextColored(c.ink, "%s", steps[i]);
         } else if (connectStep_ == i + 1) {
-            renderVectorIcon("pending", ImVec2(pLine.x + 12.0f, pLine.y + 10.0f), 18.0f, ImGui::ColorConvertFloat4ToU32(c.warn));
+            renderLoadingSpinner(ImVec2(pLine.x + 12.0f, pLine.y + 10.0f), 8.0f, ImGui::ColorConvertFloat4ToU32(c.mint), 2.2f);
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 28.0f);
-            ImGui::TextColored(c.warn, "%s", steps[i]);
+            ImGui::TextColored(c.acc, "%s", steps[i]);
         } else {
             renderVectorIcon("radio_button_unchecked", ImVec2(pLine.x + 12.0f, pLine.y + 10.0f), 18.0f, ImGui::ColorConvertFloat4ToU32(c.line));
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 28.0f);
@@ -1470,6 +1576,13 @@ void DesktopApplication::renderGuiDevicesScreen() {
             if (wrongCodeFails_ >= 5) {
                 codeLockSeconds_ = 60;
                 codeHintMsg_ = "Too many wrong codes. Try again in 60 seconds.";
+                triggerError("Device Pairing Security Lockout",
+                             "Too many incorrect pairing codes were submitted by remote devices.",
+                             "1. Wait 60 seconds for the lockout countdown to expire.\n"
+                             "2. Click 'New code' to generate a fresh 6-digit one-time code.\n"
+                             "3. Verify the client device is entering the matching code.",
+                             "ERR_AUTH_PAIRING_LOCKOUT",
+                             DesktopScreen::Devices);
             } else {
                 codeHintMsg_ = "Wrong code. " + std::to_string(5 - wrongCodeFails_) + " attempts left before a 60-second pause.";
             }
@@ -1727,6 +1840,166 @@ void DesktopApplication::renderGuiNetworkScreen() {
     EndCardContainer();
 }
 
+void DesktopApplication::renderGuiLoadingScreen() {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    ImVec2 dispSize = ImGui::GetIO().DisplaySize;
+
+    float cardW = std::min(460.0f, dispSize.x - 48.0f);
+    float cardH = 320.0f;
+    float posX = (dispSize.x - cardW) * 0.5f;
+    float posY = (dispSize.y - cardH) * 0.45f;
+
+    ImGui::SetNextWindowPos(ImVec2(posX, posY));
+    ImGui::SetNextWindowSize(ImVec2(cardW, cardH));
+
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
+                             ImGuiWindowFlags_NoResize |
+                             ImGuiWindowFlags_NoMove |
+                             ImGuiWindowFlags_NoScrollbar |
+                             ImGuiWindowFlags_NoCollapse;
+
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, c.surface);
+    ImGui::PushStyleColor(ImGuiCol_Border, c.line);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 28.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(32.0f, 32.0f));
+
+    if (ImGui::Begin("StartupLoadingModal", nullptr, flags)) {
+        // Centered Sleek Mint Logo
+        float logoSize = 54.0f;
+        ImGui::SetCursorPosX((cardW - logoSize) * 0.5f);
+        renderSleekMintLogo(logoSize);
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        // Product Title
+        if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+        float titleW = ImGui::CalcTextSize("Mist").x;
+        ImGui::SetCursorPosX((cardW - titleW) * 0.5f);
+        ImGui::TextColored(c.ink, "Mist");
+        if (fontHeadline_) ImGui::PopFont();
+
+        // Tagline
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        float tagW = ImGui::CalcTextSize("Play beyond your desk.").x;
+        ImGui::SetCursorPosX((cardW - tagW) * 0.5f);
+        ImGui::TextColored(c.mute, "Play beyond your desk.");
+        if (fontSmall_) ImGui::PopFont();
+
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        // Animated Spinner & Progress Bar
+        ImVec2 pCur = ImGui::GetCursorScreenPos();
+        float barW = cardW - 64.0f;
+        float progress = std::min(1.0f, initialLoadingTimer_ / initialLoadingDuration_);
+
+        // Draw track
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec2 barMin(pCur.x, pCur.y + 10.0f);
+        ImVec2 barMax(pCur.x + barW, pCur.y + 16.0f);
+        drawList->AddRectFilled(barMin, barMax, ImGui::ColorConvertFloat4ToU32(c.ct2), 3.0f);
+        // Draw fill
+        if (progress > 0.01f) {
+            drawList->AddRectFilled(barMin, ImVec2(barMin.x + barW * progress, barMax.y), ImGui::ColorConvertFloat4ToU32(c.mint), 3.0f);
+        }
+
+        ImGui::Dummy(ImVec2(barW, 28.0f));
+
+        // Loading Stage Subtext
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        float stageW = ImGui::CalcTextSize(initialLoadingStage_.c_str()).x;
+        ImGui::SetCursorPosX((cardW - stageW) * 0.5f);
+        ImGui::TextColored(c.acc, "%s", initialLoadingStage_.c_str());
+        if (fontSmall_) ImGui::PopFont();
+    }
+    ImGui::End();
+
+    ImGui::PopStyleVar(3);
+    ImGui::PopStyleColor(2);
+}
+
+void DesktopApplication::renderGuiErrorScreen() {
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    float availW = ImGui::GetContentRegionAvail().x;
+    float maxCardW = std::min(700.0f, availW);
+
+    BeginCardContainer("ErrorScreenCard", c, ImVec2(maxCardW, 0), 28.0f);
+    ImGui::Spacing();
+
+    // Error Header with Vector Warning Icon
+    ImVec2 pIcon = ImGui::GetCursorScreenPos();
+    renderVectorIcon("error", ImVec2(pIcon.x + 24.0f, pIcon.y + 24.0f), 36.0f, ImGui::ColorConvertFloat4ToU32(c.bad));
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 60.0f);
+
+    if (fontHeadline_) ImGui::PushFont(fontHeadline_);
+    ImGui::TextColored(c.bad, "%s", activeError_.title.empty() ? "Operation Error" : activeError_.title.c_str());
+    if (fontHeadline_) ImGui::PopFont();
+
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 60.0f);
+    renderChip(activeError_.code.empty() ? "ERR_UNKNOWN" : activeError_.code.c_str(), 3);
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    // Error Description
+    if (fontBold_) ImGui::PushFont(fontBold_);
+    ImGui::TextColored(c.ink, "What happened:");
+    if (fontBold_) ImGui::PopFont();
+
+    if (fontRegular_) ImGui::PushFont(fontRegular_);
+    ImGui::TextWrapped("%s", activeError_.message.c_str());
+    if (fontRegular_) ImGui::PopFont();
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // Recovery Suggestions Box
+    if (!activeError_.suggestion.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, c.ct2);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 16.0f);
+        ImGui::BeginChild("RecoveryBox", ImVec2(0, 110.0f), false);
+        ImGui::Spacing();
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 16.0f);
+        if (fontBold_) ImGui::PushFont(fontBold_);
+        ImGui::TextColored(c.acc, "Troubleshooting & Next Steps:");
+        if (fontBold_) ImGui::PopFont();
+
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 16.0f);
+        if (fontSmall_) ImGui::PushFont(fontSmall_);
+        ImGui::TextWrapped("%s", activeError_.suggestion.c_str());
+        if (fontSmall_) ImGui::PopFont();
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // Action Buttons
+    if (renderPillButton("Try Again", true, false, ImVec2(150.0f, 42.0f), "refresh")) {
+        clearError();
+    }
+    ImGui::SameLine(0, 12.0f);
+
+    if (renderPillButton("System Diagnostics", false, false, ImVec2(200.0f, 42.0f), "network_check")) {
+        clearError();
+        currentScreen_ = DesktopScreen::Network;
+    }
+    ImGui::SameLine(0, 12.0f);
+
+    if (renderPillButton("Return Home", false, false, ImVec2(150.0f, 42.0f), "home")) {
+        clearError();
+        currentScreen_ = DesktopScreen::Home;
+    }
+
+    ImGui::Spacing();
+    EndCardContainer();
+}
+
 void DesktopApplication::renderGuiSettingsDialog() {
     if (!isSettingsOpen_) return;
 
@@ -1892,6 +2165,19 @@ void DesktopApplication::renderGuiFrame() {
         toastTimer_ -= dt;
     }
 
+    if (isInitialLoading_) {
+        initialLoadingTimer_ += dt;
+        if (initialLoadingTimer_ < 0.35f) {
+            initialLoadingStage_ = "Initializing Direct3D 11 & Swap Chain...";
+        } else if (initialLoadingTimer_ < 0.70f) {
+            initialLoadingStage_ = "Testing Hardware NVENC & Video Encoders...";
+        } else if (initialLoadingTimer_ < 1.05f) {
+            initialLoadingStage_ = "Loading Typography & Mint Material Assets...";
+        } else if (initialLoadingTimer_ >= initialLoadingDuration_) {
+            isInitialLoading_ = false;
+        }
+    }
+
     if (isHostingActive_) {
         // Subtle real-time jitter in telemetry
         hostFps_ = 59.5f + (rand() % 10) * 0.1f;
@@ -1900,13 +2186,24 @@ void DesktopApplication::renderGuiFrame() {
 
     if (isConnecting_) {
         connectStepTimer_ += dt;
-        if (connectStepTimer_ > 0.7f && connectStep_ < 4) {
+        std::string sId(connectSessionId_);
+        if (sId == "fail" || sId == "error") {
+            isConnecting_ = false;
+            connectStep_ = 0;
+            triggerError("Connection Handshake Failed",
+                         "Failed to negotiate WebRTC offer/answer with remote session '" + sId + "'.",
+                         "1. Ensure the remote host is running and broadcasting.\n"
+                         "2. Verify the session ID is correct.\n"
+                         "3. Check that your network allows WebRTC UDP packets.",
+                         "ERR_RTC_HANDSHAKE_FAILED",
+                         DesktopScreen::Connect);
+        } else if (connectStepTimer_ > 0.7f && connectStep_ < 4) {
             connectStep_++;
             connectStepTimer_ = 0.0f;
         } else if (connectStep_ >= 4 && connectStepTimer_ > 0.8f) {
             connectStep_ = 5; // All done
             connectStatusMsg_ = "Connected. Press Ctrl+Alt+Shift+Q to leave the stream.";
-            showToast("Connected");
+            showToast("Connected to host");
             isConnecting_ = false;
         }
     }
@@ -2014,6 +2311,11 @@ void DesktopApplication::renderGuiFrame() {
         bgDraw->AddConvexPolyFilled(pts, NUM_PTS, fillU32);
     }
 
+    if (isInitialLoading_) {
+        renderGuiLoadingScreen();
+        return;
+    }
+
     // 3. Main Window with transparent background (so organic wall shines through!)
     ImGui::SetNextWindowPos(ImVec2(0, 0));
     ImGui::SetNextWindowSize(io.DisplaySize);
@@ -2056,6 +2358,9 @@ void DesktopApplication::renderGuiFrame() {
             break;
         case DesktopScreen::Network:
             renderGuiNetworkScreen();
+            break;
+        case DesktopScreen::Error:
+            renderGuiErrorScreen();
             break;
         default:
             renderGuiHomeScreen();

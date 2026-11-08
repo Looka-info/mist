@@ -27,7 +27,7 @@ target_link_libraries(mist_imgui PUBLIC
     dwmapi
 )
 
-add_executable(mist_desktop
+add_executable(mist_desktop WIN32
     src/DesktopApplication.cpp
     src/main.cpp
     ${CMAKE_SOURCE_DIR}/resources/mist.rc

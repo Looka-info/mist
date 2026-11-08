@@ -4,7 +4,7 @@ configure_file(
     @ONLY
 )
 
-add_executable(mist_installer
+add_executable(mist_installer WIN32
     src/main.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/installer.rc
 )

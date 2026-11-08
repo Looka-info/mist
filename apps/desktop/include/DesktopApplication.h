@@ -31,6 +31,7 @@ enum class DesktopScreen : uint8_t {
     Connect = 3,
     Devices = 4,
     Network = 5,
+    Error = 6,
     Pairing = 4,          // backward-compatible alias for Devices
     StreamSettings = 5,   // backward-compatible alias for Network
     LiveSession = 5,      // backward-compatible alias for Network
@@ -93,17 +94,40 @@ private:
     void renderGuiConnectScreen();
     void renderGuiDevicesScreen();
     void renderGuiNetworkScreen();
+    void renderGuiLoadingScreen();
+    void renderGuiErrorScreen();
     void renderGuiSettingsDialog();
     void renderGuiToast();
 
     // GUI Visual Components
     void renderSleekMintLogo(float size = 36.0f) const;
     void renderVectorIcon(const char* name, const ImVec2& center, float size, ImU32 color) const;
+    void renderLoadingSpinner(const ImVec2& center, float radius, ImU32 color, float thickness = 3.0f) const;
     void renderChip(const char* text, int statusType = 0) const; // 0=neutral, 1=ok, 2=warn, 3=bad
     void renderMetricBox(const char* label, const char* value, const char* sublabel = nullptr) const;
     bool renderPillButton(const char* label, bool primary = false, bool danger = false, const ImVec2& size = ImVec2(0, 40.0f), const char* iconName = nullptr);
     void showToast(const std::string& message);
+    void triggerError(const std::string& title, const std::string& message,
+                      const std::string& suggestion = "", const std::string& code = "ERR_GENERIC",
+                      DesktopScreen returnScreen = DesktopScreen::Home);
+    void clearError();
     void generateOrganicShapes();
+
+    struct ErrorInfo {
+        bool hasError{false};
+        std::string title;
+        std::string code;
+        std::string message;
+        std::string suggestion;
+        DesktopScreen returnScreen{DesktopScreen::Home};
+    };
+    ErrorInfo activeError_;
+
+    // Initial Loading Splash State
+    bool isInitialLoading_{true};
+    float initialLoadingTimer_{0.0f};
+    float initialLoadingDuration_{1.2f};
+    std::string initialLoadingStage_{"Initializing Direct3D 11 & Hardware NVENC..."};
 
     struct OrganicShape {
         int templateType{0};
