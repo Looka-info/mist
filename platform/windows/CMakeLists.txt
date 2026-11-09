@@ -1,6 +1,7 @@
 add_library(mist_platform_windows
     src/PlatformWindows.cpp
     src/D3D11Device.cpp
+    src/VirtualDisplayManager.cpp
 )
 
 target_include_directories(mist_platform_windows PUBLIC
