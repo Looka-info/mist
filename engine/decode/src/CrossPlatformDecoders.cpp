@@ -856,36 +856,88 @@ bool MediaCodecVideoDecoder::isCodecSupported(encode::VideoCodec codec) noexcept
     switch (codec) {
         case encode::VideoCodec::H264:
         case encode::VideoCodec::HEVC:
-        case encode::VideoCodec::AV1:
             return true;
+        case encode::VideoCodec::AV1:
+#if defined(__ANDROID__)
+            // AV1 hardware decoder requires Android 10+ (API level 29) on supported SoCs
+            return true;
+#else
+            return false;
+#endif
     }
     return false;
 }
 
 common::Result<void> MediaCodecVideoDecoder::initialize(const DecodeConfig& config) {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__ANDROID__)
+    (void)config;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Android NDK AMediaCodec decoder is only supported on Android");
+#else
     config_ = config;
-    isInitialized_ = true;
     decodedFrameCount_ = 0;
     while (!frameQueue_.empty()) frameQueue_.pop();
 
-#if defined(__ANDROID__)
+    const char* mime = "video/avc";
+    if (config_.codec == encode::VideoCodec::HEVC) {
+        mime = "video/hevc";
+    } else if (config_.codec == encode::VideoCodec::AV1) {
+        mime = "video/av01";
+    }
+
+    if (mediaCodec_) {
+        AMediaCodec_stop(mediaCodec_);
+        AMediaCodec_delete(mediaCodec_);
+        mediaCodec_ = nullptr;
+    }
+
+    mediaCodec_ = AMediaCodec_createDecoderByType(mime);
+    if (!mediaCodec_) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotFound,
+                             std::string("No Android hardware decoder found for MIME ") + mime);
+    }
+
+    AMediaFormat* format = AMediaFormat_new();
+    AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, mime);
+    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, 1920);
+    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT, 1080);
+    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_COLOR_FORMAT, 0x7F000789); // COLOR_FormatYUV420Flexible
+    AMediaFormat_setInt32(format, "low-latency", config_.lowLatencyTuning ? 1 : 0);
+
+    media_status_t status = AMediaCodec_configure(mediaCodec_, format, nativeWindow_, nullptr, 0);
+    AMediaFormat_delete(format);
+
+    if (status != AMEDIA_OK) {
+        AMediaCodec_delete(mediaCodec_);
+        mediaCodec_ = nullptr;
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InitializationFailed,
+                             "AMediaCodec_configure failed with status " + std::to_string(status));
+    }
+
+    status = AMediaCodec_start(mediaCodec_);
+    if (status != AMEDIA_OK) {
+        AMediaCodec_delete(mediaCodec_);
+        mediaCodec_ = nullptr;
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InitializationFailed,
+                             "AMediaCodec_start failed with status " + std::to_string(status));
+    }
+
+    isInitialized_ = true;
     MIST_LOG_INFO(common::SubsystemId::Decode,
-                  "Android NDK AMediaCodec hardware decoder initialized for " +
-                  std::string(config_.codec == encode::VideoCodec::AV1 ? "video/av01" :
-                              config_.codec == encode::VideoCodec::HEVC ? "video/hevc" : "video/avc"));
-#else
-    MIST_LOG_INFO(common::SubsystemId::Decode,
-                  "Android NDK AMediaCodec decoder initialized (software test harness) for " +
-                  std::string(config_.codec == encode::VideoCodec::AV1 ? "video/av01" :
-                              config_.codec == encode::VideoCodec::HEVC ? "video/hevc" : "video/avc"));
-#endif
+                  std::string("Android NDK AMediaCodec hardware decoder initialized for ") + mime);
     return common::Result<void>::success();
+#endif
 }
 
 common::Result<void> MediaCodecVideoDecoder::submitPacket(const encode::EncodedPacket& packet) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!isInitialized_) {
+#if !defined(__ANDROID__)
+    (void)packet;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Android NDK AMediaCodec decoder is only supported on Android");
+#else
+    if (!isInitialized_ || !mediaCodec_) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotInitialized,
                              "MediaCodec decoder not initialized");
     }
@@ -894,25 +946,76 @@ common::Result<void> MediaCodecVideoDecoder::submitPacket(const encode::EncodedP
                              "Empty packet submitted to MediaCodec");
     }
 
-    ++decodedFrameCount_;
-    DecodedFrame frame{
-        .width = 1920,
-        .height = 1080,
-        .timestampNs = packet.timestampNs,
-        .frameNumber = decodedFrameCount_,
-        .nativeResource = nullptr
-    };
-
-    while (frameQueue_.size() >= 2) {
-        frameQueue_.pop();
+    ssize_t inputIndex = AMediaCodec_dequeueInputBuffer(mediaCodec_, 10000 /* 10ms */);
+    if (inputIndex < 0) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::ResourceExhausted,
+                             "No available MediaCodec input buffers");
     }
-    frameQueue_.push(frame);
+
+    size_t bufferSize = 0;
+    uint8_t* buffer = AMediaCodec_getInputBuffer(mediaCodec_, static_cast<size_t>(inputIndex), &bufferSize);
+    if (!buffer || bufferSize < packet.data.size()) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::BufferOverflow,
+                             "MediaCodec input buffer capacity insufficient for packet");
+    }
+
+    std::memcpy(buffer, packet.data.data(), packet.data.size());
+    uint32_t flags = packet.isKeyframe ? 1 /* BUFFER_FLAG_KEY_FRAME */ : 0;
+    media_status_t status = AMediaCodec_queueInputBuffer(
+        mediaCodec_,
+        static_cast<size_t>(inputIndex),
+        0,
+        packet.data.size(),
+        static_cast<uint64_t>(packet.timestampNs / 1000ULL), // microseconds
+        flags
+    );
+
+    if (status != AMEDIA_OK) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InternalError,
+                             "AMediaCodec_queueInputBuffer failed with status " + std::to_string(status));
+    }
+
+    // Drain available output buffers
+    AMediaCodecBufferInfo info;
+    ssize_t outputIndex = AMediaCodec_dequeueOutputBuffer(mediaCodec_, &info, 0 /* non-blocking */);
+    while (outputIndex >= 0) {
+        ++decodedFrameCount_;
+        DecodedFrame frame{
+            .width = 1920,
+            .height = 1080,
+            .timestampNs = static_cast<uint64_t>(info.presentationTimeUs * 1000ULL),
+            .frameNumber = decodedFrameCount_,
+            .nativeResource = nativeWindow_ ? nativeWindow_ : nullptr,
+            .resourceId = static_cast<uint64_t>(outputIndex),
+            .resourceDeleter = nullptr
+        };
+
+        if (nativeWindow_) {
+            AMediaCodec_releaseOutputBuffer(mediaCodec_, static_cast<size_t>(outputIndex), true /* render */);
+        }
+
+        while (frameQueue_.size() >= 2) {
+            auto old = frameQueue_.front();
+            frameQueue_.pop();
+            if (!nativeWindow_) {
+                AMediaCodec_releaseOutputBuffer(mediaCodec_, static_cast<size_t>(old.resourceId), false);
+            }
+        }
+        frameQueue_.push(frame);
+
+        outputIndex = AMediaCodec_dequeueOutputBuffer(mediaCodec_, &info, 0);
+    }
 
     return common::Result<void>::success();
+#endif
 }
 
 common::Result<DecodedFrame> MediaCodecVideoDecoder::getNextFrame() {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__ANDROID__)
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Android NDK AMediaCodec decoder is only supported on Android");
+#else
     if (frameQueue_.empty()) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotFound,
                              "No decoded frames in MediaCodec queue");
@@ -920,14 +1023,28 @@ common::Result<DecodedFrame> MediaCodecVideoDecoder::getNextFrame() {
     DecodedFrame f = frameQueue_.front();
     frameQueue_.pop();
     return f;
+#endif
 }
 
-common::Result<void> MediaCodecVideoDecoder::releaseFrame(const DecodedFrame& /*frame*/) {
+common::Result<void> MediaCodecVideoDecoder::releaseFrame(const DecodedFrame& frame) {
+    std::lock_guard<std::mutex> lock(mutex_);
+#if defined(__ANDROID__)
+    if (!nativeWindow_ && mediaCodec_ && frame.resourceId > 0) {
+        AMediaCodec_releaseOutputBuffer(mediaCodec_, static_cast<size_t>(frame.resourceId), false);
+    }
+#else
+    (void)frame;
+#endif
     return common::Result<void>::success();
 }
 
 common::Result<void> MediaCodecVideoDecoder::flush() {
     std::lock_guard<std::mutex> lock(mutex_);
+#if defined(__ANDROID__)
+    if (mediaCodec_) {
+        AMediaCodec_flush(mediaCodec_);
+    }
+#endif
     while (!frameQueue_.empty()) frameQueue_.pop();
     return common::Result<void>::success();
 }
@@ -935,6 +1052,13 @@ common::Result<void> MediaCodecVideoDecoder::flush() {
 common::Result<void> MediaCodecVideoDecoder::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
     isInitialized_ = false;
+#if defined(__ANDROID__)
+    if (mediaCodec_) {
+        AMediaCodec_stop(mediaCodec_);
+        AMediaCodec_delete(mediaCodec_);
+        mediaCodec_ = nullptr;
+    }
+#endif
     while (!frameQueue_.empty()) frameQueue_.pop();
     return common::Result<void>::success();
 }

@@ -176,8 +176,13 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
+#if defined(__ANDROID__)
+    AMediaCodec* mediaCodec_{nullptr};
+    ANativeWindow* nativeWindow_{nullptr};
+#else
     [[maybe_unused]] void* mediaCodec_{nullptr};
     [[maybe_unused]] void* nativeWindow_{nullptr};
+#endif
 };
 
 // Web WebCodecs / WebAssembly client decoder implementation
