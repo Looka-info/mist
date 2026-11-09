@@ -1111,14 +1111,30 @@ common::Result<void> MediaCodecVideoDecoder::submitPacket(const encode::EncodedP
                              "AMediaCodec_queueInputBuffer failed with status " + std::to_string(status));
     }
 
-    // Drain available output buffers
+    // Drain available output buffers and track format/dimension updates dynamically
     AMediaCodecBufferInfo info;
     ssize_t outputIndex = AMediaCodec_dequeueOutputBuffer(mediaCodec_, &info, 0 /* non-blocking */);
-    while (outputIndex >= 0) {
+    while (outputIndex >= 0 || outputIndex == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
+        if (outputIndex == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
+            AMediaFormat* newFormat = AMediaCodec_getOutputFormat(mediaCodec_);
+            if (newFormat) {
+                int32_t w = 0, h = 0;
+                if (AMediaFormat_getInt32(newFormat, AMEDIAFORMAT_KEY_WIDTH, &w) && w > 0) {
+                    currentWidth_ = static_cast<uint32_t>(w);
+                }
+                if (AMediaFormat_getInt32(newFormat, AMEDIAFORMAT_KEY_HEIGHT, &h) && h > 0) {
+                    currentHeight_ = static_cast<uint32_t>(h);
+                }
+                AMediaFormat_delete(newFormat);
+            }
+            outputIndex = AMediaCodec_dequeueOutputBuffer(mediaCodec_, &info, 0);
+            continue;
+        }
+
         ++decodedFrameCount_;
         DecodedFrame frame{
-            .width = 1920,
-            .height = 1080,
+            .width = currentWidth_ > 0 ? currentWidth_ : 1920,
+            .height = currentHeight_ > 0 ? currentHeight_ : 1080,
             .timestampNs = static_cast<uint64_t>(info.presentationTimeUs * 1000ULL),
             .frameNumber = decodedFrameCount_,
             .nativeResource = nativeWindow_ ? nativeWindow_ : nullptr,
@@ -1127,13 +1143,15 @@ common::Result<void> MediaCodecVideoDecoder::submitPacket(const encode::EncodedP
         };
 
         if (nativeWindow_) {
+            // Render directly to surface presentation target
             AMediaCodec_releaseOutputBuffer(mediaCodec_, static_cast<size_t>(outputIndex), true /* render */);
         }
 
         while (frameQueue_.size() >= 2) {
             auto old = frameQueue_.front();
             frameQueue_.pop();
-            if (!nativeWindow_) {
+            if (!nativeWindow_ && old.resourceId != UINT64_MAX) {
+                // Must release all indices including index 0
                 AMediaCodec_releaseOutputBuffer(mediaCodec_, static_cast<size_t>(old.resourceId), false);
             }
         }
@@ -1165,11 +1183,40 @@ common::Result<DecodedFrame> MediaCodecVideoDecoder::getNextFrame() {
 common::Result<void> MediaCodecVideoDecoder::releaseFrame(const DecodedFrame& frame) {
     std::lock_guard<std::mutex> lock(mutex_);
 #if defined(__ANDROID__)
-    if (!nativeWindow_ && mediaCodec_ && frame.resourceId > 0) {
+    // Explicit buffer index ownership: index 0 is valid and must not be leaked
+    if (!nativeWindow_ && mediaCodec_ && frame.resourceId != UINT64_MAX) {
         AMediaCodec_releaseOutputBuffer(mediaCodec_, static_cast<size_t>(frame.resourceId), false);
     }
 #else
     (void)frame;
+#endif
+    return common::Result<void>::success();
+}
+
+common::Result<void> MediaCodecVideoDecoder::setNativeWindow(void* window) {
+    std::lock_guard<std::mutex> lock(mutex_);
+#if defined(__ANDROID__)
+    if (nativeWindow_ == window) {
+        return common::Result<void>::success();
+    }
+    if (nativeWindow_) {
+        ANativeWindow_release(static_cast<ANativeWindow*>(nativeWindow_));
+    }
+    nativeWindow_ = window;
+    if (nativeWindow_) {
+        ANativeWindow_acquire(static_cast<ANativeWindow*>(nativeWindow_));
+    }
+    if (isInitialized_ && mediaCodec_) {
+        media_status_t status = AMediaCodec_setOutputSurface(
+            mediaCodec_, static_cast<ANativeWindow*>(nativeWindow_)
+        );
+        if (status != AMEDIA_OK) {
+            return common::Error(common::SubsystemId::Decode, common::ErrorCode::InternalError,
+                                 "AMediaCodec_setOutputSurface failed with status " + std::to_string(status));
+        }
+    }
+#else
+    nativeWindow_ = window;
 #endif
     return common::Result<void>::success();
 }
@@ -1193,6 +1240,10 @@ common::Result<void> MediaCodecVideoDecoder::shutdown() {
         AMediaCodec_stop(mediaCodec_);
         AMediaCodec_delete(mediaCodec_);
         mediaCodec_ = nullptr;
+    }
+    if (nativeWindow_) {
+        ANativeWindow_release(static_cast<ANativeWindow*>(nativeWindow_));
+        nativeWindow_ = nullptr;
     }
 #endif
     while (!frameQueue_.empty()) frameQueue_.pop();

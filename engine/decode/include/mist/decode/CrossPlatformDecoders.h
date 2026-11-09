@@ -202,8 +202,12 @@ public:
     [[nodiscard]] common::Result<void> releaseFrame(const DecodedFrame& frame) override;
     [[nodiscard]] common::Result<void> flush() override;
     [[nodiscard]] common::Result<void> shutdown() override;
+    [[nodiscard]] common::Result<void> setNativeWindow(void* window);
     [[nodiscard]] bool isInitialized() const noexcept { return isInitialized_; }
     [[nodiscard]] uint32_t getDecodedFrameCount() const noexcept { return decodedFrameCount_; }
+    [[nodiscard]] uint32_t getCurrentWidth() const noexcept { return currentWidth_; }
+    [[nodiscard]] uint32_t getCurrentHeight() const noexcept { return currentHeight_; }
+    [[nodiscard]] void* getNativeWindow() const noexcept { return nativeWindow_; }
     [[nodiscard]] bool isHardwareAccelerated() const noexcept;
     [[nodiscard]] static bool isNativePlatform() noexcept;
     [[nodiscard]] static bool isCodecSupported(encode::VideoCodec codec) noexcept;
@@ -213,13 +217,15 @@ private:
     DecodeConfig config_{};
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
+    uint32_t currentWidth_{1920};
+    uint32_t currentHeight_{1080};
     std::queue<DecodedFrame> frameQueue_;
 #if defined(__ANDROID__)
     AMediaCodec* mediaCodec_{nullptr};
     ANativeWindow* nativeWindow_{nullptr};
 #else
     [[maybe_unused]] void* mediaCodec_{nullptr};
-    [[maybe_unused]] void* nativeWindow_{nullptr};
+    void* nativeWindow_{nullptr};
 #endif
 };
 

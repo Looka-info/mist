@@ -228,6 +228,41 @@ TEST(AndroidMediaCodecTest, BufferQueueOrHonestRejection) {
     }
 }
 
+
+TEST(AndroidMediaCodecTest, OutputBufferIndexZeroOwnershipAndWindowTarget) {
+    auto decRes = MediaCodecVideoDecoder::create();
+    ASSERT_TRUE(decRes.hasValue());
+    auto decoder = std::move(decRes.value());
+
+    EXPECT_FALSE(decoder->isInitialized());
+    EXPECT_EQ(decoder->getNativeWindow(), nullptr);
+    EXPECT_EQ(decoder->getCurrentWidth(), 1920u);
+    EXPECT_EQ(decoder->getCurrentHeight(), 1080u);
+
+    // Mock native window attachment
+    int dummyWindow = 42;
+    EXPECT_TRUE(decoder->setNativeWindow(&dummyWindow).hasValue());
+    EXPECT_EQ(decoder->getNativeWindow(), &dummyWindow);
+
+    // Detach window
+    EXPECT_TRUE(decoder->setNativeWindow(nullptr).hasValue());
+    EXPECT_EQ(decoder->getNativeWindow(), nullptr);
+
+    // Output index zero release must not crash or leak
+    DecodedFrame frameZero{
+        .width = 1280,
+        .height = 720,
+        .timestampNs = 1000,
+        .frameNumber = 1,
+        .nativeResource = nullptr,
+        .resourceId = 0, // Valid Android buffer index 0
+        .resourceDeleter = nullptr
+    };
+    EXPECT_TRUE(decoder->releaseFrame(frameZero).hasValue());
+
+    EXPECT_TRUE(decoder->shutdown().hasValue());
+}
+
 TEST(WebRtcWasmTest, WebCodecsOrHonestRejection) {
     auto decRes = WebRtcWasmVideoDecoder::create();
     ASSERT_TRUE(decRes.hasValue());
