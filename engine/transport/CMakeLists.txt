@@ -81,6 +81,7 @@ add_library(mist_transport STATIC
     src/qos/QualityAdaptationManager.cpp
     src/qos/AdaptiveBitrateController.cpp
     src/qos/PerGuestAdaptiveBitrate.cpp
+    src/qos/HostBandwidthBudgetManager.cpp
 )
 
 target_include_directories(mist_transport PUBLIC

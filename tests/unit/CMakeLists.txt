@@ -37,6 +37,7 @@ add_executable(mist_unit_tests
     TestPeerIdentity.cpp
     TestMultiGuestFanout.cpp
     TestPerGuestAdaptiveBitrate.cpp
+    TestHostBandwidthBudget.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

@@ -240,6 +240,18 @@ pub struct GuestQualityStatus {
     pub loss_percent: f64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostBandwidthBudget {
+    pub upload_limit_kbps: u32,
+    pub total_allocated_kbps: u32,
+    pub video_allocated_kbps: u32,
+    pub audio_reserved_kbps: u32,
+    pub control_reserved_kbps: u32,
+    pub headroom_kbps: u32,
+    pub unallocated_kbps: u32,
+    pub is_oversubscribed: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SecurityTrustState {
     Unverified,

@@ -79,6 +79,12 @@ pub struct NetworkConfig {
     pub enable_ipv6: bool,
     pub ice_min_port: u16,
     pub ice_max_port: u16,
+    #[serde(default = "default_max_upload_limit_kbps")]
+    pub max_upload_limit_kbps: u32,
+}
+
+fn default_max_upload_limit_kbps() -> u32 {
+    30_000
 }
 
 impl Default for NetworkConfig {
@@ -100,6 +106,7 @@ impl Default for NetworkConfig {
             enable_ipv6: true,
             ice_min_port: 0,
             ice_max_port: 0,
+            max_upload_limit_kbps: 30_000,
         }
     }
 }
