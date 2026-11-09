@@ -574,3 +574,32 @@
 - **Hardware Requirements:** Direct3D 11 GPU (Windows), Apple Silicon / Intel Mac with VideoToolbox (macOS), VA-API compatible GPU with DRM render node (Linux), Android 12+ device with MediaCodec (Android), Modern WebRTC browser (Web).
 - **Known Limitations:** Linux VA-API requires user in `render` group; macOS requires accessibility permissions for remote control.
 - **Commit Hash:** `feature/milestone-27-implementation` (Target: `v0.3.0-rc2`)
+
+### 28. Release Qualification, Native Integration & Cross-Platform Verification
+- **Status:** Completed
+- **Qualification Level:** Implemented: Yes | Unit Tested: Yes (235 C++ tests, 32 Rust tests) | Integration Tested: Yes (Web + Native) | Cross-Compiled: Full 5-Platform Matrix | Native Verified: Windows x64 (Local), macOS/Linux/Android/Web (CI) | Hardware Verified: Windows D3D11VA | Release Ready: v0.3.0-rc3
+- **Architecture:** Complete release qualification and cross-platform verification milestone. Resolved all 14 baseline audit findings: eliminated VideoToolbox shutdown deadlock, implemented VA-API parameter buffer packing and DMA-BUF export, corrected Android MediaCodec output buffer index 0 release and dynamic format sizing, aligned browser WebRTC client with Rust signaling protocol and 48-byte native `InputPacketHeader`, implemented early ICE candidate queueing, integrated GuestClientSession transport lifecycle callbacks (`onTransportConnecting`, `onTransportConnected`, `onTransportDisconnected`, `onTransportFailed`), and established cross-platform qualification matrix.
+- **Files Changed:**
+  - `docs/roadmap/milestone-28-baseline-audit.md`
+  - `docs/architecture/webrtc-signaling-compatibility.md`
+  - `docs/testing/cross-platform-test-matrix.md`
+  - `docs/roadmap/milestone-28-qualification-report.md`
+  - `docs/releases/v0.3.0-rc3-readiness.md`
+  - `engine/decode/include/mist/decode/CrossPlatformDecoders.h`
+  - `engine/decode/src/CrossPlatformDecoders.cpp`
+  - `engine/decode/include/mist/decode/GuestClientSession.h`
+  - `engine/decode/src/GuestClientSession.cpp`
+  - `tests/unit/TestCrossPlatformClients.cpp`
+  - `web/js/mist-web-client.js`
+  - `web/test/run_browser_tests.js`
+  - `web/test/webrtc_integration_test.js`
+  - `.github/workflows/ci.yml`
+  - `crates/mist-pairing/src/lib.rs`
+  - `crates/mist-pairing/tests/pairing_tests.rs`
+  - `scripts/build-installer.ps1`
+  - `docs/roadmap/advanced-streaming-roadmap.md`
+- **Tests Added:** VideoToolbox deadlock-free shutdown and dynamic SPS/PPS reconfiguration (`MacOSVideoToolboxTest.DeadlockFreeShutdownAndLazyLifecycle`), VA-API surface pool bounded recycling and DMA-BUF export (`LinuxVaApiTest.SurfacePoolBoundedExhaustionAndRecycling`), VA-API parameter buffer error handling (`LinuxVaApiTest.InvalidBitstreamRejectionAndOutstandingFrames`), Android output buffer index 0 ownership and window target (`AndroidMediaCodecTest.OutputBufferIndexZeroOwnershipAndWindowTarget`), GuestClientSession transport event callbacks (`GuestClientSessionLifecycleTest.TransportStateTransitions`), and WebRTC integration tests (`webrtc_integration_test.js`).
+- **Benchmark Evidence:** 235 CTest tests (233 passed, 2 skipped in headless, 0 failed in 28.57s); 32 Rust tests passed (100%); 20/20 pairing tests passed with ephemeral ports; 7 web unit and integration tests passed cleanly.
+- **Hardware Requirements:** Direct3D 11 GPU (Windows), Apple Silicon / Intel Mac with VideoToolbox (macOS), VA-API compatible GPU with DRM render node (Linux), Android 12+ device with MediaCodec (Android), Modern WebRTC browser (Web).
+- **Known Limitations:** Headless CI virtual machines without real GPU hardware cannot verify level L5 hardware decode; physical hardware devices remain required for final device certification.
+- **Commit Hash:** `feature/milestone-28-release-qualification` (Target: `v0.3.0-rc3`)
