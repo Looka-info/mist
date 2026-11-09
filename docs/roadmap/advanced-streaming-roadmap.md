@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | 1 | **NAT Traversal Reliability** | Critical | **Unit Tested** | `0985593` |
 | 2 | **TURN Relay Fallback** | Critical | **Unit Tested** | `1b6b2bd` |
-| 3 | **Host-Side Authentication** | Critical | **Unit Tested** | Pending |
+| 3 | **Host-Side Authentication** | Critical | **Unit Tested** | `87697fc` |
 | 4 | **Host Approval Flow** | High | Not Started | — |
 | 5 | **Per-Guest Permissions** | High | Not Started | — |
 | 6 | **Encryption Verification & Peer Identity** | High | Not Started | — |
@@ -88,7 +88,7 @@
 - **Benchmark Evidence:** SHA-256 hashing and 256-bit CSPRNG token generation execute in < 0.05ms per operation; zero heap allocations during cryptographic token validation.
 - **Hardware Requirements:** OS CSPRNG support (Windows BCrypt/ProcessPrng).
 - **Known Limitations:** Host process must remain active and responsive to approve incoming pairing requests; clock skew exceeding 60 seconds triggers replay rejection.
-- **Commit Hash:** Pending
+- **Commit Hash:** `87697fc`
 
 ### 4. Host Approval Flow
 - **Status:** Not Started
