@@ -20,6 +20,8 @@ struct DecodedFrame {
     uint64_t timestampNs{0};
     uint64_t frameNumber{0};
     void* nativeResource{nullptr}; // e.g. ID3D11Texture2D* in Milestone 2
+    uint64_t resourceId{0};
+    void (*resourceDeleter)(void* res){nullptr};
 };
 
 class IVideoDecoder {

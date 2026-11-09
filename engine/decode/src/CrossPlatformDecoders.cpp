@@ -57,38 +57,224 @@ bool VideoToolboxDecoder::isCodecSupported(encode::VideoCodec codec) noexcept {
             return true;
         case encode::VideoCodec::AV1:
 #if defined(__APPLE__)
-            // AV1 hardware decoding supported on Apple M3 / A17 Pro or later
-            return true;
+            return true; // AV1 hardware decoding on Apple Silicon M3/A17 Pro or later
 #else
-            return true; // Supported in simulated software path
+            return false;
 #endif
     }
     return false;
 }
 
+#if defined(__APPLE__)
+struct AppleNalUnit {
+    const uint8_t* data{nullptr};
+    size_t size{0};
+    uint8_t type{0};
+};
+
+static std::vector<AppleNalUnit> parseAppleAnnexB(const uint8_t* buffer, size_t size, bool isHevc) {
+    std::vector<AppleNalUnit> units;
+    if (!buffer || size < 4) return units;
+
+    std::vector<size_t> startCodeOffsets;
+    for (size_t i = 0; i + 2 < size; ++i) {
+        if (buffer[i] == 0x00 && buffer[i + 1] == 0x00) {
+            if (buffer[i + 2] == 0x01) {
+                startCodeOffsets.push_back(i);
+                i += 2;
+            } else if (i + 3 < size && buffer[i + 2] == 0x00 && buffer[i + 3] == 0x01) {
+                startCodeOffsets.push_back(i);
+                i += 3;
+            }
+        }
+    }
+
+    for (size_t i = 0; i < startCodeOffsets.size(); ++i) {
+        size_t start = startCodeOffsets[i];
+        size_t prefixLen = (buffer[start + 2] == 0x01) ? 3 : 4;
+        size_t nalStart = start + prefixLen;
+        size_t nalEnd = (i + 1 < startCodeOffsets.size()) ? startCodeOffsets[i + 1] : size;
+        if (nalEnd > nalStart) {
+            uint8_t firstByte = buffer[nalStart];
+            uint8_t nalType = isHevc ? ((firstByte >> 1) & 0x3F) : (firstByte & 0x1F);
+            units.push_back(AppleNalUnit{
+                .data = buffer + nalStart,
+                .size = nalEnd - nalStart,
+                .type = nalType
+            });
+        }
+    }
+    return units;
+}
+
+bool VideoToolboxDecoder::extractH264Parameters(const uint8_t* data, size_t size) {
+    auto nals = parseAppleAnnexB(data, size, false);
+    const AppleNalUnit* sps = nullptr;
+    const AppleNalUnit* pps = nullptr;
+    for (const auto& nal : nals) {
+        if (nal.type == 7 && !sps) sps = &nal;
+        if (nal.type == 8 && !pps) pps = &nal;
+    }
+    if (!sps || !pps) return false;
+
+    const uint8_t* parameterSetPointers[2] = { sps->data, pps->data };
+    const size_t parameterSetSizes[2] = { sps->size, pps->size };
+
+    if (formatDesc_) {
+        CFRelease(formatDesc_);
+        formatDesc_ = nullptr;
+    }
+
+    OSStatus status = CMVideoFormatDescriptionCreateFromH264ParameterSets(
+        kCFAllocatorDefault,
+        2,
+        parameterSetPointers,
+        parameterSetSizes,
+        4,
+        &formatDesc_
+    );
+    return (status == noErr && formatDesc_ != nullptr);
+}
+
+bool VideoToolboxDecoder::extractHevcParameters(const uint8_t* data, size_t size) {
+    auto nals = parseAppleAnnexB(data, size, true);
+    const AppleNalUnit* vps = nullptr;
+    const AppleNalUnit* sps = nullptr;
+    const AppleNalUnit* pps = nullptr;
+    for (const auto& nal : nals) {
+        if (nal.type == 32 && !vps) vps = &nal;
+        if (nal.type == 33 && !sps) sps = &nal;
+        if (nal.type == 34 && !pps) pps = &nal;
+    }
+    if (!vps || !sps || !pps) return false;
+
+    const uint8_t* parameterSetPointers[3] = { vps->data, sps->data, pps->data };
+    const size_t parameterSetSizes[3] = { vps->size, sps->size, pps->size };
+
+    if (formatDesc_) {
+        CFRelease(formatDesc_);
+        formatDesc_ = nullptr;
+    }
+
+    OSStatus status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
+        kCFAllocatorDefault,
+        3,
+        parameterSetPointers,
+        parameterSetSizes,
+        4,
+        nullptr,
+        &formatDesc_
+    );
+    return (status == noErr && formatDesc_ != nullptr);
+}
+
+bool VideoToolboxDecoder::createDecompressionSession() {
+    if (!formatDesc_) return false;
+
+    VTDecompressionOutputCallbackRecord callbackRecord{};
+    callbackRecord.decompressionOutputCallback = decompressionOutputCallback;
+    callbackRecord.decompressionOutputRefCon = this;
+
+    CFMutableDictionaryRef destinationPixelBufferAttributes = CFDictionaryCreateMutable(
+        kCFAllocatorDefault,
+        0,
+        &kCFTypeDictionaryKeyCallBacks,
+        &kCFTypeDictionaryValueCallBacks
+    );
+    int pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+    CFNumberRef pixelFormatNum = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &pixelFormat);
+    CFDictionarySetValue(destinationPixelBufferAttributes, kCVPixelBufferPixelFormatTypeKey, pixelFormatNum);
+    CFRelease(pixelFormatNum);
+
+    if (vtSession_) {
+        VTDecompressionSessionWaitForAsynchronousFrames(vtSession_);
+        VTDecompressionSessionInvalidate(vtSession_);
+        CFRelease(vtSession_);
+        vtSession_ = nullptr;
+    }
+
+    OSStatus status = VTDecompressionSessionCreate(
+        kCFAllocatorDefault,
+        formatDesc_,
+        nullptr,
+        destinationPixelBufferAttributes,
+        &callbackRecord,
+        &vtSession_
+    );
+    CFRelease(destinationPixelBufferAttributes);
+    formatCreated_ = (status == noErr && vtSession_ != nullptr);
+    return formatCreated_;
+}
+
+void VideoToolboxDecoder::decompressionOutputCallback(
+    void* decompressionOutputRefCon,
+    void* sourceFrameRefCon,
+    OSStatus status,
+    VTDecodeInfoFlags /*infoFlags*/,
+    CVImageBufferRef imageBuffer,
+    CMTime /*presentationTimeStamp*/,
+    CMTime /*presentationDuration*/) {
+    if (status != noErr || !imageBuffer) {
+        return;
+    }
+    auto* self = static_cast<VideoToolboxDecoder*>(decompressionOutputRefCon);
+    CVPixelBufferRetain(imageBuffer);
+
+    std::lock_guard<std::mutex> lock(self->mutex_);
+    self->decodedFrameCount_++;
+    DecodedFrame frame{};
+    frame.width = static_cast<uint32_t>(CVPixelBufferGetWidth(imageBuffer));
+    frame.height = static_cast<uint32_t>(CVPixelBufferGetHeight(imageBuffer));
+    frame.timestampNs = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(sourceFrameRefCon));
+    frame.frameNumber = self->decodedFrameCount_;
+    frame.nativeResource = imageBuffer;
+    frame.resourceDeleter = [](void* res) {
+        if (res) CVPixelBufferRelease(static_cast<CVPixelBufferRef>(res));
+    };
+
+    while (self->frameQueue_.size() >= 2) {
+        auto old = self->frameQueue_.front();
+        self->frameQueue_.pop();
+        if (old.nativeResource) {
+            CVPixelBufferRelease(static_cast<CVPixelBufferRef>(old.nativeResource));
+        }
+    }
+    self->frameQueue_.push(frame);
+}
+#endif
+
 common::Result<void> VideoToolboxDecoder::initialize(const DecodeConfig& config) {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__APPLE__)
+    (void)config;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Apple VideoToolbox is only supported on macOS");
+#else
     config_ = config;
     isInitialized_ = true;
     decodedFrameCount_ = 0;
-    while (!frameQueue_.empty()) frameQueue_.pop();
+    formatCreated_ = false;
+    while (!frameQueue_.empty()) {
+        auto f = frameQueue_.front();
+        frameQueue_.pop();
+        if (f.nativeResource) CVPixelBufferRelease(static_cast<CVPixelBufferRef>(f.nativeResource));
+    }
 
-#if defined(__APPLE__)
     MIST_LOG_INFO(common::SubsystemId::Decode,
-                  "Apple VideoToolbox hardware decompression session initialized for " +
+                  "Apple VideoToolbox hardware decompression initialized for " +
                   std::string(config_.codec == encode::VideoCodec::AV1 ? "AV1" :
                               config_.codec == encode::VideoCodec::HEVC ? "HEVC" : "H.264"));
-#else
-    MIST_LOG_INFO(common::SubsystemId::Decode,
-                  "Apple VideoToolbox decoder initialized (software test harness) for " +
-                  std::string(config_.codec == encode::VideoCodec::AV1 ? "AV1" :
-                              config_.codec == encode::VideoCodec::HEVC ? "HEVC" : "H.264"));
-#endif
     return common::Result<void>::success();
+#endif
 }
 
 common::Result<void> VideoToolboxDecoder::submitPacket(const encode::EncodedPacket& packet) {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__APPLE__)
+    (void)packet;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Apple VideoToolbox is only supported on macOS");
+#else
     if (!isInitialized_) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotInitialized,
                              "VideoToolbox decoder not initialized");
@@ -98,21 +284,107 @@ common::Result<void> VideoToolboxDecoder::submitPacket(const encode::EncodedPack
                              "Empty encoded packet submitted to VideoToolbox");
     }
 
-    ++decodedFrameCount_;
-    DecodedFrame frame{
-        .width = 1920,
-        .height = 1080,
-        .timestampNs = packet.timestampNs,
-        .frameNumber = decodedFrameCount_,
-        .nativeResource = nullptr // CVPixelBufferRef in macOS native environment
-    };
-
-    while (frameQueue_.size() >= 2) {
-        frameQueue_.pop();
+    if (!formatCreated_) {
+        bool paramsExtracted = false;
+        if (config_.codec == encode::VideoCodec::H264) {
+            paramsExtracted = extractH264Parameters(packet.data.data(), packet.data.size());
+        } else if (config_.codec == encode::VideoCodec::HEVC) {
+            paramsExtracted = extractHevcParameters(packet.data.data(), packet.data.size());
+        }
+        if (paramsExtracted) {
+            if (!createDecompressionSession()) {
+                return common::Error(common::SubsystemId::Decode, common::ErrorCode::InitializationFailed,
+                                     "Failed to create VideoToolbox decompression session");
+            }
+        }
     }
-    frameQueue_.push(frame);
+
+    if (!vtSession_ || !formatDesc_) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InvalidState,
+                             "VideoToolbox session waiting for parameter sets (SPS/PPS)");
+    }
+
+    CMBlockBufferRef blockBuffer = nullptr;
+    OSStatus status = CMBlockBufferCreateWithMemoryBlock(
+        kCFAllocatorDefault,
+        nullptr,
+        packet.data.size(),
+        kCFAllocatorDefault,
+        nullptr,
+        0,
+        packet.data.size(),
+        0,
+        &blockBuffer
+    );
+    if (status != noErr || !blockBuffer) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InternalError,
+                             "Failed to allocate CMBlockBuffer");
+    }
+
+    std::vector<uint8_t> avccData = packet.data;
+    auto nals = parseAppleAnnexB(packet.data.data(), packet.data.size(), config_.codec == encode::VideoCodec::HEVC);
+    for (const auto& nal : nals) {
+        size_t nalOffset = nal.data - packet.data.data();
+        if (nalOffset >= 4 && avccData[nalOffset - 4] == 0x00 && avccData[nalOffset - 3] == 0x00 &&
+            avccData[nalOffset - 2] == 0x00 && avccData[nalOffset - 1] == 0x01) {
+            uint32_t len = static_cast<uint32_t>(nal.size);
+            avccData[nalOffset - 4] = static_cast<uint8_t>((len >> 24) & 0xFF);
+            avccData[nalOffset - 3] = static_cast<uint8_t>((len >> 16) & 0xFF);
+            avccData[nalOffset - 2] = static_cast<uint8_t>((len >> 8) & 0xFF);
+            avccData[nalOffset - 1] = static_cast<uint8_t>(len & 0xFF);
+        }
+    }
+
+    CMBlockBufferReplaceDataBytes(avccData.data(), blockBuffer, 0, avccData.size());
+
+    CMSampleBufferRef sampleBuffer = nullptr;
+    CMSampleTimingInfo timingInfo{};
+    timingInfo.presentationTimeStamp = CMTimeMake(packet.timestampNs, 1000000000);
+    timingInfo.duration = kCMTimeInvalid;
+    timingInfo.decodeTimeStamp = kCMTimeInvalid;
+
+    const size_t sampleSize = avccData.size();
+    status = CMSampleBufferCreate(
+        kCFAllocatorDefault,
+        blockBuffer,
+        true,
+        nullptr,
+        nullptr,
+        formatDesc_,
+        1,
+        1,
+        &timingInfo,
+        1,
+        &sampleSize,
+        &sampleBuffer
+    );
+
+    if (status != noErr || !sampleBuffer) {
+        CFRelease(blockBuffer);
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InternalError,
+                             "Failed to create CMSampleBuffer");
+    }
+
+    VTDecodeFrameFlags decodeFlags = 0;
+    VTDecodeInfoFlags infoFlagsOut = 0;
+    status = VTDecompressionSessionDecodeFrame(
+        vtSession_,
+        sampleBuffer,
+        decodeFlags,
+        reinterpret_cast<void*>(static_cast<uintptr_t>(packet.timestampNs)),
+        &infoFlagsOut
+    );
+
+    CFRelease(sampleBuffer);
+    CFRelease(blockBuffer);
+
+    if (status != noErr) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InternalError,
+                             "VTDecompressionSessionDecodeFrame failed with status " + std::to_string(status));
+    }
 
     return common::Result<void>::success();
+#endif
 }
 
 common::Result<DecodedFrame> VideoToolboxDecoder::getNextFrame() {
@@ -126,20 +398,61 @@ common::Result<DecodedFrame> VideoToolboxDecoder::getNextFrame() {
     return f;
 }
 
-common::Result<void> VideoToolboxDecoder::releaseFrame(const DecodedFrame& /*frame*/) {
+common::Result<void> VideoToolboxDecoder::releaseFrame(const DecodedFrame& frame) {
+#if defined(__APPLE__)
+    if (frame.nativeResource) {
+        CVPixelBufferRelease(static_cast<CVPixelBufferRef>(frame.nativeResource));
+    }
+#else
+    (void)frame;
+#endif
     return common::Result<void>::success();
 }
 
 common::Result<void> VideoToolboxDecoder::flush() {
     std::lock_guard<std::mutex> lock(mutex_);
-    while (!frameQueue_.empty()) frameQueue_.pop();
+#if defined(__APPLE__)
+    if (vtSession_) {
+        VTDecompressionSessionWaitForAsynchronousFrames(vtSession_);
+    }
+#endif
+    while (!frameQueue_.empty()) {
+#if defined(__APPLE__)
+        auto f = frameQueue_.front();
+        if (f.nativeResource) {
+            CVPixelBufferRelease(static_cast<CVPixelBufferRef>(f.nativeResource));
+        }
+#endif
+        frameQueue_.pop();
+    }
     return common::Result<void>::success();
 }
 
 common::Result<void> VideoToolboxDecoder::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
     isInitialized_ = false;
-    while (!frameQueue_.empty()) frameQueue_.pop();
+#if defined(__APPLE__)
+    if (vtSession_) {
+        VTDecompressionSessionWaitForAsynchronousFrames(vtSession_);
+        VTDecompressionSessionInvalidate(vtSession_);
+        CFRelease(vtSession_);
+        vtSession_ = nullptr;
+    }
+    if (formatDesc_) {
+        CFRelease(formatDesc_);
+        formatDesc_ = nullptr;
+    }
+    formatCreated_ = false;
+#endif
+    while (!frameQueue_.empty()) {
+#if defined(__APPLE__)
+        auto f = frameQueue_.front();
+        if (f.nativeResource) {
+            CVPixelBufferRelease(static_cast<CVPixelBufferRef>(f.nativeResource));
+        }
+#endif
+        frameQueue_.pop();
+    }
     return common::Result<void>::success();
 }
 

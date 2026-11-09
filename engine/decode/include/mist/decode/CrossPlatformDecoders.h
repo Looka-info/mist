@@ -8,6 +8,13 @@
 #include <mutex>
 #include <vector>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#include <VideoToolbox/VideoToolbox.h>
+#include <CoreMedia/CoreMedia.h>
+#include <CoreVideo/CoreVideo.h>
+#endif
+
 namespace mist::decode {
 
 enum class ClientPlatform : uint8_t {
@@ -65,8 +72,27 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
+#if defined(__APPLE__)
+    VTDecompressionSessionRef vtSession_{nullptr};
+    CMVideoFormatDescriptionRef formatDesc_{nullptr};
+    bool formatCreated_{false};
+
+    static void decompressionOutputCallback(
+        void* decompressionOutputRefCon,
+        void* sourceFrameRefCon,
+        OSStatus status,
+        VTDecodeInfoFlags infoFlags,
+        CVImageBufferRef imageBuffer,
+        CMTime presentationTimeStamp,
+        CMTime presentationDuration);
+
+    bool extractH264Parameters(const uint8_t* data, size_t size);
+    bool extractHevcParameters(const uint8_t* data, size_t size);
+    bool createDecompressionSession();
+#else
     [[maybe_unused]] void* vtSession_{nullptr};
     [[maybe_unused]] void* formatDesc_{nullptr};
+#endif
 };
 
 // Linux VA-API hardware decoder implementation

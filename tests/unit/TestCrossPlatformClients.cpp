@@ -51,42 +51,29 @@ TEST(MacOSVideoToolboxTest, DecodeLifecycle) {
     EXPECT_FALSE(decoder->isInitialized());
 
     DecodeConfig cfg{
-        .codec = VideoCodec::AV1,
+        .codec = VideoCodec::H264,
         .preferHardwareDecoding = true,
         .lowLatencyTuning = true
     };
-    auto initRes = decoder->initialize(cfg);
-    EXPECT_TRUE(initRes.hasValue());
-    EXPECT_TRUE(decoder->isInitialized());
 
-    // Submit packet
-    EncodedPacket pkt{};
-    pkt.data = {0x12, 0x00, 0x0A, 0x0B, 0x0C};
-    pkt.timestampNs = 123456789ULL;
-    pkt.isKeyframe = true;
+    if (VideoToolboxDecoder::isNativePlatform()) {
+        auto initRes = decoder->initialize(cfg);
+        EXPECT_TRUE(initRes.hasValue());
+        EXPECT_TRUE(decoder->isInitialized());
 
-    auto subRes = decoder->submitPacket(pkt);
-    EXPECT_TRUE(subRes.hasValue());
-    EXPECT_EQ(decoder->getDecodedFrameCount(), 1u);
+        EncodedPacket emptyPkt{};
+        EXPECT_FALSE(decoder->submitPacket(emptyPkt).hasValue());
 
-    // Retrieve frame
-    auto frameRes = decoder->getNextFrame();
-    ASSERT_TRUE(frameRes.hasValue());
-    EXPECT_EQ(frameRes.value().width, 1920u);
-    EXPECT_EQ(frameRes.value().height, 1080u);
-    EXPECT_EQ(frameRes.value().timestampNs, 123456789ULL);
-    EXPECT_EQ(frameRes.value().frameNumber, 1u);
-
-    EXPECT_TRUE(decoder->releaseFrame(frameRes.value()).hasValue());
-
-    // Second fetch should return empty/NotFound
-    auto emptyRes = decoder->getNextFrame();
-    EXPECT_FALSE(emptyRes.hasValue());
-
-    // Flush and shutdown
-    EXPECT_TRUE(decoder->flush().hasValue());
-    EXPECT_TRUE(decoder->shutdown().hasValue());
-    EXPECT_FALSE(decoder->isInitialized());
+        EXPECT_TRUE(decoder->flush().hasValue());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
+        EXPECT_FALSE(decoder->isInitialized());
+    } else {
+        auto initRes = decoder->initialize(cfg);
+        EXPECT_FALSE(initRes.hasValue());
+        EXPECT_EQ(initRes.error().code(), common::ErrorCode::NotImplemented);
+        EXPECT_FALSE(decoder->isInitialized());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
+    }
 }
 
 TEST(LinuxVaApiTest, SurfaceRingBufferLifecycle) {
