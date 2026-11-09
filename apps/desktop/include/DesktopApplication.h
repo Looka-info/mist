@@ -30,15 +30,15 @@ namespace mist::desktop {
 
 enum class DesktopScreen : uint8_t {
     Home = 1,
-    Host = 2,
-    Connect = 3,
-    Devices = 4,
-    Network = 5,
+    Host = 2,           // Wi-Fi Screen Share
+    Connect = 3,        // Connect with Pairing Code
+    Devices = 4,        // Device Management & Pairing
+    Network = 5,        // Wi-Fi & Network Health
     Error = 6,
-    Pairing = 4,          // backward-compatible alias for Devices
-    StreamSettings = 5,   // backward-compatible alias for Network
-    LiveSession = 5,      // backward-compatible alias for Network
-    DeviceManagement = 4, // backward-compatible alias for Devices
+    LiveSession = 7,    // Fullscreen Live Streaming View with Glass HUD
+    Pairing = 4,        // backward-compatible alias for Devices
+    StreamSettings = 5, // backward-compatible alias for Network
+    DeviceManagement = 4,// backward-compatible alias for Devices
     Exit = 99
 };
 
@@ -143,7 +143,7 @@ private:
     void toggleTheme();
     void renderGuiFrame();
 
-    // GUI Screen Components (Matching Mist.html design specification)
+    // GUI Screen Components (Material Design 3)
     void renderGuiHeader();
     void renderGuiNavRail();
     void renderGuiHomeScreen();
@@ -151,10 +151,15 @@ private:
     void renderGuiConnectScreen();
     void renderGuiDevicesScreen();
     void renderGuiNetworkScreen();
+    void renderGuiLiveSessionScreen();
+    void renderStreamingHud();
     void renderGuiLoadingScreen();
     void renderGuiErrorScreen();
     void renderGuiSettingsDialog();
     void renderGuiToast();
+
+    void navigateToScreen(DesktopScreen screen);
+    float getAnim(const std::string& key, float target, float speed = 12.0f);
 
     // GUI Visual Components
     void renderSleekMintLogo(float size = 36.0f) const;
@@ -278,6 +283,30 @@ private:
     std::vector<float> rttHistory_;
     bool isNetworkCongested_{false};
     float congestionDuration_{0.0f};
+
+    // Animation & Transition Engine State
+    float screenAlpha_{1.0f};
+    float screenSlide_{0.0f};
+    DesktopScreen transitionTarget_{DesktopScreen::Home};
+    bool isTransitioning_{false};
+    std::unordered_map<std::string, float> animMap_;
+    float codePulseEffect_{0.0f};
+
+    // Live Streaming Session & Floating HUD State
+    bool showLiveStreamingHud_{true};
+    float streamSessionDuration_{0.0f};
+    float hudHoverTimer_{0.0f};
+    bool isStreamingFullscreen_{false};
+
+    // Wi-Fi Screen Sharing & Pairing State
+    bool isWifiSharingActive_{false};
+    uint32_t codeRemainingSeconds_{300};
+    float codeTimer_{0.0f};
+    char clientPairingCode_[16]{""};
+    bool incomingRequestActive_{true};
+    std::string pendingDeviceId_{"pixel-tab-01"};
+    std::string pendingDeviceName_{"Pixel Tablet (Living Room)"};
+    security::DevicePermissions pendingPermissions_{ true, true, false, false, false };
 
     // Settings Modal State
     int settingsTheme_{0}; // 0 = Light, 1 = Dark

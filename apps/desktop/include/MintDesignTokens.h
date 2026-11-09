@@ -12,56 +12,65 @@ enum class ThemeMode : uint8_t {
 };
 
 // Exact color tokens from Mist.html design specification
+// Exact Material Design 3 Google Pixel palette for Mist
 struct MintPalette {
-    // Light Theme: :root
-    // --bg:#f0faf6; --sf:#ffffff; --ct:#bff0dd; --ct2:#e3f6ee; --mint:#46deb5; --onm:#032b20;
-    // --acc:#0f8466; --on:#ffffff; --onct:#06382b; --ink:#10231d; --mute:#4f655d; --line:#d4e7df;
-    // --ok:#0f8466; --warn:#8a5a00; --bad:#b3261e;
-    // --s1:#c2efdc; --s2:#dcf6ec; --s3:#a3e8cb; --s4:#d0f2e4;
+    // Pixel Mint:     #B8EBD5 (Primary action & brand highlight)
+    // Fresh Mint:     #8ED8BA (Vibrant secondary mint)
+    // Forest Green:   #174B38 (Emphasis & primary dark green)
+    // Deep Evergreen: #0D3024 (Deepest contrast & primary text)
+    // Cloud:          #F2F8F4 (Calm light background)
+    // Soft Sage:      #DDEFE4 (Soft light surface container)
+    // Dark background:#101A15 (Pitch dark canvas)
+    // Dark surface:   #18231C (Elevated dark card surface)
+    // Dark variant:   #202E25 (Soft dark container)
 
-    static constexpr ImVec4 LightBg       { 0.941f, 0.980f, 0.965f, 1.00f }; // #f0faf6
-    static constexpr ImVec4 LightSurface  { 1.000f, 1.000f, 1.000f, 1.00f }; // #ffffff
-    static constexpr ImVec4 LightCt       { 0.749f, 0.941f, 0.867f, 1.00f }; // #bff0dd (Active Container / Pill)
-    static constexpr ImVec4 LightCt2      { 0.890f, 0.965f, 0.933f, 1.00f }; // #e3f6ee (Soft Container / Tile)
-    static constexpr ImVec4 LightMint     { 0.275f, 0.871f, 0.710f, 1.00f }; // #46deb5 (Vibrant Mint)
-    static constexpr ImVec4 LightOnMint   { 0.012f, 0.169f, 0.125f, 1.00f }; // #032b20 (Dark Forest Text)
-    static constexpr ImVec4 LightAcc      { 0.059f, 0.518f, 0.400f, 1.00f }; // #0f8466 (Forest Accent Green)
-    static constexpr ImVec4 LightOnCt     { 0.024f, 0.220f, 0.169f, 1.00f }; // #06382b (Text on Active Container)
-    static constexpr ImVec4 LightInk      { 0.063f, 0.137f, 0.114f, 1.00f }; // #10231d (Primary Text)
-    static constexpr ImVec4 LightMute     { 0.310f, 0.396f, 0.365f, 1.00f }; // #4f655d (Muted Secondary Text)
-    static constexpr ImVec4 LightLine     { 0.831f, 0.906f, 0.875f, 1.00f }; // #d4e7df (Border Outline)
-    static constexpr ImVec4 LightOk       { 0.059f, 0.518f, 0.400f, 1.00f }; // #0f8466
-    static constexpr ImVec4 LightWarn     { 0.541f, 0.353f, 0.000f, 1.00f }; // #8a5a00
-    static constexpr ImVec4 LightBad      { 0.702f, 0.149f, 0.118f, 1.00f }; // #b3261e
-    static constexpr ImVec4 LightS1       { 0.761f, 0.937f, 0.863f, 1.00f }; // #c2efdc
-    static constexpr ImVec4 LightS2       { 0.863f, 0.965f, 0.925f, 1.00f }; // #dcf6ec
-    static constexpr ImVec4 LightS3       { 0.639f, 0.910f, 0.796f, 1.00f }; // #a3e8cb
-    static constexpr ImVec4 LightS4       { 0.816f, 0.949f, 0.894f, 1.00f }; // #d0f2e4
+    static constexpr ImVec4 PixelMint     { 0.722f, 0.922f, 0.835f, 1.00f }; // #b8ebd5
+    static constexpr ImVec4 FreshMint     { 0.557f, 0.847f, 0.729f, 1.00f }; // #8ed8ba
+    static constexpr ImVec4 ForestGreen   { 0.090f, 0.294f, 0.220f, 1.00f }; // #174b38
+    static constexpr ImVec4 DeepEvergreen { 0.051f, 0.188f, 0.141f, 1.00f }; // #0d3024
+    static constexpr ImVec4 Cloud         { 0.949f, 0.973f, 0.957f, 1.00f }; // #f2f8f4
+    static constexpr ImVec4 SoftSage      { 0.867f, 0.937f, 0.894f, 1.00f }; // #ddefe4
+    static constexpr ImVec4 DarkBg        { 0.063f, 0.102f, 0.082f, 1.00f }; // #101a15
+    static constexpr ImVec4 DarkSurface   { 0.094f, 0.137f, 0.110f, 1.00f }; // #18231c
+    static constexpr ImVec4 DarkVariant   { 0.125f, 0.180f, 0.145f, 1.00f }; // #202e25
 
-    // Dark Theme: :root[data-theme="dark"]
-    // --bg:#0c1915; --sf:#12231e; --mint:#6fdcb6; --onm:#00382a; --ct:#1d3d33; --ct2:#183128;
-    // --acc:#6fdcb6; --on:#00382a; --onct:#c9f4e3; --ink:#dcefe8; --mute:#92b2a6; --line:#25423a;
-    // --ok:#6fdcb6; --warn:#e5ad45; --bad:#f2867d;
-    // --s1:#1f6b57; --s2:#14463a; --s3:#2b9a7c; --s4:#0f3a30;
+    // Light Theme
+    static constexpr ImVec4 LightBg       { 0.949f, 0.973f, 0.957f, 1.00f }; // Cloud #f2f8f4
+    static constexpr ImVec4 LightSurface  { 1.000f, 1.000f, 1.000f, 1.00f }; // White card
+    static constexpr ImVec4 LightCt       { 0.722f, 0.922f, 0.835f, 1.00f }; // Pixel Mint #b8ebd5
+    static constexpr ImVec4 LightCt2      { 0.867f, 0.937f, 0.894f, 1.00f }; // Soft Sage #ddefe4
+    static constexpr ImVec4 LightMint     { 0.557f, 0.847f, 0.729f, 1.00f }; // Fresh Mint #8ed8ba
+    static constexpr ImVec4 LightOnMint   { 0.051f, 0.188f, 0.141f, 1.00f }; // Deep Evergreen #0d3024
+    static constexpr ImVec4 LightAcc      { 0.090f, 0.294f, 0.220f, 1.00f }; // Forest Green #174b38
+    static constexpr ImVec4 LightOnCt     { 0.051f, 0.188f, 0.141f, 1.00f }; // Deep Evergreen #0d3024
+    static constexpr ImVec4 LightInk      { 0.051f, 0.188f, 0.141f, 1.00f }; // Deep Evergreen primary text
+    static constexpr ImVec4 LightMute     { 0.260f, 0.370f, 0.320f, 1.00f }; // Muted sage text
+    static constexpr ImVec4 LightLine     { 0.768f, 0.870f, 0.812f, 1.00f }; // Border outline
+    static constexpr ImVec4 LightOk       { 0.090f, 0.440f, 0.320f, 1.00f }; // Success green
+    static constexpr ImVec4 LightWarn     { 0.650f, 0.420f, 0.050f, 1.00f }; // Amber warning
+    static constexpr ImVec4 LightBad      { 0.720f, 0.150f, 0.150f, 1.00f }; // Error red
+    static constexpr ImVec4 LightS1       { 0.722f, 0.922f, 0.835f, 1.00f };
+    static constexpr ImVec4 LightS2       { 0.867f, 0.937f, 0.894f, 1.00f };
+    static constexpr ImVec4 LightS3       { 0.557f, 0.847f, 0.729f, 1.00f };
+    static constexpr ImVec4 LightS4       { 0.800f, 0.910f, 0.850f, 1.00f };
 
-    static constexpr ImVec4 DarkBg        { 0.047f, 0.098f, 0.082f, 1.00f }; // #0c1915
-    static constexpr ImVec4 DarkSurface   { 0.071f, 0.137f, 0.118f, 1.00f }; // #12231e
-    static constexpr ImVec4 DarkCt        { 0.114f, 0.239f, 0.200f, 1.00f }; // #1d3d33
-    static constexpr ImVec4 DarkCt2       { 0.094f, 0.192f, 0.157f, 1.00f }; // #183128
-    static constexpr ImVec4 DarkMint      { 0.435f, 0.863f, 0.714f, 1.00f }; // #6fdcb6
-    static constexpr ImVec4 DarkOnMint    { 0.000f, 0.220f, 0.165f, 1.00f }; // #00382a
-    static constexpr ImVec4 DarkAcc       { 0.435f, 0.863f, 0.714f, 1.00f }; // #6fdcb6
-    static constexpr ImVec4 DarkOnCt      { 0.788f, 0.957f, 0.890f, 1.00f }; // #c9f4e3
-    static constexpr ImVec4 DarkInk       { 0.863f, 0.937f, 0.910f, 1.00f }; // #dcefe8
-    static constexpr ImVec4 DarkMute      { 0.573f, 0.698f, 0.651f, 1.00f }; // #92b2a6
-    static constexpr ImVec4 DarkLine      { 0.145f, 0.259f, 0.227f, 1.00f }; // #25423a
-    static constexpr ImVec4 DarkOk        { 0.435f, 0.863f, 0.714f, 1.00f }; // #6fdcb6
-    static constexpr ImVec4 DarkWarn      { 0.898f, 0.678f, 0.271f, 1.00f }; // #e5ad45
-    static constexpr ImVec4 DarkBad       { 0.949f, 0.525f, 0.490f, 1.00f }; // #f2867d
-    static constexpr ImVec4 DarkS1        { 0.122f, 0.420f, 0.341f, 1.00f }; // #1f6b57
-    static constexpr ImVec4 DarkS2        { 0.078f, 0.275f, 0.227f, 1.00f }; // #14463a
-    static constexpr ImVec4 DarkS3        { 0.169f, 0.604f, 0.486f, 1.00f }; // #2b9a7c
-    static constexpr ImVec4 DarkS4        { 0.059f, 0.227f, 0.188f, 1.00f }; // #0f3a30
+    // Dark Theme
+    static constexpr ImVec4 DarkCt        { 0.090f, 0.294f, 0.220f, 1.00f }; // Forest Green #174b38
+    static constexpr ImVec4 DarkCt2       { 0.125f, 0.180f, 0.145f, 1.00f }; // Dark Variant #202e25
+    static constexpr ImVec4 DarkMint      { 0.557f, 0.847f, 0.729f, 1.00f }; // Fresh Mint #8ed8ba
+    static constexpr ImVec4 DarkOnMint    { 0.051f, 0.188f, 0.141f, 1.00f }; // Deep Evergreen text on mint
+    static constexpr ImVec4 DarkAcc       { 0.722f, 0.922f, 0.835f, 1.00f }; // Pixel Mint accent
+    static constexpr ImVec4 DarkOnCt      { 0.722f, 0.922f, 0.835f, 1.00f }; // Pixel Mint text on active container
+    static constexpr ImVec4 DarkInk       { 0.949f, 0.973f, 0.957f, 1.00f }; // Cloud #f2f8f4 text
+    static constexpr ImVec4 DarkMute      { 0.600f, 0.730f, 0.670f, 1.00f }; // Soft Sage muted text
+    static constexpr ImVec4 DarkLine      { 0.160f, 0.250f, 0.200f, 1.00f }; // Dark line
+    static constexpr ImVec4 DarkOk        { 0.557f, 0.847f, 0.729f, 1.00f };
+    static constexpr ImVec4 DarkWarn      { 0.898f, 0.678f, 0.271f, 1.00f };
+    static constexpr ImVec4 DarkBad       { 0.949f, 0.525f, 0.490f, 1.00f };
+    static constexpr ImVec4 DarkS1        { 0.090f, 0.294f, 0.220f, 1.00f };
+    static constexpr ImVec4 DarkS2        { 0.051f, 0.188f, 0.141f, 1.00f };
+    static constexpr ImVec4 DarkS3        { 0.125f, 0.180f, 0.145f, 1.00f };
+    static constexpr ImVec4 DarkS4        { 0.070f, 0.220f, 0.160f, 1.00f };
 };
 
 struct ThemeColors {
@@ -110,14 +119,21 @@ struct ThemeColors {
     ImVec4 surfaceContainerLow;
 };
 
-// Material 3 & Mint Shape Metrics
+// Material 3 Shape Metrics
 struct MintShapes {
-    static constexpr float Dialog = 28.0f; // dialog border-radius: 28px
-    static constexpr float Card   = 28.0f; // .card border-radius: 28px
-    static constexpr float Tile   = 24.0f; // .tile border-radius: 24px
-    static constexpr float Control= 16.0f; // .ic border-radius: 16px, inputs: 12-16px
-    static constexpr float Small  = 8.0f;  // .chip border-radius: 8px
-    static constexpr float Pill   = 99.0f; // .btn, .rail a, .search border-radius: 99px
+    static constexpr float ExtraSmall = 4.0f;
+    static constexpr float Small      = 8.0f;  // Chips, badges, small items
+    static constexpr float Medium     = 12.0f; // Text fields, menus, cards
+    static constexpr float Large      = 16.0f; // Action tiles, floating HUDs
+    static constexpr float ExtraLarge = 28.0f; // Large cards, dialogs, modals
+    static constexpr float Full       = 999.0f;// Pill buttons, switches, rail indicators
+
+    // Backward-compatible aliases
+    static constexpr float Dialog     = ExtraLarge;
+    static constexpr float Card       = ExtraLarge;
+    static constexpr float Tile       = Large;
+    static constexpr float Control    = Medium;
+    static constexpr float Pill       = Full;
 };
 
 // Typography Scale (Comfortable large modern scale)

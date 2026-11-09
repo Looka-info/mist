@@ -77,36 +77,41 @@ All screens use the uniform `BeginM3CardHelper` / `EndM3CardHelper` pattern:
 
 ## 4. Screen Architecture & Workflows
 
-### 4.1 Screen 1: Home (Device & Host Discovery)
-- **Hero Card:** Displays 64px geometric logo, tagline ("Play beyond your desk"), and overview.
-- **Direct Connect Card:** Direct IP/port entry with instant availability verification (< 0.5 ms RTT).
-- **KPI Summary Cards:** Real-time summary of local node, GPU encoder (NVENC), and peer network QoS.
-- **Discovered Hosts Table:** Discovered LAN beacons with hardware specifications, round-trip times, and one-click connection actions.
+### 4.1 Screen 1: Home (Dashboard & Quick Actions)
+- **Hero Card:** Displays 44px sleek geometric logo, brand tagline, and overview.
+- **Action Tiles:** 4 Material 3 24px-rounded action tiles for Wi-Fi Screen Share, Connect with Code, Paired Devices, and Wi-Fi & Network.
+- **Latest Sessions:** Quick review of recent connections and streaming metrics.
+- **System Check:** Real-time summary of GPU encoder (NVENC), graphics driver, display session, audio endpoint, and Wi-Fi link.
 
-### 4.2 Screen 2: Device Pairing
-- **Active Code Display:** Prominent Base32 6-character code box with live countdown progress bar (300-second single-use validity).
-- **Cryptographic Authorization:** Host Ed25519 public key fingerprint verification.
-- **Incoming Requests:** Interactive approval cards displaying requesting device ID and granular permission requests (Keyboard, Mouse, Gamepad).
+### 4.2 Screen 2: Wi-Fi Screen Share (Host)
+- **Wi-Fi Preflight Banner:** Validates active Wi-Fi connection, SSID, signal quality, NVENC encoder, and WASAPI loopback before streaming.
+- **Active Code Display:** Prominent 6-character pill boxes with animated pulse highlight, live expiration countdown timer (300 seconds), and single-use invalidation.
+- **One-Click Session Controls:** Copy Code to clipboard, Revoke & New Code, and Stop Sharing.
+- **Host Permission Controls:** Explicit toggles for streaming game audio and allowing remote input (keyboard, mouse, gamepad).
+- **Incoming Requests:** Interactive approval cards displaying requesting device identity and permission requests.
 
-### 4.3 Screen 3: Host Management
-- **Broadcast Status:** One-click hosting state toggle (Active / Paused).
-- **Emergency Severance:** High-visibility "Immediate Emergency Disconnect" action to terminate all streaming DataChannels instantly.
-- **Display Selection:** Target display monitor dropdown (Primary vs Secondary monitors) and WASAPI audio loopback toggle.
-- **Operator Safety Shield:** Physical keyboard/mouse hardware priority preemption switch (2.0s suppression of remote inputs).
+### 4.3 Screen 3: Connect to a Device (Client)
+- **6-Character Code Entry:** Single unified pairing entry point; supports typing or pasting a 6-character code from clipboard.
+- **Permission Preferences:** Toggles for receiving game audio and sending remote input.
+- **Animated Stepper:** Step-by-step progress visualizer tracking network verification, code authentication, WebRTC negotiation, and first-frame delivery.
+- **Automatic Session Transition:** On successful pairing, smoothly navigates into the Live Streaming Session.
 
 ### 4.4 Screen 4: Stream Quality Settings
-- **Quality Profiles:** 4 interactive Material You profile cards:
+- **Quality Profiles:** 4 interactive Material 3 profile options:
   - *Performance:* 720p60, 3,500 kbps (Competitive sub-15ms esports).
-  - *Balanced:* 1080p60, 8,000 kbps (High-speed LAN default).
+  - *Balanced:* 1080p60, 8,000 kbps (High-speed Wi-Fi / direct link default).
   - *Quality:* 1080p60, 15,000 kbps (Pristine visual fidelity).
   - *Adaptive:* Dynamic 2,000–20,000 kbps (AIMD congestion-controlled).
-- **Custom Tuning:** Bitrate sliders (Min, Target, Max) and VSync toggle for presentation latency tuning.
+- **Custom Tuning:** Bitrate sliders (Min, Target, Max) and frame rate selector.
 
-### 4.5 Screen 5: Live Session Telemetry
-- **Video Pipeline:** Resolution, FPS, NVENC hardware encoding latency (1.82ms), NVDEC decoding latency (2.45ms), frame drop rate.
-- **Network QoS:** WebRTC transport mode, estimated bandwidth (45.2 Mbps), RTT (3.4ms), jitter (0.42ms), packet loss (0.00%), SCTP DataChannel state.
-- **Audio & Input:** Opus 48 kHz bitrate (128 kbps), buffer depth (10ms), A/V skew (14.93ms < 40ms limit), input dispatch latency (0.28ms).
-- **Motion-to-Photon Waterfall:** Step-by-step latency visualizer (Capture + NVENC + Network + Decode + Present = 6.8 ms total).
+### 4.5 Screen 5: Live Streaming Session & Floating HUD
+- **Active Viewport:** Large immersive viewport representation displaying the live 60 FPS hardware stream.
+- **Collapsible Floating Glass HUD:** Semi-transparent Material Design 3 HUD displaying live telemetry:
+  - *Resolution & FPS:* 1080p60 NVENC
+  - *Bandwidth & Bitrate:* Real-time throughput (Mbps)
+  - *Latency:* Sub-millisecond to low-millisecond RTT (ms), jitter, and packet loss
+  - *Status Indicators:* Stereo Opus 48 kHz audio and remote input control status
+  - *Controls:* Fullscreen mode toggle, HUD minimize/expand toggle, and graceful stream disconnect action.
 
 ### 4.6 Screen 6: Device Management
 - **Trusted Device Ledger:** Persisted device list loaded via `PairingManager`.
