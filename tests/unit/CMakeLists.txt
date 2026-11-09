@@ -36,6 +36,7 @@ add_executable(mist_unit_tests
     TestTurnRelay.cpp
     TestPeerIdentity.cpp
     TestMultiGuestFanout.cpp
+    TestPerGuestAdaptiveBitrate.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

@@ -227,6 +227,19 @@ impl QualityProfile {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GuestQualityStatus {
+    pub guest_id: String,
+    pub profile: QualityProfile,
+    pub target_bitrate_kbps: u32,
+    pub width: u32,
+    pub height: u32,
+    pub fps: u32,
+    pub rendition_index: u32,
+    pub rtt_ms: f64,
+    pub loss_percent: f64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SecurityTrustState {
     Unverified,
