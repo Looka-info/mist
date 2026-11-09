@@ -2,6 +2,8 @@ add_library(mist_platform_windows
     src/PlatformWindows.cpp
     src/D3D11Device.cpp
     src/VirtualDisplayManager.cpp
+    src/WakeOnLan.cpp
+    src/HostServiceManager.cpp
 )
 
 target_include_directories(mist_platform_windows PUBLIC
@@ -21,5 +23,6 @@ if(WIN32)
         d3d11
         dxgi
         winmm
+        ws2_32
     )
 endif()
