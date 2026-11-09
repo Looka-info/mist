@@ -25,6 +25,12 @@ add_library(mist_warnings INTERFACE)
 target_compile_features(mist_warnings INTERFACE cxx_std_20)
 
 if(MSVC)
+    target_compile_definitions(mist_warnings INTERFACE
+        _CRT_SECURE_NO_WARNINGS
+        _CRT_NONSTDC_NO_DEPRECATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+    )
     target_compile_options(mist_warnings INTERFACE
         /W4
         /permissive-
@@ -32,6 +38,8 @@ if(MSVC)
         /EHsc
         /utf-8
         /volatile:iso
+        /wd4201
+        /wd4100
     )
     if(MIST_TREAT_WARNINGS_AS_ERRORS)
         target_compile_options(mist_warnings INTERFACE /WX)

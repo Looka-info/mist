@@ -5,8 +5,8 @@
 
 // 2. Embedded Binary Payloads
 201 RCDATA "@CMAKE_BINARY_DIR@/apps/desktop/mist_desktop.exe"
-202 RCDATA "@CMAKE_BINARY_DIR@/apps/host/mist_host.exe"
-203 RCDATA "@CMAKE_BINARY_DIR@/apps/client/mist_client.exe"
+202 RCDATA "$<TARGET_FILE:mist_host>"
+203 RCDATA "$<TARGET_FILE:mist_client>"
 204 RCDATA "@CMAKE_SOURCE_DIR@/bin/mist-signaling.exe"
 205 RCDATA "@CMAKE_SOURCE_DIR@/resources/mist.ico"
 206 RCDATA "@CMAKE_SOURCE_DIR@/resources/fonts/Roboto-Regular.ttf"
@@ -16,8 +16,8 @@
 
 // 3. Version Information
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     0,3,0,1
-PRODUCTVERSION  0,3,0,1
+FILEVERSION     0,3,0,3
+PRODUCTVERSION  0,3,0,3
 FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
 FILEFLAGS       0
 FILEOS          VOS_NT_WINDOWS32
@@ -30,11 +30,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Mist Systems Architecture"
             VALUE "FileDescription",  "Mist Native Game Streaming Setup Wizard"
-            VALUE "FileVersion",      "0.3.0-rc1"
+            VALUE "FileVersion",      "0.3.0-rc3"
             VALUE "InternalName",     "MistSetup"
-            VALUE "OriginalFilename", "MistSetup-v0.3.0-rc1.exe"
+            VALUE "OriginalFilename", "MistSetup-v0.3.0-rc3.exe"
             VALUE "ProductName",      "Mist Game Streaming Platform"
-            VALUE "ProductVersion",   "0.3.0-rc1"
+            VALUE "ProductVersion",   "0.3.0-rc3"
             VALUE "LegalCopyright",   "Copyright (C) 2026 Mist Project Contributors"
         END
     END

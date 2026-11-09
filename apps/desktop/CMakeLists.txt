@@ -59,24 +59,25 @@ else()
     # Modern Rust + Slint Desktop Target
     find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
-    set(RUST_TARGET_SUBDIR "debug")
-    set(RUST_CONFIG_FLAG "")
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        set(RUST_TARGET_SUBDIR "release")
-        set(RUST_CONFIG_FLAG "--release")
-    endif()
-
-    set(CARGO_BUILD_TARGET_DIR "${CMAKE_SOURCE_DIR}/target/${RUST_TARGET_SUBDIR}")
-    if(EXISTS "D:/rust/target")
-        set(CARGO_BUILD_TARGET_DIR "D:/rust/target/${RUST_TARGET_SUBDIR}")
+    set(RUST_TARGET_SUBDIR "release")
+    set(RUST_CONFIG_FLAG "--release")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(RUST_TARGET_SUBDIR "debug")
+        set(RUST_CONFIG_FLAG "")
     endif()
 
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe
         COMMAND ${CARGO_EXECUTABLE} build --package mist-desktop ${RUST_CONFIG_FLAG}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_1=${CMAKE_SOURCE_DIR}/target/${RUST_TARGET_SUBDIR}/mist-desktop.exe
+            -DSOURCE_2=D:/rust/target/${RUST_TARGET_SUBDIR}/mist-desktop.exe
+            -DSOURCE_3=${CMAKE_SOURCE_DIR}/bin/mist_desktop.exe
+            -DDESTINATION=${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe
+            -P ${CMAKE_SOURCE_DIR}/cmake/stage_desktop.cmake
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CARGO_BUILD_TARGET_DIR}/mist-desktop.exe"
             "${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe"
+            "${CMAKE_SOURCE_DIR}/bin/mist_desktop.exe"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Building and staging Mist Desktop (Rust + Slint) -> ${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe"
     )
