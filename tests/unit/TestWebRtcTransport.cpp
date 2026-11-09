@@ -122,6 +122,23 @@ TEST(TestWebRtcTransport, DirectLoopbackNegotiation) {
     }
 
     EXPECT_TRUE(connected) << "Direct loopback WebRTC connection failed to reach Connected state";
+
+    // Teardown and unregister callbacks to avoid background worker race on stack exit
+    if (hostPc) {
+        hostPc->setLocalCandidateCallback(nullptr);
+        hostPc->setLocalDescriptionCallback(nullptr);
+    }
+    if (clientPc) {
+        clientPc->setLocalCandidateCallback(nullptr);
+        clientPc->setLocalDescriptionCallback(nullptr);
+    }
+    if (hostTransport) {
+        (void)hostTransport->disconnect();
+    }
+    if (clientTransport) {
+        (void)clientTransport->disconnect();
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 
 TEST(TestWebRtcTransport, VideoPacketizationAndPLI) {
@@ -204,4 +221,23 @@ TEST(TestWebRtcTransport, VideoPacketizationAndPLI) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
         EXPECT_TRUE(pliReceived.load() || true); // PLI request verified
     }
+
+    // Teardown and unregister callbacks to avoid background worker race on stack exit
+    if (hostPc) {
+        hostPc->setLocalCandidateCallback(nullptr);
+        hostPc->setLocalDescriptionCallback(nullptr);
+    }
+    if (clientPc) {
+        clientPc->setLocalCandidateCallback(nullptr);
+        clientPc->setLocalDescriptionCallback(nullptr);
+    }
+    if (clientTransport) {
+        clientTransport->setFrameReceivedCallback(nullptr);
+        (void)clientTransport->disconnect();
+    }
+    if (hostTransport) {
+        hostTransport->setKeyframeRequestCallback(nullptr);
+        (void)hostTransport->disconnect();
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }

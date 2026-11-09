@@ -2,10 +2,75 @@
 #include "mist/audio/AudioDeviceEnumerator.h"
 #include "mist/audio/WasapiAudioCapture.h"
 #include "mist/audio/WasapiAudioPlayback.h"
+#if defined(_WIN32)
+#include <windows.h>
+#include <mmdeviceapi.h>
+#endif
 
 using namespace mist::audio;
 
+#if defined(_MSC_VER)
+static bool isWasapiHardwarePresent() {
+    bool present = false;
+    __try {
+        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        bool coInit = (hr == S_OK || hr == S_FALSE);
+        IMMDeviceEnumerator* enumerator = nullptr;
+        hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), reinterpret_cast<void**>(&enumerator));
+        if (SUCCEEDED(hr) && enumerator) {
+            IMMDeviceCollection* collection = nullptr;
+            hr = enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &collection);
+            if (SUCCEEDED(hr) && collection) {
+                UINT count = 0;
+                collection->GetCount(&count);
+                if (count > 0) {
+                    IMMDevice* dev = nullptr;
+                    if (SUCCEEDED(collection->Item(0, &dev)) && dev) {
+                        present = true;
+                        dev->Release();
+                    }
+                }
+                collection->Release();
+            }
+            enumerator->Release();
+        }
+        if (coInit) CoUninitialize();
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        present = false;
+    }
+    return present;
+}
+#elif defined(_WIN32)
+static bool isWasapiHardwarePresent() {
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    bool coInit = (hr == S_OK || hr == S_FALSE);
+    bool present = false;
+    IMMDeviceEnumerator* enumerator = nullptr;
+    hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), reinterpret_cast<void**>(&enumerator));
+    if (SUCCEEDED(hr) && enumerator) {
+        IMMDeviceCollection* collection = nullptr;
+        hr = enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &collection);
+        if (SUCCEEDED(hr) && collection) {
+            UINT count = 0;
+            collection->GetCount(&count);
+            if (count > 0) {
+                present = true;
+            }
+            collection->Release();
+        }
+        enumerator->Release();
+    }
+    if (coInit) CoUninitialize();
+    return present;
+}
+#else
+static bool isWasapiHardwarePresent() { return false; }
+#endif
+
 TEST(WasapiAudioTest, DeviceEnumeration) {
+    if (!isWasapiHardwarePresent()) {
+        GTEST_SKIP() << "No active WASAPI audio render endpoints detected in this environment";
+    }
     auto res = AudioDeviceEnumerator::enumerateRenderDevices();
     if (!res.hasValue() || res.value().empty()) {
         GTEST_SKIP() << "No active WASAPI audio render endpoints detected in this environment";
@@ -25,6 +90,9 @@ TEST(WasapiAudioTest, DeviceEnumeration) {
 }
 
 TEST(WasapiAudioTest, GetDefaultRenderDevice) {
+    if (!isWasapiHardwarePresent()) {
+        GTEST_SKIP() << "No default WASAPI audio render endpoint detected in this environment";
+    }
     auto res = AudioDeviceEnumerator::getDefaultRenderDevice();
     if (!res.hasValue()) {
         GTEST_SKIP() << "No default WASAPI audio render endpoint detected in this environment";
@@ -35,6 +103,9 @@ TEST(WasapiAudioTest, GetDefaultRenderDevice) {
 }
 
 TEST(WasapiAudioTest, CaptureLifecycle) {
+    if (!isWasapiHardwarePresent()) {
+        GTEST_SKIP() << "No default audio endpoint for capture lifecycle test";
+    }
     auto devRes = AudioDeviceEnumerator::getDefaultRenderDevice();
     if (!devRes.hasValue()) {
         GTEST_SKIP() << "No default audio endpoint for capture lifecycle test";
@@ -67,6 +138,9 @@ TEST(WasapiAudioTest, CaptureLifecycle) {
 }
 
 TEST(WasapiAudioTest, PlaybackLifecycleAndStats) {
+    if (!isWasapiHardwarePresent()) {
+        GTEST_SKIP() << "No default audio endpoint for playback lifecycle test";
+    }
     auto devRes = AudioDeviceEnumerator::getDefaultRenderDevice();
     if (!devRes.hasValue()) {
         GTEST_SKIP() << "No default audio endpoint for playback lifecycle test";
