@@ -80,19 +80,17 @@ impl SessionSupervisor {
         None
     }
 
-    pub fn start_host<F>(
-        &mut self,
-        session_id: &str,
-        config: &AppConfig,
-        event_cb: F,
-    ) -> Result<()>
+    pub fn start_host<F>(&mut self, session_id: &str, config: &AppConfig, event_cb: F) -> Result<()>
     where
         F: Fn(SessionEvent) + Send + Sync + 'static,
     {
         self.stop();
 
-        let host_bin = Self::find_binary("mist_host")
-            .ok_or_else(|| MistError::Session("mist_host.exe binary not found. Please build the project first.".to_string()))?;
+        let host_bin = Self::find_binary("mist_host").ok_or_else(|| {
+            MistError::Session(
+                "mist_host.exe binary not found. Please build the project first.".to_string(),
+            )
+        })?;
 
         let pid = std::process::id();
         let pipe_name = format!(r"\\.\pipe\mist_ipc_host_{}", pid);
@@ -108,50 +106,48 @@ impl SessionSupervisor {
         let telem_clone = telem_arc.clone();
         let is_str_clone = is_stream_arc.clone();
 
-        ipc.start(&pipe_name, move |msg| {
-            match msg.msg_type {
-                MessageType::ProcessInitialized => {
-                    *state_clone.lock().unwrap() = ConnectionState::Initializing;
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Initializing));
-                }
-                MessageType::SignalingConnected => {
-                    *state_clone.lock().unwrap() = ConnectionState::Connecting;
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Connecting));
-                }
-                MessageType::IceConnected => {
-                    *state_clone.lock().unwrap() = ConnectionState::Streaming;
-                    is_str_clone.store(true, Ordering::SeqCst);
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Streaming));
-                }
-                MessageType::TelemetryUpdate => {
-                    if let Some(p) = msg.get_payload::<IpcTelemetryPayload>() {
-                        let t = SessionTelemetry {
-                            fps: p.fps,
-                            bitrate_kbps: p.bitrate_kbps,
-                            rtt_ms: p.rtt_ms,
-                            jitter_ms: p.jitter_ms,
-                            packet_loss_percent: p.packet_loss_percent,
-                            frames_decoded: p.frames_decoded,
-                            frames_dropped: p.frames_dropped,
-                            timestamp_ns: p.stats_timestamp_ns,
-                            source: "webrtc_media".to_string(),
-                        };
-                        *telem_clone.lock().unwrap() = t.clone();
-                        cb_clone(SessionEvent::TelemetryUpdated(t));
-                    }
-                }
-                MessageType::ConnectionLost => {
-                    *state_clone.lock().unwrap() = ConnectionState::Disconnected;
-                    is_str_clone.store(false, Ordering::SeqCst);
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Disconnected));
-                }
-                MessageType::StreamingStopped => {
-                    *state_clone.lock().unwrap() = ConnectionState::Idle;
-                    is_str_clone.store(false, Ordering::SeqCst);
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Idle));
-                }
-                _ => {}
+        ipc.start(&pipe_name, move |msg| match msg.msg_type {
+            MessageType::ProcessInitialized => {
+                *state_clone.lock().unwrap() = ConnectionState::Initializing;
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Initializing));
             }
+            MessageType::SignalingConnected => {
+                *state_clone.lock().unwrap() = ConnectionState::Connecting;
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Connecting));
+            }
+            MessageType::IceConnected => {
+                *state_clone.lock().unwrap() = ConnectionState::Streaming;
+                is_str_clone.store(true, Ordering::SeqCst);
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Streaming));
+            }
+            MessageType::TelemetryUpdate => {
+                if let Some(p) = msg.get_payload::<IpcTelemetryPayload>() {
+                    let t = SessionTelemetry {
+                        fps: p.fps,
+                        bitrate_kbps: p.bitrate_kbps,
+                        rtt_ms: p.rtt_ms,
+                        jitter_ms: p.jitter_ms,
+                        packet_loss_percent: p.packet_loss_percent,
+                        frames_decoded: p.frames_decoded,
+                        frames_dropped: p.frames_dropped,
+                        timestamp_ns: p.stats_timestamp_ns,
+                        source: "webrtc_media".to_string(),
+                    };
+                    *telem_clone.lock().unwrap() = t.clone();
+                    cb_clone(SessionEvent::TelemetryUpdated(t));
+                }
+            }
+            MessageType::ConnectionLost => {
+                *state_clone.lock().unwrap() = ConnectionState::Disconnected;
+                is_str_clone.store(false, Ordering::SeqCst);
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Disconnected));
+            }
+            MessageType::StreamingStopped => {
+                *state_clone.lock().unwrap() = ConnectionState::Idle;
+                is_str_clone.store(false, Ordering::SeqCst);
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Idle));
+            }
+            _ => {}
         })?;
 
         let mut cmd = Command::new(host_bin);
@@ -169,7 +165,9 @@ impl SessionSupervisor {
             &pipe_name,
         ]);
 
-        let child = cmd.spawn().map_err(|e| MistError::Session(format!("Failed to spawn mist_host: {}", e)))?;
+        let child = cmd
+            .spawn()
+            .map_err(|e| MistError::Session(format!("Failed to spawn mist_host: {}", e)))?;
 
         self.child_process = Some(child);
         self.ipc_server = Some(ipc);
@@ -192,8 +190,11 @@ impl SessionSupervisor {
     {
         self.stop();
 
-        let client_bin = Self::find_binary("mist_client")
-            .ok_or_else(|| MistError::Session("mist_client.exe binary not found. Please build the project first.".to_string()))?;
+        let client_bin = Self::find_binary("mist_client").ok_or_else(|| {
+            MistError::Session(
+                "mist_client.exe binary not found. Please build the project first.".to_string(),
+            )
+        })?;
 
         let pid = std::process::id();
         let pipe_name = format!(r"\\.\pipe\mist_ipc_client_{}", pid);
@@ -211,56 +212,54 @@ impl SessionSupervisor {
         let is_str_clone = is_stream_arc.clone();
         let hwnd_clone = hwnd_arc.clone();
 
-        ipc.start(&pipe_name, move |msg| {
-            match msg.msg_type {
-                MessageType::ProcessInitialized => {
-                    *state_clone.lock().unwrap() = ConnectionState::Initializing;
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Initializing));
-                }
-                MessageType::SignalingConnected => {
-                    *state_clone.lock().unwrap() = ConnectionState::Connecting;
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Connecting));
-                }
-                MessageType::WindowHandle => {
-                    if let Some(p) = msg.get_payload::<IpcWindowPayload>() {
-                        *hwnd_clone.lock().unwrap() = p.hwnd;
-                        cb_clone(SessionEvent::ClientWindowReady(p.hwnd));
-                    }
-                }
-                MessageType::FirstFramePresented => {
-                    *state_clone.lock().unwrap() = ConnectionState::Streaming;
-                    is_str_clone.store(true, Ordering::SeqCst);
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Streaming));
-                }
-                MessageType::TelemetryUpdate => {
-                    if let Some(p) = msg.get_payload::<IpcTelemetryPayload>() {
-                        let t = SessionTelemetry {
-                            fps: p.fps,
-                            bitrate_kbps: p.bitrate_kbps,
-                            rtt_ms: p.rtt_ms,
-                            jitter_ms: p.jitter_ms,
-                            packet_loss_percent: p.packet_loss_percent,
-                            frames_decoded: p.frames_decoded,
-                            frames_dropped: p.frames_dropped,
-                            timestamp_ns: p.stats_timestamp_ns,
-                            source: "webrtc_media".to_string(),
-                        };
-                        *telem_clone.lock().unwrap() = t.clone();
-                        cb_clone(SessionEvent::TelemetryUpdated(t));
-                    }
-                }
-                MessageType::ConnectionLost => {
-                    *state_clone.lock().unwrap() = ConnectionState::Disconnected;
-                    is_str_clone.store(false, Ordering::SeqCst);
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Disconnected));
-                }
-                MessageType::StreamingStopped => {
-                    *state_clone.lock().unwrap() = ConnectionState::Idle;
-                    is_str_clone.store(false, Ordering::SeqCst);
-                    cb_clone(SessionEvent::StateChanged(ConnectionState::Idle));
-                }
-                _ => {}
+        ipc.start(&pipe_name, move |msg| match msg.msg_type {
+            MessageType::ProcessInitialized => {
+                *state_clone.lock().unwrap() = ConnectionState::Initializing;
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Initializing));
             }
+            MessageType::SignalingConnected => {
+                *state_clone.lock().unwrap() = ConnectionState::Connecting;
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Connecting));
+            }
+            MessageType::WindowHandle => {
+                if let Some(p) = msg.get_payload::<IpcWindowPayload>() {
+                    *hwnd_clone.lock().unwrap() = p.hwnd;
+                    cb_clone(SessionEvent::ClientWindowReady(p.hwnd));
+                }
+            }
+            MessageType::FirstFramePresented => {
+                *state_clone.lock().unwrap() = ConnectionState::Streaming;
+                is_str_clone.store(true, Ordering::SeqCst);
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Streaming));
+            }
+            MessageType::TelemetryUpdate => {
+                if let Some(p) = msg.get_payload::<IpcTelemetryPayload>() {
+                    let t = SessionTelemetry {
+                        fps: p.fps,
+                        bitrate_kbps: p.bitrate_kbps,
+                        rtt_ms: p.rtt_ms,
+                        jitter_ms: p.jitter_ms,
+                        packet_loss_percent: p.packet_loss_percent,
+                        frames_decoded: p.frames_decoded,
+                        frames_dropped: p.frames_dropped,
+                        timestamp_ns: p.stats_timestamp_ns,
+                        source: "webrtc_media".to_string(),
+                    };
+                    *telem_clone.lock().unwrap() = t.clone();
+                    cb_clone(SessionEvent::TelemetryUpdated(t));
+                }
+            }
+            MessageType::ConnectionLost => {
+                *state_clone.lock().unwrap() = ConnectionState::Disconnected;
+                is_str_clone.store(false, Ordering::SeqCst);
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Disconnected));
+            }
+            MessageType::StreamingStopped => {
+                *state_clone.lock().unwrap() = ConnectionState::Idle;
+                is_str_clone.store(false, Ordering::SeqCst);
+                cb_clone(SessionEvent::StateChanged(ConnectionState::Idle));
+            }
+            _ => {}
         })?;
 
         let mut cmd = Command::new(client_bin);
@@ -278,7 +277,9 @@ impl SessionSupervisor {
             &parent_hwnd.to_string(),
         ]);
 
-        let child = cmd.spawn().map_err(|e| MistError::Session(format!("Failed to spawn mist_client: {}", e)))?;
+        let child = cmd
+            .spawn()
+            .map_err(|e| MistError::Session(format!("Failed to spawn mist_client: {}", e)))?;
 
         self.child_process = Some(child);
         self.ipc_server = Some(ipc);
@@ -305,7 +306,12 @@ impl SessionSupervisor {
 
     pub fn set_viewport(&self, x: i32, y: i32, width: u32, height: u32) -> bool {
         if let Some(ref ipc) = self.ipc_server {
-            let p = IpcViewportPayload { x, y, width, height };
+            let p = IpcViewportPayload {
+                x,
+                y,
+                width,
+                height,
+            };
             let msg = IpcMessage::with_payload(MessageType::SetViewport, &p);
             ipc.send_message(&msg)
         } else {

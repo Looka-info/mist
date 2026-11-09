@@ -33,18 +33,17 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
         main_window.set_settings_capture_backend(cfg.video.capture_backend.clone().into());
         main_window.set_settings_wol_mac(cfg.video.wol_mac_address.clone().into());
         main_window.set_settings_virtual_display(cfg.video.virtual_display_enabled);
-        main_window.set_settings_virtual_display_res(cfg.video.virtual_display_resolution.clone().into());
-        main_window.set_session_codec(
-            if cfg.video.hdr_enabled {
-                "AV1 (10-Bit HDR)".into()
-            } else if cfg.video.codec == "hevc" {
-                "HEVC (H.265)".into()
-            } else if cfg.video.codec == "h264" {
-                "H.264 (Universal)".into()
-            } else {
-                "AV1 / HEVC (Auto)".into()
-            }
-        );
+        main_window
+            .set_settings_virtual_display_res(cfg.video.virtual_display_resolution.clone().into());
+        main_window.set_session_codec(if cfg.video.hdr_enabled {
+            "AV1 (10-Bit HDR)".into()
+        } else if cfg.video.codec == "hevc" {
+            "HEVC (H.265)".into()
+        } else if cfg.video.codec == "h264" {
+            "H.264 (Universal)".into()
+        } else {
+            "AV1 / HEVC (Auto)".into()
+        });
         main_window.set_session_display_idx(cfg.video.display_index as i32);
         main_window.set_session_relative_mouse(cfg.video.relative_mouse);
         main_window.set_host_virtual_display(cfg.video.virtual_display_enabled);
@@ -65,7 +64,9 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                         last_connected: d.last_connected.into(),
                         is_trusted: d.is_trusted,
                         has_audio: d.permissions.audio,
-                        has_input: d.permissions.keyboard || d.permissions.mouse || d.permissions.gamepad,
+                        has_input: d.permissions.keyboard
+                            || d.permissions.mouse
+                            || d.permissions.gamepad,
                     });
                 }
                 let model = Rc::new(VecModel::from(items));
@@ -123,7 +124,8 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                             _ => {}
                         }
                     }
-                }).unwrap_or(());
+                })
+                .unwrap_or(());
             };
 
             let prompt_cb = Arc::new(move |_req_id, client_id, client_name| {
@@ -131,10 +133,17 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                 slint::invoke_from_event_loop(move || {
                     if let Some(win) = w.upgrade() {
                         win.set_dialog_title("Incoming Connection Request".into());
-                        win.set_dialog_message(format!("Device '{}' ({}) is requesting permission to stream.", client_name, client_id).into());
+                        win.set_dialog_message(
+                            format!(
+                                "Device '{}' ({}) is requesting permission to stream.",
+                                client_name, client_id
+                            )
+                            .into(),
+                        );
                         win.set_dialog_open(true);
                     }
-                }).unwrap_or(());
+                })
+                .unwrap_or(());
             });
 
             match ctrl.start_sharing(event_cb, prompt_cb) {
@@ -212,7 +221,9 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
 
             if code_str.len() != 6 {
                 if let Some(win) = win_weak.upgrade() {
-                    win.set_connect_error("Please enter a valid 6-character alphanumeric code.".into());
+                    win.set_connect_error(
+                        "Please enter a valid 6-character alphanumeric code.".into(),
+                    );
                 }
                 return;
             }
@@ -248,7 +259,8 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                             if let Some(win) = w.upgrade() {
                                 win.set_connect_step(2);
                             }
-                        }).unwrap_or(());
+                        })
+                        .unwrap_or(());
 
                         // Start client streaming process
                         let cfg = ctrl_thread.config.lock().unwrap().clone();
@@ -264,10 +276,14 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                                 slint::invoke_from_event_loop(move || {
                                     if let Some(win) = w2.upgrade() {
                                         match ev {
-                                            SessionEvent::StateChanged(ConnectionState::Connecting) => {
+                                            SessionEvent::StateChanged(
+                                                ConnectionState::Connecting,
+                                            ) => {
                                                 win.set_connect_step(3);
                                             }
-                                            SessionEvent::StateChanged(ConnectionState::Streaming) => {
+                                            SessionEvent::StateChanged(
+                                                ConnectionState::Streaming,
+                                            ) => {
                                                 win.set_is_connecting(false);
                                                 win.set_is_session_active(true);
                                                 win.set_active_tab(7); // Switch to LiveSession
@@ -279,14 +295,17 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                                                 win.set_telem_jitter(t.formatted_jitter().into());
                                                 win.set_telem_loss(t.formatted_loss().into());
                                             }
-                                            SessionEvent::StateChanged(ConnectionState::Disconnected) => {
+                                            SessionEvent::StateChanged(
+                                                ConnectionState::Disconnected,
+                                            ) => {
                                                 win.set_is_session_active(false);
                                                 win.set_is_connecting(false);
                                             }
                                             _ => {}
                                         }
                                     }
-                                }).unwrap_or(());
+                                })
+                                .unwrap_or(());
                             },
                         );
 
@@ -295,9 +314,12 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                             slint::invoke_from_event_loop(move || {
                                 if let Some(win) = w3.upgrade() {
                                     win.set_is_connecting(false);
-                                    win.set_connect_error(format!("Failed to launch client: {}", e).into());
+                                    win.set_connect_error(
+                                        format!("Failed to launch client: {}", e).into(),
+                                    );
                                 }
-                            }).unwrap_or(());
+                            })
+                            .unwrap_or(());
                         }
                     }
                     Ok(r) => {
@@ -307,7 +329,8 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                                 win.set_is_connecting(false);
                                 win.set_connect_error(r.error_message.into());
                             }
-                        }).unwrap_or(());
+                        })
+                        .unwrap_or(());
                     }
                     Err(e) => {
                         let w = win_thread.clone();
@@ -316,7 +339,8 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                                 win.set_is_connecting(false);
                                 win.set_connect_error(e.to_string().into());
                             }
-                        }).unwrap_or(());
+                        })
+                        .unwrap_or(());
                     }
                 }
             });
@@ -343,7 +367,11 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
         let ctrl = controller.clone();
         main_window.on_paste_code(move || {
             if let Some(text) = ctrl.paste_code_from_clipboard() {
-                let clean: String = text.chars().filter(|c| c.is_ascii_alphanumeric()).take(6).collect();
+                let clean: String = text
+                    .chars()
+                    .filter(|c| c.is_ascii_alphanumeric())
+                    .take(6)
+                    .collect();
                 if let Some(win) = win_weak.upgrade() {
                     win.set_connect_code(clean.into());
                 }
@@ -355,7 +383,13 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
     {
         let win_weak = main_window.as_weak();
         main_window.on_code_typed(move |typed| {
-            let upper: String = typed.to_string().chars().filter(|c| c.is_ascii_alphanumeric()).take(6).collect::<String>().to_uppercase();
+            let upper: String = typed
+                .to_string()
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric())
+                .take(6)
+                .collect::<String>()
+                .to_uppercase();
             if let Some(win) = win_weak.upgrade() {
                 if win.get_connect_code() != upper {
                     win.set_connect_code(upper.into());
@@ -378,34 +412,51 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
     {
         let win_weak = main_window.as_weak();
         let ctrl = controller.clone();
-        main_window.on_save_settings(move |dark, high_cont, fps, bitrate_kbps, sig_url, stun, audio, codec, hdr, backend, wol, virt_disp, virt_res| {
-            {
-                let mut cfg = ctrl.config.lock().unwrap();
-                cfg.ui.dark_theme = dark;
-                cfg.ui.high_contrast = high_cont;
-                cfg.video.fps = fps as u32;
-                cfg.video.bitrate_kbps = bitrate_kbps as u32;
-                cfg.network.signaling_url = sig_url.to_string();
-                cfg.network.stun_server = stun.to_string();
-                cfg.audio.enabled = audio;
-                cfg.video.codec = codec.to_string();
-                cfg.video.hdr_enabled = hdr;
-                cfg.video.capture_backend = backend.to_string();
-                cfg.video.wol_mac_address = wol.to_string();
-                cfg.video.virtual_display_enabled = virt_disp;
-                cfg.video.virtual_display_resolution = virt_res.to_string();
-                let _ = cfg.save();
-            }
+        main_window.on_save_settings(
+            move |dark,
+                  high_cont,
+                  fps,
+                  bitrate_kbps,
+                  sig_url,
+                  stun,
+                  audio,
+                  codec,
+                  hdr,
+                  backend,
+                  wol,
+                  virt_disp,
+                  virt_res| {
+                {
+                    let mut cfg = ctrl.config.lock().unwrap();
+                    cfg.ui.dark_theme = dark;
+                    cfg.ui.high_contrast = high_cont;
+                    cfg.video.fps = fps as u32;
+                    cfg.video.bitrate_kbps = bitrate_kbps as u32;
+                    cfg.network.signaling_url = sig_url.to_string();
+                    cfg.network.stun_server = stun.to_string();
+                    cfg.audio.enabled = audio;
+                    cfg.video.codec = codec.to_string();
+                    cfg.video.hdr_enabled = hdr;
+                    cfg.video.capture_backend = backend.to_string();
+                    cfg.video.wol_mac_address = wol.to_string();
+                    cfg.video.virtual_display_enabled = virt_disp;
+                    cfg.video.virtual_display_resolution = virt_res.to_string();
+                    let _ = cfg.save();
+                }
 
-            // In-flight reconfiguration update via IPC
-            ctrl.session_supervisor.lock().unwrap().update_config(bitrate_kbps as u32, fps as u32);
+                // In-flight reconfiguration update via IPC
+                ctrl.session_supervisor
+                    .lock()
+                    .unwrap()
+                    .update_config(bitrate_kbps as u32, fps as u32);
 
-            if let Some(win) = win_weak.upgrade() {
-                win.set_host_virtual_display(virt_disp);
-                win.set_toast_message("Settings saved and applied.".into());
-                win.set_toast_visible(true);
-            }
-        });
+                if let Some(win) = win_weak.upgrade() {
+                    win.set_host_virtual_display(virt_disp);
+                    win.set_toast_message("Settings saved and applied.".into());
+                    win.set_toast_visible(true);
+                }
+            },
+        );
     }
 
     // Wake-on-LAN dispatch
@@ -417,7 +468,9 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             if let Some(win) = win_weak.upgrade() {
                 match res {
                     Ok(()) => {
-                        win.set_toast_message(format!("Magic packet broadcasted to {}", mac).into());
+                        win.set_toast_message(
+                            format!("Magic packet broadcasted to {}", mac).into(),
+                        );
                     }
                     Err(e) => {
                         win.set_toast_message(format!("WoL error: {}", e).into());
@@ -450,7 +503,11 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             let val = ctrl.toggle_relative_mouse();
             if let Some(win) = win_weak.upgrade() {
                 win.set_session_relative_mouse(val);
-                win.set_toast_message(if val { "Relative Mouse Confined (Esc to free)".into() } else { "Mouse Unconfined".into() });
+                win.set_toast_message(if val {
+                    "Relative Mouse Confined (Esc to free)".into()
+                } else {
+                    "Mouse Unconfined".into()
+                });
                 win.set_toast_visible(true);
             }
         });
@@ -465,7 +522,11 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             if let Some(win) = win_weak.upgrade() {
                 win.set_settings_virtual_display(val);
                 win.set_host_virtual_display(val);
-                win.set_toast_message(if val { "IddCx Virtual Display Activated".into() } else { "Virtual Display Detached".into() });
+                win.set_toast_message(if val {
+                    "IddCx Virtual Display Activated".into()
+                } else {
+                    "Virtual Display Detached".into()
+                });
                 win.set_toast_visible(true);
             }
         });
@@ -532,34 +593,38 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
         let ctrl = controller.clone();
         let mut toast_counter = 0;
 
-        timer.start(slint::TimerMode::Repeated, Duration::from_secs(1), move || {
-            if let Some(win) = win_weak.upgrade() {
-                let pm = ctrl.pairing_manager.lock().unwrap();
+        timer.start(
+            slint::TimerMode::Repeated,
+            Duration::from_secs(1),
+            move || {
+                if let Some(win) = win_weak.upgrade() {
+                    let pm = ctrl.pairing_manager.lock().unwrap();
 
-                // Code expiration countdown
-                let rem = pm.active_code_remaining_secs() as i32;
-                win.set_remaining_seconds(rem);
-                if rem == 0 && win.get_is_sharing() {
-                    win.set_pairing_code("EXPIRED".into());
-                }
+                    // Code expiration countdown
+                    let rem = pm.active_code_remaining_secs() as i32;
+                    win.set_remaining_seconds(rem);
+                    if rem == 0 && win.get_is_sharing() {
+                        win.set_pairing_code("EXPIRED".into());
+                    }
 
-                // Lockout countdown
-                let is_lock = pm.is_locked_out();
-                win.set_is_locked_out(is_lock);
-                win.set_lockout_seconds(pm.lockout_remaining_secs() as i32);
+                    // Lockout countdown
+                    let is_lock = pm.is_locked_out();
+                    win.set_is_locked_out(is_lock);
+                    win.set_lockout_seconds(pm.lockout_remaining_secs() as i32);
 
-                // Auto-hide toast after 3 seconds
-                if win.get_toast_visible() {
-                    toast_counter += 1;
-                    if toast_counter >= 3 {
-                        win.set_toast_visible(false);
+                    // Auto-hide toast after 3 seconds
+                    if win.get_toast_visible() {
+                        toast_counter += 1;
+                        if toast_counter >= 3 {
+                            win.set_toast_visible(false);
+                            toast_counter = 0;
+                        }
+                    } else {
                         toast_counter = 0;
                     }
-                } else {
-                    toast_counter = 0;
                 }
-            }
-        });
+            },
+        );
     }
 
     main_window.run()

@@ -272,7 +272,10 @@ impl NamedPipeServer {
         };
 
         if handle == INVALID_HANDLE_VALUE {
-            return Err(MistError::Ipc(format!("Failed to create named pipe {}", pipe_name)));
+            return Err(MistError::Ipc(format!(
+                "Failed to create named pipe {}",
+                pipe_name
+            )));
         }
 
         *self.pipe_handle.lock().unwrap() = handle as isize;
@@ -286,7 +289,8 @@ impl NamedPipeServer {
             let h = *pipe_arc.lock().unwrap() as HANDLE;
             let connected = unsafe { ConnectNamedPipe(h, std::ptr::null_mut()) };
             let err = unsafe { GetLastError() };
-            if connected == 0 && err != 535 { // ERROR_PIPE_CONNECTED
+            if connected == 0 && err != 535 {
+                // ERROR_PIPE_CONNECTED
                 tracing::warn!("Named pipe client connection failed, code: {}", err);
                 return;
             }
@@ -312,7 +316,8 @@ impl NamedPipeServer {
                     }
                 } else {
                     let err = unsafe { GetLastError() };
-                    if err == 109 { // ERROR_BROKEN_PIPE
+                    if err == 109 {
+                        // ERROR_BROKEN_PIPE
                         tracing::info!("Named pipe client disconnected.");
                         break;
                     }

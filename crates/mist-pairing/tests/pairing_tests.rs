@@ -13,7 +13,11 @@ fn test_pairing_code_generation_and_alphabet() {
     let code = pm.generate_pairing_code("test-session-1".to_string());
     assert_eq!(code.len(), 6);
     for b in code.bytes() {
-        assert!(PAIRING_ALPHABET.contains(&b), "Character not in alphabet: {}", b as char);
+        assert!(
+            PAIRING_ALPHABET.contains(&b),
+            "Character not in alphabet: {}",
+            b as char
+        );
     }
 }
 
@@ -117,7 +121,10 @@ fn test_host_approval_and_revocation() {
 fn test_remote_pairing_tcp_flow() {
     let port = 8099;
     let pm = Arc::new(Mutex::new(PairingManager::new()));
-    let code = pm.lock().unwrap().generate_pairing_code("sess-tcp-1".to_string());
+    let code = pm
+        .lock()
+        .unwrap()
+        .generate_pairing_code("sess-tcp-1".to_string());
 
     let decisions = Arc::new(Mutex::new(HashMap::new()));
     let decisions_clone = decisions.clone();
@@ -198,7 +205,9 @@ fn test_temporary_invitation_tokens() {
         inv_token.clone(),
         0x0F, // Guest requests all, but invitation has preapproved
     );
-    let req_id = pm.submit_pairing_request(&req1).expect("Invitation should be valid");
+    let req_id = pm
+        .submit_pairing_request(&req1)
+        .expect("Invitation should be valid");
     assert_eq!(pm.pending_requests().len(), 1);
 
     // 3. Verify single-use consumption: submitting again fails
@@ -257,12 +266,18 @@ fn test_session_bound_authorization() {
     // 2. Session mismatch fails
     let wrong_session = pm.validate_session_auth("sess-beta-88", "client-valid", &auth_token);
     assert!(wrong_session.is_err());
-    assert!(wrong_session.unwrap_err().to_string().contains("Session mismatch"));
+    assert!(wrong_session
+        .unwrap_err()
+        .to_string()
+        .contains("Session mismatch"));
 
     // 3. Client identity mismatch fails
     let wrong_client = pm.validate_session_auth(&session_id, "attacker-pc", &auth_token);
     assert!(wrong_client.is_err());
-    assert!(wrong_client.unwrap_err().to_string().contains("Peer identity mismatch"));
+    assert!(wrong_client
+        .unwrap_err()
+        .to_string()
+        .contains("Peer identity mismatch"));
 
     // 4. Revocation invalidates token
     assert!(pm.revoke_session_auth(&auth_token));
@@ -292,7 +307,10 @@ fn test_replay_protection_nonce_and_timestamp() {
     req.nonce = original_nonce; // Reused nonce
     let res2 = pm.submit_pairing_request(&req);
     assert!(res2.is_err());
-    assert!(res2.unwrap_err().to_string().contains("Replay attack detected"));
+    assert!(res2
+        .unwrap_err()
+        .to_string()
+        .contains("Replay attack detected"));
 
     // 3. Expired timestamp (> 60s ago) triggers timestamp expiration
     let mut stale_req = RemotePairingRequest::new(
@@ -388,7 +406,10 @@ fn test_host_approval_lifecycle_deny_vs_kick_vs_ban() {
         &code2,
         DevicePermissions::all(),
     );
-    assert!(req_id2.is_ok(), "Denied client should be able to request again");
+    assert!(
+        req_id2.is_ok(),
+        "Denied client should be able to request again"
+    );
 
     // 2. APPROVE request
     let (auth_tok, _) = pm
@@ -402,7 +423,11 @@ fn test_host_approval_lifecycle_deny_vs_kick_vs_ban() {
     assert!(!pm.is_device_banned("test-client-lc"));
 
     // 4. BAN device: persistently blocks guest identity
-    assert!(pm.ban_device("test-client-lc", Some("Lifecycle Client".to_string()), Some("Host policy violation".to_string())));
+    assert!(pm.ban_device(
+        "test-client-lc",
+        Some("Lifecycle Client".to_string()),
+        Some("Host policy violation".to_string())
+    ));
     assert!(pm.is_device_banned("test-client-lc"));
 
     // Banned device cannot submit pairing requests
@@ -445,7 +470,9 @@ fn test_active_connected_guests_inspection() {
         )
         .unwrap();
 
-    let (_tok_alpha, _) = pm.approve_request(req_id1, DevicePermissions::all()).unwrap();
+    let (_tok_alpha, _) = pm
+        .approve_request(req_id1, DevicePermissions::all())
+        .unwrap();
 
     let code2 = pm.generate_pairing_code(session_id.clone());
     let req_id2 = pm
@@ -538,7 +565,9 @@ fn test_runtime_permission_changes_and_immediate_revocation() {
         .unwrap();
 
     // 1. Host grants all permissions initially
-    let (_auth_tok, _) = pm.approve_request(req_id, DevicePermissions::all()).unwrap();
+    let (_auth_tok, _) = pm
+        .approve_request(req_id, DevicePermissions::all())
+        .unwrap();
 
     // Host input layer verification
     assert!(pm.verify_guest_action("guest-perm-client", "keyboard"));
@@ -588,7 +617,9 @@ fn test_encryption_verification_and_sas_derivation() {
     )
     .with_fingerprint(client_fp);
 
-    let req_id = pm.submit_pairing_request(&req).expect("Request submission should succeed");
+    let req_id = pm
+        .submit_pairing_request(&req)
+        .expect("Request submission should succeed");
 
     // Approve with host fingerprint
     let (auth_token, client_name, host_sas) = pm
@@ -601,8 +632,12 @@ fn test_encryption_verification_and_sas_derivation() {
     assert_eq!(&host_sas[3..4], "-");
 
     // Client independently calculates SAS with identical parameters
-    let guest_sas = mist_pairing::crypto::calculate_sas(host_fp, client_fp, "sess-tls-1", &auth_token);
-    assert_eq!(host_sas, guest_sas, "Host and guest SAS codes must match exactly for verification");
+    let guest_sas =
+        mist_pairing::crypto::calculate_sas(host_fp, client_fp, "sess-tls-1", &auth_token);
+    assert_eq!(
+        host_sas, guest_sas,
+        "Host and guest SAS codes must match exactly for verification"
+    );
 
     // Validate session authentication with matching fingerprint
     let val_res = pm.validate_session_auth_with_fingerprint(
@@ -611,7 +646,10 @@ fn test_encryption_verification_and_sas_derivation() {
         &auth_token,
         client_fp,
     );
-    assert!(val_res.is_ok(), "Authentication with matching DTLS fingerprint must succeed");
+    assert!(
+        val_res.is_ok(),
+        "Authentication with matching DTLS fingerprint must succeed"
+    );
 }
 
 #[test]
@@ -643,7 +681,14 @@ fn test_dtls_fingerprint_mismatch_rejected() {
         &auth_token,
         attacker_fp,
     );
-    assert!(spoof_attempt.is_err(), "Authentication with mismatched DTLS fingerprint must be rejected");
+    assert!(
+        spoof_attempt.is_err(),
+        "Authentication with mismatched DTLS fingerprint must be rejected"
+    );
     let err_str = spoof_attempt.unwrap_err().to_string();
-    assert!(err_str.contains("Peer identity mismatch"), "Error should explain fingerprint mismatch: {}", err_str);
+    assert!(
+        err_str.contains("Peer identity mismatch"),
+        "Error should explain fingerprint mismatch: {}",
+        err_str
+    );
 }

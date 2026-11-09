@@ -60,7 +60,9 @@ impl SessionStore {
     pub fn get_or_create(&mut self, session_id: &str, token: &str) -> &mut HardenedSession {
         self.sessions
             .entry(session_id.to_string())
-            .or_insert_with(|| HardenedSession::new(session_id.to_string(), token.to_string(), self.default_ttl))
+            .or_insert_with(|| {
+                HardenedSession::new(session_id.to_string(), token.to_string(), self.default_ttl)
+            })
     }
 
     pub fn get(&self, session_id: &str) -> Option<&HardenedSession> {

@@ -19,7 +19,9 @@ fn test_ipc_message_serialization() {
     let deserialized = IpcMessage::deserialize(&bytes).expect("Should deserialize message");
     assert_eq!(deserialized.msg_type, MessageType::TelemetryUpdate);
 
-    let p = deserialized.get_payload::<IpcTelemetryPayload>().expect("Payload should match");
+    let p = deserialized
+        .get_payload::<IpcTelemetryPayload>()
+        .expect("Payload should match");
     assert_eq!(p.bitrate_kbps, 15000);
     assert_eq!(p.frames_decoded, 3600);
     assert_eq!(p.stats_timestamp_ns, 1234567890);
@@ -40,7 +42,9 @@ fn test_ipc_config_payload() {
     let deserialized = IpcMessage::deserialize(&bytes).expect("Should deserialize");
     assert_eq!(deserialized.msg_type, MessageType::UpdateConfig);
 
-    let p = deserialized.get_payload::<IpcConfigPayload>().expect("Payload should match");
+    let p = deserialized
+        .get_payload::<IpcConfigPayload>()
+        .expect("Payload should match");
     assert_eq!(p.bitrate_kbps, 20000);
     assert_eq!(p.fps, 120);
     assert_eq!(p.width, 2560);

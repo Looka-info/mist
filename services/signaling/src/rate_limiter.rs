@@ -61,7 +61,8 @@ impl RateLimiter {
 
     pub fn prune_idle(&mut self, idle_timeout: Duration) {
         let now = Instant::now();
-        self.buckets.retain(|_, bucket| now.duration_since(bucket.last_update) < idle_timeout);
+        self.buckets
+            .retain(|_, bucket| now.duration_since(bucket.last_update) < idle_timeout);
     }
 
     pub fn active_tracked_ips(&self) -> usize {

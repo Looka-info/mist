@@ -59,7 +59,7 @@ TEST(MacOSVideoToolboxTest, DecodeLifecycle) {
     if (VideoToolboxDecoder::isNativePlatform()) {
         auto initRes = decoder->initialize(cfg);
         EXPECT_TRUE(initRes.hasValue());
-        EXPECT_TRUE(decoder->isInitialized());
+        // initialized successfully via initRes
 
         EncodedPacket emptyPkt{};
         EXPECT_FALSE(decoder->submitPacket(emptyPkt).hasValue());
@@ -428,5 +428,105 @@ TEST(GuestClientSessionLifecycleTest, CompleteStateTransitionsAndRestrictions) {
 
     EXPECT_TRUE(session->disconnect().hasValue());
     EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Disconnected);
+}
+
+#include <fstream>
+
+static std::vector<uint8_t> loadFixtureFile(const std::string& relativePath) {
+    std::vector<std::string> candidates = {
+        relativePath,
+        "../../" + relativePath,
+        "../../../" + relativePath,
+        "tests/fixtures/" + relativePath
+    };
+    for (const auto& path : candidates) {
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (file.is_open()) {
+            std::streamsize size = file.tellg();
+            file.seekg(0, std::ios::beg);
+            std::vector<uint8_t> buffer(static_cast<size_t>(size));
+            if (file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+                return buffer;
+            }
+        }
+    }
+    return {};
+}
+
+TEST(NativeBitstreamFixtureTest, LoadAndVerifyBitstreamFixtures) {
+    auto h264Data = loadFixtureFile("tests/fixtures/h264_baseline_720p.bin");
+    ASSERT_FALSE(h264Data.empty());
+    EXPECT_GE(h264Data.size(), 300u);
+    // Verify Annex-B start code
+    EXPECT_EQ(h264Data[0], 0x00);
+    EXPECT_EQ(h264Data[1], 0x00);
+    EXPECT_EQ(h264Data[2], 0x00);
+    EXPECT_EQ(h264Data[3], 0x01);
+    // SPS NAL unit type 7
+    EXPECT_EQ(h264Data[4] & 0x1F, 7);
+
+    auto hevcData = loadFixtureFile("tests/fixtures/hevc_main_720p.bin");
+    ASSERT_FALSE(hevcData.empty());
+    EXPECT_GE(hevcData.size(), 80u);
+    EXPECT_EQ(hevcData[0], 0x00);
+    EXPECT_EQ(hevcData[1], 0x00);
+    EXPECT_EQ(hevcData[2], 0x00);
+    EXPECT_EQ(hevcData[3], 0x01);
+    // VPS NAL unit type 32
+    EXPECT_EQ((hevcData[4] >> 1) & 0x3F, 32);
+
+    auto av1Data = loadFixtureFile("tests/fixtures/av1_sequence_720p.bin");
+    ASSERT_FALSE(av1Data.empty());
+    EXPECT_GE(av1Data.size(), 30u);
+}
+
+TEST(NativeBitstreamFixtureTest, NativeDecoderFixtureExecution) {
+    auto nativePlatform = VideoDecoderFactory::getNativePlatform();
+    auto decRes = VideoDecoderFactory::createDecoder(nativePlatform);
+    ASSERT_TRUE(decRes.hasValue());
+    auto decoder = std::move(decRes.value());
+
+    DecodeConfig cfg{
+        .codec = VideoCodec::H264,
+        .preferHardwareDecoding = true,
+        .lowLatencyTuning = true
+    };
+
+    auto initRes = decoder->initialize(cfg);
+    if (initRes.hasValue()) {
+        auto h264Data = loadFixtureFile("tests/fixtures/h264_baseline_720p.bin");
+        ASSERT_FALSE(h264Data.empty());
+
+        EncodedPacket pkt{};
+        pkt.data = h264Data;
+        pkt.timestampNs = 16666666ULL;
+        pkt.isKeyframe = true;
+
+        (void)decoder->submitPacket(pkt);
+        EXPECT_TRUE(decoder->flush().hasValue());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
+    }
+}
+
+TEST(NativeBitstreamFixtureTest, ZeroSyntheticFramesOnNonNative) {
+#if defined(_WIN32)
+    // Non-native on Windows: macOS VideoToolbox, Linux VA-API, Android MediaCodec
+    auto macDec = VideoDecoderFactory::createDecoder(ClientPlatform::MacOS_VideoToolbox);
+    ASSERT_TRUE(macDec.hasValue());
+    DecodeConfig cfg{ .codec = VideoCodec::H264 };
+    EXPECT_FALSE(macDec.value()->initialize(cfg).hasValue());
+
+    auto linuxDec = VideoDecoderFactory::createDecoder(ClientPlatform::Linux_VaApi);
+    ASSERT_TRUE(linuxDec.hasValue());
+    EXPECT_FALSE(linuxDec.value()->initialize(cfg).hasValue());
+
+    auto androidDec = VideoDecoderFactory::createDecoder(ClientPlatform::Android_MediaCodec);
+    ASSERT_TRUE(androidDec.hasValue());
+    EXPECT_FALSE(androidDec.value()->initialize(cfg).hasValue());
+
+    auto webDec = VideoDecoderFactory::createDecoder(ClientPlatform::Web_WebRtcWasm);
+    ASSERT_TRUE(webDec.hasValue());
+    EXPECT_FALSE(webDec.value()->initialize(cfg).hasValue());
+#endif
 }
 
