@@ -101,6 +101,24 @@ pub struct AuthorizedSessionTicket {
     pub consumed: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BannedDeviceRecord {
+    pub device_id: DeviceId,
+    pub device_name: String,
+    pub banned_at: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectedGuest {
+    pub device_id: DeviceId,
+    pub device_name: String,
+    pub session_id: String,
+    pub authenticated_at: String,
+    pub permissions: DevicePermissions,
+    pub token_hash: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConnectionState {
     Idle,

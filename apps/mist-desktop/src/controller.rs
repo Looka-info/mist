@@ -163,4 +163,32 @@ impl DesktopController {
     pub fn get_trusted_devices(&self) -> Vec<DeviceEntry> {
         self.pairing_manager.lock().unwrap().trusted_devices()
     }
+
+    #[allow(dead_code)]
+    pub fn kick_guest(&self, device_id: &str) -> bool {
+        self.pairing_manager.lock().unwrap().kick_guest(device_id)
+    }
+
+    #[allow(dead_code)]
+    pub fn ban_device(&self, device_id: &str, reason: Option<&str>) -> bool {
+        self.pairing_manager
+            .lock()
+            .unwrap()
+            .ban_device(device_id, None, reason.map(|s| s.to_string()))
+    }
+
+    #[allow(dead_code)]
+    pub fn unban_device(&self, device_id: &str) -> bool {
+        self.pairing_manager.lock().unwrap().unban_device(device_id)
+    }
+
+    #[allow(dead_code)]
+    pub fn get_banned_devices(&self) -> Vec<mist_domain::BannedDeviceRecord> {
+        self.pairing_manager.lock().unwrap().banned_devices()
+    }
+
+    #[allow(dead_code)]
+    pub fn get_active_connected_guests(&self) -> Vec<mist_domain::ConnectedGuest> {
+        self.pairing_manager.lock().unwrap().active_connected_guests()
+    }
 }

@@ -5,7 +5,8 @@ pub mod crypto;
 use chrono::Utc;
 use mist_core::{MistError, Result};
 use mist_domain::{
-    AuthorizedSessionTicket, DeviceEntry, DeviceId, DevicePermissions, GuestIdentityRecord,
+    AuthorizedSessionTicket, BannedDeviceRecord, ConnectedGuest, DeviceEntry, DeviceId,
+    DevicePermissions, GuestIdentityRecord,
 };
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -114,6 +115,7 @@ pub struct PairingManager {
     failed_attempts: u32,
     lockout_until: Option<Instant>,
     trusted_devices: HashMap<String, DeviceEntry>,
+    banned_devices: HashMap<String, BannedDeviceRecord>,
     guest_identities: HashMap<String, GuestIdentityRecord>,
     authorized_tickets: HashMap<String, AuthorizedSessionTicket>,
     seen_nonces: HashMap<String, Instant>,
@@ -129,6 +131,7 @@ impl Default for PairingManager {
             failed_attempts: 0,
             lockout_until: None,
             trusted_devices: HashMap::new(),
+            banned_devices: HashMap::new(),
             guest_identities: HashMap::new(),
             authorized_tickets: HashMap::new(),
             seen_nonces: HashMap::new(),
@@ -137,6 +140,7 @@ impl Default for PairingManager {
         };
         mgr.load_trusted_devices();
         mgr.load_guest_identities();
+        mgr.load_banned_devices();
         mgr
     }
 }
@@ -204,6 +208,117 @@ impl PairingManager {
         if let Ok(content) = serde_json::to_string_pretty(&records) {
             let _ = fs::write(&p, content);
         }
+    }
+
+    fn banned_devices_path() -> PathBuf {
+        Self::storage_dir().join("banned_devices.json")
+    }
+
+    fn load_banned_devices(&mut self) {
+        let p = Self::banned_devices_path();
+        if p.exists() {
+            if let Ok(content) = fs::read_to_string(&p) {
+                if let Ok(records) = serde_json::from_str::<Vec<BannedDeviceRecord>>(&content) {
+                    for r in records {
+                        self.banned_devices.insert(r.device_id.0.clone(), r);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn save_banned_devices(&self) {
+        let p = Self::banned_devices_path();
+        let records: Vec<&BannedDeviceRecord> = self.banned_devices.values().collect();
+        if let Ok(content) = serde_json::to_string_pretty(&records) {
+            let _ = fs::write(&p, content);
+        }
+    }
+
+    pub fn is_device_banned(&self, device_id: &str) -> bool {
+        self.banned_devices.contains_key(device_id)
+    }
+
+    pub fn banned_devices(&self) -> Vec<BannedDeviceRecord> {
+        let mut list: Vec<BannedDeviceRecord> = self.banned_devices.values().cloned().collect();
+        list.sort_by(|a, b| b.banned_at.cmp(&a.banned_at));
+        list
+    }
+
+    /// Persistently bans a guest device identity, revoking any active session tickets and rejecting future attempts.
+    pub fn ban_device(
+        &mut self,
+        device_id: &str,
+        device_name: Option<String>,
+        reason: Option<String>,
+    ) -> bool {
+        let name = device_name
+            .or_else(|| self.guest_identities.get(device_id).map(|g| g.device_name.clone()))
+            .or_else(|| self.trusted_devices.get(device_id).map(|d| d.name.clone()))
+            .unwrap_or_else(|| "Unknown Device".to_string());
+
+        let record = BannedDeviceRecord {
+            device_id: DeviceId::new(device_id),
+            device_name: name,
+            banned_at: Utc::now().to_rfc3339(),
+            reason: reason.unwrap_or_else(|| "Banned by host".to_string()),
+        };
+
+        self.banned_devices.insert(device_id.to_string(), record);
+
+        // Remove any pending requests from this device
+        self.pending_requests.retain(|r| r.client_device_id != device_id);
+
+        // Revoke any active session tickets for this device immediately
+        self.authorized_tickets.retain(|_, t| t.client_device_id != device_id);
+
+        // Mark guest identity as not trusted
+        if let Some(guest) = self.guest_identities.get_mut(device_id) {
+            guest.is_trusted = false;
+        }
+
+        self.save_banned_devices();
+        self.save_guest_identities();
+        true
+    }
+
+    /// Unbans a previously banned device, allowing it to request pairing again.
+    pub fn unban_device(&mut self, device_id: &str) -> bool {
+        let removed = self.banned_devices.remove(device_id).is_some();
+        if removed {
+            self.save_banned_devices();
+        }
+        removed
+    }
+
+    /// Terminates the current active session for a guest without revoking trusted status or banning.
+    pub fn kick_guest(&mut self, device_id: &str) -> bool {
+        let before_count = self.authorized_tickets.len();
+        self.authorized_tickets.retain(|_, t| t.client_device_id != device_id);
+        self.authorized_tickets.len() < before_count
+    }
+
+    /// Inspect all currently authenticated and active connected guests.
+    pub fn active_connected_guests(&self) -> Vec<ConnectedGuest> {
+        let now = Utc::now();
+        let mut guests = Vec::new();
+
+        for (token_hash, ticket) in &self.authorized_tickets {
+            if let Ok(exp) = chrono::DateTime::parse_from_rfc3339(&ticket.expires_at) {
+                if now <= exp {
+                    guests.push(ConnectedGuest {
+                        device_id: DeviceId::new(&ticket.client_device_id),
+                        device_name: ticket.client_device_name.clone(),
+                        session_id: ticket.session_id.clone(),
+                        authenticated_at: ticket.issued_at.clone(),
+                        permissions: ticket.permissions.clone(),
+                        token_hash: token_hash.clone(),
+                    });
+                }
+            }
+        }
+        guests.sort_by(|a, b| b.authenticated_at.cmp(&a.authenticated_at));
+        guests
     }
 
     pub fn is_locked_out(&self) -> bool {
@@ -354,6 +469,13 @@ impl PairingManager {
                 "Too many failed attempts. Locked out for {} seconds.",
                 remaining
             )));
+        }
+
+        // Banned device rejection
+        if self.is_device_banned(&req.client_device_id) {
+            return Err(MistError::Pairing(
+                "Device has been banned by the host operator.".to_string(),
+            ));
         }
 
         // Replay defense
@@ -533,6 +655,12 @@ impl PairingManager {
         client_device_id: &str,
         auth_token: &str,
     ) -> Result<DevicePermissions> {
+        if self.is_device_banned(client_device_id) {
+            return Err(MistError::Pairing(
+                "Device has been banned by the host operator.".to_string(),
+            ));
+        }
+
         let hash = crypto::sha256_hex(auth_token.as_bytes());
         let permissions = {
             let ticket = self

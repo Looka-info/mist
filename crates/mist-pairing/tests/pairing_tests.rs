@@ -348,3 +348,136 @@ fn test_guest_identity_records_and_permissions() {
         .unwrap();
     assert_eq!(updated_guest.connection_count, 1);
 }
+
+#[test]
+fn test_host_approval_lifecycle_deny_vs_kick_vs_ban() {
+    let mut pm = PairingManager::new();
+    let session_id = "sess-lifecycle-1".to_string();
+
+    // Clean up any test device state
+    pm.unban_device("test-client-lc");
+    pm.revoke_device("test-client-lc");
+
+    // 1. Submit request and DENY
+    let code1 = pm.generate_pairing_code(session_id.clone());
+    let req_id1 = pm
+        .submit_request(
+            "test-client-lc".to_string(),
+            "Lifecycle Client".to_string(),
+            &code1,
+            DevicePermissions::all(),
+        )
+        .unwrap();
+
+    assert_eq!(pm.pending_requests().len(), 1);
+    assert!(pm.deny_request(req_id1));
+    assert_eq!(pm.pending_requests().len(), 0);
+
+    // Verify DENY is NOT a ban: client can submit again with a new code
+    assert!(!pm.is_device_banned("test-client-lc"));
+    let code2 = pm.generate_pairing_code(session_id.clone());
+    let req_id2 = pm.submit_request(
+        "test-client-lc".to_string(),
+        "Lifecycle Client".to_string(),
+        &code2,
+        DevicePermissions::all(),
+    );
+    assert!(req_id2.is_ok(), "Denied client should be able to request again");
+
+    // 2. APPROVE request
+    let (auth_tok, _) = pm
+        .approve_request(req_id2.unwrap(), DevicePermissions::all())
+        .unwrap();
+    assert!(pm.is_session_auth_valid(&session_id, "test-client-lc", &auth_tok));
+
+    // 3. KICK guest: terminates active session, but does NOT ban or untrust
+    assert!(pm.kick_guest("test-client-lc"));
+    assert!(!pm.is_session_auth_valid(&session_id, "test-client-lc", &auth_tok));
+    assert!(!pm.is_device_banned("test-client-lc"));
+
+    // 4. BAN device: persistently blocks guest identity
+    assert!(pm.ban_device("test-client-lc", Some("Lifecycle Client".to_string()), Some("Host policy violation".to_string())));
+    assert!(pm.is_device_banned("test-client-lc"));
+
+    // Banned device cannot submit pairing requests
+    let code3 = pm.generate_pairing_code(session_id.clone());
+    let req3 = pm.submit_request(
+        "test-client-lc".to_string(),
+        "Lifecycle Client".to_string(),
+        &code3,
+        DevicePermissions::all(),
+    );
+    assert!(req3.is_err());
+    assert!(req3.unwrap_err().to_string().contains("banned"));
+
+    // 5. UNBAN device: allows pairing again
+    assert!(pm.unban_device("test-client-lc"));
+    assert!(!pm.is_device_banned("test-client-lc"));
+
+    let code4 = pm.generate_pairing_code(session_id.clone());
+    let req4 = pm.submit_request(
+        "test-client-lc".to_string(),
+        "Lifecycle Client".to_string(),
+        &code4,
+        DevicePermissions::all(),
+    );
+    assert!(req4.is_ok());
+}
+
+#[test]
+fn test_active_connected_guests_inspection() {
+    let mut pm = PairingManager::new();
+    let session_id = "sess-inspect-1".to_string();
+
+    let code1 = pm.generate_pairing_code(session_id.clone());
+    let req_id1 = pm
+        .submit_request(
+            "guest-dev-alpha".to_string(),
+            "Alpha Device".to_string(),
+            &code1,
+            DevicePermissions::all(),
+        )
+        .unwrap();
+
+    let (_tok_alpha, _) = pm.approve_request(req_id1, DevicePermissions::all()).unwrap();
+
+    let code2 = pm.generate_pairing_code(session_id.clone());
+    let req_id2 = pm
+        .submit_request(
+            "guest-dev-beta".to_string(),
+            "Beta Device".to_string(),
+            &code2,
+            DevicePermissions {
+                keyboard: false,
+                mouse: false,
+                gamepad: true,
+                audio: true,
+            },
+        )
+        .unwrap();
+
+    let (_tok_beta, _) = pm
+        .approve_request(
+            req_id2,
+            DevicePermissions {
+                keyboard: false,
+                mouse: false,
+                gamepad: true,
+                audio: true,
+            },
+        )
+        .unwrap();
+
+    // Inspect connected guests
+    let active = pm.active_connected_guests();
+    assert_eq!(active.len(), 2);
+    assert!(active.iter().any(|g| g.device_id.0 == "guest-dev-alpha"));
+    assert!(active.iter().any(|g| g.device_id.0 == "guest-dev-beta"));
+
+    // Kick guest alpha
+    assert!(pm.kick_guest("guest-dev-alpha"));
+
+    let remaining = pm.active_connected_guests();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].device_id.0, "guest-dev-beta");
+}
