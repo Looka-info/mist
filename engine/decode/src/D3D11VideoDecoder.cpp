@@ -15,6 +15,16 @@
 DEFINE_GUID(CLSID_CMSH264DecoderMFT, 0x62ce7e72, 0x4c71, 0x4d20, 0xb1, 0x5d, 0x45, 0x28, 0x31, 0xa8, 0x8d, 0x9d);
 #endif
 
+// CMSH265DecoderMFT CLSID
+#ifndef CLSID_CMSH265DecoderMFT
+DEFINE_GUID(CLSID_CMSH265DecoderMFT, 0x420a51a3, 0xd601, 0x46cf, 0xb7, 0x4f, 0x56, 0x40, 0x1e, 0x42, 0x05, 0x67);
+#endif
+
+// MFVideoFormat_HEVC
+#ifndef MFVideoFormat_HEVC
+DEFINE_GUID(MFVideoFormat_HEVC, 0x43564548, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
+#endif
+
 // CODECAPI_AVLowLatencyMode
 #ifndef CODECAPI_AVLowLatencyMode
 DEFINE_GUID(CODECAPI_AVLowLatencyMode, 0x9c27891a, 0xed7a, 0x40e1, 0x88, 0xe8, 0xb2, 0x27, 0x27, 0xa0, 0x24, 0xee);
@@ -23,6 +33,16 @@ DEFINE_GUID(CODECAPI_AVLowLatencyMode, 0x9c27891a, 0xed7a, 0x40e1, 0x88, 0xe8, 0
 // D3D11_DECODER_PROFILE_H264_VLD_NOFGT
 #ifndef D3D11_DECODER_PROFILE_H264_VLD_NOFGT
 DEFINE_GUID(D3D11_DECODER_PROFILE_H264_VLD_NOFGT, 0x1b81be68, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
+#endif
+
+// D3D11_DECODER_PROFILE_HEVC_VLD_MAIN
+#ifndef D3D11_DECODER_PROFILE_HEVC_VLD_MAIN
+DEFINE_GUID(D3D11_DECODER_PROFILE_HEVC_VLD_MAIN, 0x5b11d51b, 0xcd23, 0x45e6, 0xb2, 0x2b, 0x85, 0x8b, 0x5d, 0x03, 0x22, 0x3f);
+#endif
+
+// D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10
+#ifndef D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10
+DEFINE_GUID(D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10, 0x107af0e0, 0xef1a, 0x4d42, 0xab, 0xc8, 0x45, 0x49, 0x9b, 0x3d, 0x85, 0x25);
 #endif
 
 #endif
@@ -81,7 +101,10 @@ DecoderCapability D3D11VideoDecoder::queryCapabilities(ID3D11Device* device) noe
                 if (IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_H264_VLD_NOFGT)) {
                     cap.supportsH264 = true;
                     cap.isHardwareAccelerated = true;
-                    break;
+                } else if (IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN) ||
+                           IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10)) {
+                    cap.supportsHevc = true;
+                    cap.isHardwareAccelerated = true;
                 }
             }
         }
@@ -156,10 +179,14 @@ common::Result<void> D3D11VideoDecoder::initialize(const DecodeConfig& config) {
 
 #if defined(_WIN32)
 common::Result<void> D3D11VideoDecoder::initializeMft() {
-    HRESULT hr = CoCreateInstance(CLSID_CMSH264DecoderMFT, nullptr, CLSCTX_INPROC_SERVER,
+    GUID targetSubtype = (config_.codec == encode::VideoCodec::HEVC) ? MFVideoFormat_HEVC : MFVideoFormat_H264;
+    GUID targetClsid = (config_.codec == encode::VideoCodec::HEVC) ? CLSID_CMSH265DecoderMFT : CLSID_CMSH264DecoderMFT;
+    const char* codecName = (config_.codec == encode::VideoCodec::HEVC) ? "HEVC / H.265" : "H.264";
+
+    HRESULT hr = CoCreateInstance(targetClsid, nullptr, CLSCTX_INPROC_SERVER,
                                   IID_PPV_ARGS(&decoderTransform_));
     if (FAILED(hr)) {
-        MFT_REGISTER_TYPE_INFO inInfo{ MFMediaType_Video, MFVideoFormat_H264 };
+        MFT_REGISTER_TYPE_INFO inInfo{ MFMediaType_Video, targetSubtype };
         IMFActivate** ppActivate = nullptr;
         UINT32 count = 0;
         hr = MFTEnumEx(
@@ -180,7 +207,8 @@ common::Result<void> D3D11VideoDecoder::initializeMft() {
     }
 
     if (FAILED(hr) || !decoderTransform_) {
-        return platform::windows::hresultToMistError(hr, common::SubsystemId::Decode, "Failed to instantiate H.264 Decoder MFT");
+        return platform::windows::hresultToMistError(hr, common::SubsystemId::Decode,
+            std::string("Failed to instantiate ") + codecName + " Decoder MFT");
     }
 
     // Initialize DXGI Device Manager for hardware acceleration
@@ -190,7 +218,7 @@ common::Result<void> D3D11VideoDecoder::initializeMft() {
         if (SUCCEEDED(hr)) {
             hr = decoderTransform_->ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, reinterpret_cast<ULONG_PTR>(dxgiManager_.Get()));
             if (SUCCEEDED(hr)) {
-                MIST_LOG_INFO(common::SubsystemId::Decode, "Bound D3D11 DXGI Device Manager to H.264 Decoder MFT.");
+                MIST_LOG_INFO(common::SubsystemId::Decode, std::string("Bound D3D11 DXGI Device Manager to ") + codecName + " Decoder MFT.");
             } else {
                 MIST_LOG_WARN(common::SubsystemId::Decode, "ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER) failed, continuing with software decoding fallback.");
             }
@@ -211,12 +239,13 @@ common::Result<void> D3D11VideoDecoder::initializeMft() {
     }
 
     inputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-    inputType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264);
+    inputType->SetGUID(MF_MT_SUBTYPE, targetSubtype);
     MFSetAttributeSize(inputType.Get(), MF_MT_FRAME_SIZE, width_, height_);
 
     hr = decoderTransform_->SetInputType(0, inputType.Get(), 0);
     if (FAILED(hr)) {
-        return platform::windows::hresultToMistError(hr, common::SubsystemId::Decode, "SetInputType for H.264 failed");
+        return platform::windows::hresultToMistError(hr, common::SubsystemId::Decode,
+            std::string("SetInputType for ") + codecName + " failed");
     }
 
     // Query and set output media type (NV12 for D3D11 hardware decoding)

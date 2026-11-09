@@ -24,6 +24,7 @@ struct WebRtcTransportConfig {
     uint16_t minPort{0};
     uint16_t maxPort{0};
     uint32_t videoClockRate{90000};
+    std::string videoCodec{"h264"}; // "h264" or "hevc"
     uint32_t targetFps{60};
     uint32_t targetBitrateKbps{15000};
     bool enableDataChannels{true};

@@ -23,8 +23,15 @@ common::Result<void> VideoTrackSender::initialize(
     }
 
     try {
+        bool isHevc = (config_.videoCodec == "hevc" || config_.videoCodec == "h265");
+        int payloadType = isHevc ? 98 : 96;
+
         rtc::Description::Video mediaDesc("video", rtc::Description::Direction::SendOnly);
-        mediaDesc.addH264Codec(96);
+        if (isHevc) {
+            mediaDesc.addH265Codec(payloadType);
+        } else {
+            mediaDesc.addH264Codec(payloadType);
+        }
         mediaDesc.addSSRC(1, "mist-video");
 
         track_ = pc->addTrack(mediaDesc);
@@ -32,16 +39,25 @@ common::Result<void> VideoTrackSender::initialize(
         rtpConfig_ = std::make_shared<rtc::RtpPacketizationConfig>(
             /*ssrc=*/1,
             /*cname=*/"mist-video",
-            /*payloadType=*/96,
+            /*payloadType=*/payloadType,
             /*clockRate=*/config_.videoClockRate
         );
 
-        auto packetizer = std::make_shared<rtc::H264RtpPacketizer>(
-            rtc::NalUnit::Separator::StartSequence,
-            rtpConfig_,
-            /*maxFragmentSize=*/1200
-        );
-        track_->setMediaHandler(packetizer);
+        if (isHevc) {
+            auto packetizer = std::make_shared<rtc::H265RtpPacketizer>(
+                rtc::NalUnit::Separator::StartSequence,
+                rtpConfig_,
+                /*maxFragmentSize=*/1200
+            );
+            track_->setMediaHandler(packetizer);
+        } else {
+            auto packetizer = std::make_shared<rtc::H264RtpPacketizer>(
+                rtc::NalUnit::Separator::StartSequence,
+                rtpConfig_,
+                /*maxFragmentSize=*/1200
+            );
+            track_->setMediaHandler(packetizer);
+        }
 
         auto pliHandler = std::make_shared<rtc::PliHandler>([this]() {
             MIST_LOG_INFO(common::SubsystemId::Transport, "Received RTCP PLI (Picture Loss Indication) keyframe request");

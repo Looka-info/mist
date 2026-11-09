@@ -1,5 +1,6 @@
 add_library(mist_decode STATIC
     src/H264Parser.cpp
+    src/HevcParser.cpp
     src/AnnexBReader.cpp
     src/D3D11VideoDecoder.cpp
     src/DecodePresentPipeline.cpp

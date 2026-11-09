@@ -23,6 +23,7 @@ namespace mist::decode {
 struct DecoderCapability {
     bool isHardwareAccelerated{false};
     bool supportsH264{false};
+    bool supportsHevc{false};
     uint32_t maxResolutionWidth{4096};
     uint32_t maxResolutionHeight{4096};
     std::string deviceName;

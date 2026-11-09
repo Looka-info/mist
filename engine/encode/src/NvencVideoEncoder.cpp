@@ -388,6 +388,10 @@ common::Result<void> NvencVideoEncoder::initialize(const EncodeConfig& config) {
         encodeConfig.encodeCodecConfig.h264Config.idrPeriod = config_.gopLength;
         encodeConfig.encodeCodecConfig.h264Config.repeatSPSPPS = 1;
         encodeConfig.encodeCodecConfig.h264Config.outputAUD = 1;
+    } else if (config_.codec == VideoCodec::HEVC) {
+        encodeConfig.encodeCodecConfig.hevcConfig.idrPeriod = config_.gopLength;
+        encodeConfig.encodeCodecConfig.hevcConfig.repeatSPSPPS = 1;
+        encodeConfig.encodeCodecConfig.hevcConfig.outputAUD = 1;
     }
 
     NV_ENC_INITIALIZE_PARAMS initParams{};

@@ -82,6 +82,7 @@ add_library(mist_transport STATIC
     src/qos/AdaptiveBitrateController.cpp
     src/qos/PerGuestAdaptiveBitrate.cpp
     src/qos/HostBandwidthBudgetManager.cpp
+    src/CodecNegotiator.cpp
 )
 
 target_include_directories(mist_transport PUBLIC
