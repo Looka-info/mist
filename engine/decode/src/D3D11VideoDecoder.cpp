@@ -45,6 +45,21 @@ DEFINE_GUID(D3D11_DECODER_PROFILE_HEVC_VLD_MAIN, 0x5b11d51b, 0xcd23, 0x45e6, 0xb
 DEFINE_GUID(D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10, 0x107af0e0, 0xef1a, 0x4d42, 0xab, 0xc8, 0x45, 0x49, 0x9b, 0x3d, 0x85, 0x25);
 #endif
 
+// MFVideoFormat_AV1
+#ifndef MFVideoFormat_AV1
+DEFINE_GUID(MFVideoFormat_AV1, 0x31305641, 0x0000, 0x0010, 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
+#endif
+
+// D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0
+#ifndef D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0
+DEFINE_GUID(D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0, 0xb8be4ccb, 0xcf53, 0x46ba, 0x8d, 0x59, 0xd6, 0xb8, 0xa6, 0xda, 0x5d, 0x2a);
+#endif
+
+// CLSID_CMSAV1DecoderMFT
+#ifndef CLSID_CMSAV1DecoderMFT
+DEFINE_GUID(CLSID_CMSAV1DecoderMFT, 0x17c09e3e, 0x92f3, 0x47d7, 0x99, 0x08, 0x27, 0xaa, 0x48, 0xd3, 0x9a, 0x61);
+#endif
+
 #endif
 
 namespace mist::decode {
@@ -101,9 +116,16 @@ DecoderCapability D3D11VideoDecoder::queryCapabilities(ID3D11Device* device) noe
                 if (IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_H264_VLD_NOFGT)) {
                     cap.supportsH264 = true;
                     cap.isHardwareAccelerated = true;
-                } else if (IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN) ||
-                           IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10)) {
+                } else if (IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN)) {
                     cap.supportsHevc = true;
+                    cap.isHardwareAccelerated = true;
+                } else if (IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_HEVC_VLD_MAIN10)) {
+                    cap.supportsHevc = true;
+                    cap.supports10Bit = true;
+                    cap.isHardwareAccelerated = true;
+                } else if (IsEqualGUID(profileGuid, D3D11_DECODER_PROFILE_AV1_VLD_PROFILE0)) {
+                    cap.supportsAv1 = true;
+                    cap.supports10Bit = true;
                     cap.isHardwareAccelerated = true;
                 }
             }
@@ -179,9 +201,19 @@ common::Result<void> D3D11VideoDecoder::initialize(const DecodeConfig& config) {
 
 #if defined(_WIN32)
 common::Result<void> D3D11VideoDecoder::initializeMft() {
-    GUID targetSubtype = (config_.codec == encode::VideoCodec::HEVC) ? MFVideoFormat_HEVC : MFVideoFormat_H264;
-    GUID targetClsid = (config_.codec == encode::VideoCodec::HEVC) ? CLSID_CMSH265DecoderMFT : CLSID_CMSH264DecoderMFT;
-    const char* codecName = (config_.codec == encode::VideoCodec::HEVC) ? "HEVC / H.265" : "H.264";
+    GUID targetSubtype = MFVideoFormat_H264;
+    GUID targetClsid = CLSID_CMSH264DecoderMFT;
+    const char* codecName = "H.264";
+
+    if (config_.codec == encode::VideoCodec::AV1) {
+        targetSubtype = MFVideoFormat_AV1;
+        targetClsid = CLSID_CMSAV1DecoderMFT;
+        codecName = "AV1";
+    } else if (config_.codec == encode::VideoCodec::HEVC) {
+        targetSubtype = MFVideoFormat_HEVC;
+        targetClsid = CLSID_CMSH265DecoderMFT;
+        codecName = "HEVC / H.265";
+    }
 
     HRESULT hr = CoCreateInstance(targetClsid, nullptr, CLSCTX_INPROC_SERVER,
                                   IID_PPV_ARGS(&decoderTransform_));

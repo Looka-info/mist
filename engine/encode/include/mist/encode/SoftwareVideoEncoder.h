@@ -12,9 +12,11 @@ struct SoftwareEncoderCapability {
     bool isSupported{true};
     bool supportsH264{true};
     bool supportsHevc{true};
+    bool supportsAv1{true};
+    bool supports10Bit{true};
     uint32_t maxResolutionWidth{4096};
     uint32_t maxResolutionHeight{4096};
-    std::string encoderName{"Software CPU Fallback Encoder (Annex-B)"};
+    std::string encoderName{"Software CPU Fallback Encoder (Annex-B & AV1 OBU)"};
 };
 
 class SoftwareVideoEncoder : public IVideoEncoder {

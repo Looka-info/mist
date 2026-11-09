@@ -317,14 +317,32 @@ void CaptureEncodePipeline::encodeWorker(const std::string& outputH264Path) {
             pendingFrames_.pop();
         }
 
-        // Color conversion if NV12 format is selected
-        if (encConfig_.codec == encode::VideoCodec::H264 && colorConverter_) {
+        // Color conversion and HDR tone-mapping if needed
+        if (colorConverter_) {
             qpc.reset();
 #if defined(_WIN32)
-            auto convRes = colorConverter_->convertBgraToNv12(static_cast<ID3D11Texture2D*>(frame.nativeResource));
-            if (convRes) {
-                frame.nativeResource = convRes.value();
-                frame.format = capture::PixelFormat::NV12;
+            if (frame.format == capture::PixelFormat::R10G10B10A2_UNORM) {
+                if (capConfig_.format == capture::PixelFormat::P010 && colorConverter_->isP010Supported()) {
+                    auto convRes = colorConverter_->convertHdrToP010(static_cast<ID3D11Texture2D*>(frame.nativeResource));
+                    if (convRes) {
+                        frame.nativeResource = convRes.value();
+                        frame.format = capture::PixelFormat::P010;
+                    }
+                } else {
+                    auto convRes = colorConverter_->convertHdrToSdrNv12(static_cast<ID3D11Texture2D*>(frame.nativeResource));
+                    if (convRes) {
+                        frame.nativeResource = convRes.value();
+                        frame.format = capture::PixelFormat::NV12;
+                        frame.colorSpace = capture::ColorSpace::BT709_SDR;
+                        frame.bitDepth = 8;
+                    }
+                }
+            } else if (frame.format == capture::PixelFormat::B8G8R8A8_UNORM) {
+                auto convRes = colorConverter_->convertBgraToNv12(static_cast<ID3D11Texture2D*>(frame.nativeResource));
+                if (convRes) {
+                    frame.nativeResource = convRes.value();
+                    frame.format = capture::PixelFormat::NV12;
+                }
             }
 #endif
             histConversionLatency_->record(qpc.elapsedMicroseconds());

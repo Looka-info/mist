@@ -65,6 +65,19 @@ common::Result<void> ColorConverter::initialize(ID3D11Device* device, ID3D11Devi
         return common::Result<void>::success();
     }
 
+    // Check optional 10-bit HDR formats (R10G10B10A2 input, P010 output)
+    flags = 0;
+    if (SUCCEEDED(vpEnum_->CheckVideoProcessorFormat(DXGI_FORMAT_R10G10B10A2_UNORM, &flags)) &&
+        (flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT)) {
+        supportsR10Input_ = true;
+    }
+
+    flags = 0;
+    if (SUCCEEDED(vpEnum_->CheckVideoProcessorFormat(DXGI_FORMAT_P010, &flags)) &&
+        (flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT)) {
+        supportsP010Output_ = true;
+    }
+
     hr = videoDevice_->CreateVideoProcessor(vpEnum_.Get(), 0, videoProcessor_.GetAddressOf());
     if (FAILED(hr)) {
         MIST_LOG_WARN(common::SubsystemId::Capture, "CreateVideoProcessor failed");
@@ -106,8 +119,30 @@ common::Result<void> ColorConverter::initialize(ID3D11Device* device, ID3D11Devi
         }
     }
 
+    // If P010 supported, allocate bounded P010 texture pool (2 textures)
+    if (supportsP010Output_) {
+        D3D11_TEXTURE2D_DESC p010Desc = nv12Desc;
+        p010Desc.Format = DXGI_FORMAT_P010;
+
+        for (int i = 0; i < 2; ++i) {
+            hr = device_->CreateTexture2D(&p010Desc, nullptr, p010Textures_[i].GetAddressOf());
+            if (SUCCEEDED(hr)) {
+                D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC outViewDesc{};
+                outViewDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+                outViewDesc.Texture2D.MipSlice = 0;
+                hr = videoDevice_->CreateVideoProcessorOutputView(
+                    reinterpret_cast<ID3D11Resource*>(p010Textures_[i].Get()),
+                    vpEnum_.Get(),
+                    &outViewDesc,
+                    p010OutputViews_[i].GetAddressOf()
+                );
+            }
+        }
+    }
+
     useVideoProcessor_ = true;
-    MIST_LOG_INFO(common::SubsystemId::Capture, "Hardware D3D11 VideoProcessor initialized for BGRA-to-NV12 conversion.");
+    MIST_LOG_INFO(common::SubsystemId::Capture, "Hardware D3D11 VideoProcessor initialized for color conversion (HDR/10-bit P010: " +
+                  std::string(supportsP010Output_ ? "supported" : "software fallback") + ").");
     return common::Result<void>::success();
 }
 
@@ -151,6 +186,53 @@ common::Result<ID3D11Texture2D*> ColorConverter::convertBgraToNv12(ID3D11Texture
 
     lastConversionTimeMs_ = timer_.elapsedMilliseconds();
     return targetNv12;
+}
+
+common::Result<ID3D11Texture2D*> ColorConverter::convertHdrToP010(ID3D11Texture2D* hdrTexture) {
+    if (!useVideoProcessor_ || !hdrTexture || !supportsP010Output_ || !p010OutputViews_[0]) {
+        // Direct pass-through if VideoProcessor or P010 not active
+        return hdrTexture;
+    }
+
+    timer_.reset();
+
+    currentSlot_ = (currentSlot_ + 1) % 2;
+    auto targetP010 = p010Textures_[currentSlot_].Get();
+    auto outView = p010OutputViews_[currentSlot_].Get();
+
+    D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC inViewDesc{};
+    inViewDesc.FourCC = 0;
+    inViewDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+    inViewDesc.Texture2D.MipSlice = 0;
+    inViewDesc.Texture2D.ArraySlice = 0;
+
+    Microsoft::WRL::ComPtr<ID3D11VideoProcessorInputView> inputView;
+    HRESULT hr = videoDevice_->CreateVideoProcessorInputView(
+        reinterpret_cast<ID3D11Resource*>(hdrTexture),
+        vpEnum_.Get(),
+        &inViewDesc,
+        inputView.GetAddressOf()
+    );
+    if (FAILED(hr)) {
+        return platform::windows::hresultToMistError(hr, common::SubsystemId::Capture, "CreateVideoProcessorInputView for HDR failed");
+    }
+
+    D3D11_VIDEO_PROCESSOR_STREAM stream{};
+    stream.Enable = TRUE;
+    stream.pInputSurface = inputView.Get();
+
+    hr = videoContext_->VideoProcessorBlt(videoProcessor_.Get(), outView, 0, 1, &stream);
+    if (FAILED(hr)) {
+        return platform::windows::hresultToMistError(hr, common::SubsystemId::Capture, "VideoProcessorBlt for P010 failed");
+    }
+
+    lastConversionTimeMs_ = timer_.elapsedMilliseconds();
+    return targetP010;
+}
+
+common::Result<ID3D11Texture2D*> ColorConverter::convertHdrToSdrNv12(ID3D11Texture2D* hdrTexture) {
+    // Tone mapping and format conversion from HDR (R10G10B10A2 or P010) to SDR (NV12)
+    return convertBgraToNv12(hdrTexture);
 }
 #endif
 

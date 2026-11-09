@@ -49,6 +49,7 @@ add_executable(mist_unit_tests
     TestReconnectionAndRecovery.cpp
     TestVirtualDisplay.cpp
     TestHostServiceAndWol.cpp
+    TestAv1AndHdr.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

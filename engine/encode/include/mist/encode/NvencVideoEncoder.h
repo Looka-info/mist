@@ -21,8 +21,11 @@ struct NvencCapability {
     uint32_t maxResolutionHeight{4096};
     bool supportsH264{false};
     bool supportsHevc{false};
+    bool supportsAv1{false};
+    bool supports10Bit{false};
     bool supportsBgraInput{false};
     bool supportsNv12Input{false};
+    bool supportsP010Input{false};
     std::string driverVersion;
 };
 
@@ -40,6 +43,8 @@ struct NvencRuntimeAudit {
     std::string sessionInitStatus;
     bool supportsH264{false};
     bool supportsHevc{false};
+    bool supportsAv1{false};
+    bool supports10Bit{false};
     std::string selectedCodec;
     std::string selectedInputFormat;
     std::string details;

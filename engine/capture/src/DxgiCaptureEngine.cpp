@@ -83,7 +83,7 @@ common::Result<void> DxgiCaptureEngine::initDuplication() {
     return common::Result<void>::success();
 }
 
-common::Result<void> DxgiCaptureEngine::recreateSharedTexture(uint32_t width, uint32_t height) {
+common::Result<void> DxgiCaptureEngine::recreateSharedTexture(uint32_t width, uint32_t height, DXGI_FORMAT format) {
     if (!device_) {
         return common::Error(common::SubsystemId::Capture, common::ErrorCode::NotInitialized, "Device is null");
     }
@@ -93,7 +93,7 @@ common::Result<void> DxgiCaptureEngine::recreateSharedTexture(uint32_t width, ui
     desc.Height = height;
     desc.MipLevels = 1;
     desc.ArraySize = 1;
-    desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    desc.Format = format;
     desc.SampleDesc.Count = 1;
     desc.SampleDesc.Quality = 0;
     desc.Usage = D3D11_USAGE_DEFAULT;
@@ -109,6 +109,7 @@ common::Result<void> DxgiCaptureEngine::recreateSharedTexture(uint32_t width, ui
 
     displayInfo_.width = width;
     displayInfo_.height = height;
+    currentFormat_ = static_cast<uint32_t>(format);
     return common::Result<void>::success();
 }
 #endif
@@ -226,11 +227,12 @@ common::Result<CapturedFrame> DxgiCaptureEngine::acquireNextFrame(uint32_t timeo
     D3D11_TEXTURE2D_DESC desc{};
     desktopTexture->GetDesc(&desc);
 
-    // If resolution changed, recreate shared GPU texture
-    if (desc.Width != displayInfo_.width || desc.Height != displayInfo_.height) {
-        MIST_LOG_INFO(common::SubsystemId::Capture, "Display resolution changed to " +
-                      std::to_string(desc.Width) + "x" + std::to_string(desc.Height));
-        auto recRes = recreateSharedTexture(desc.Width, desc.Height);
+    // If resolution or format changed, recreate shared GPU texture
+    if (desc.Width != displayInfo_.width || desc.Height != displayInfo_.height || currentFormat_ != static_cast<uint32_t>(desc.Format)) {
+        MIST_LOG_INFO(common::SubsystemId::Capture, "Display resolution/format changed to " +
+                      std::to_string(desc.Width) + "x" + std::to_string(desc.Height) +
+                      " (format " + std::to_string(static_cast<uint32_t>(desc.Format)) + ")");
+        auto recRes = recreateSharedTexture(desc.Width, desc.Height, desc.Format);
         if (!recRes) {
             (void)duplication_->ReleaseFrame();
             frameAcquired_ = false;
@@ -248,10 +250,26 @@ common::Result<CapturedFrame> DxgiCaptureEngine::acquireNextFrame(uint32_t timeo
     ++frameCounter_;
     uint64_t timestampNs = timer_.elapsedNanoseconds();
 
+    PixelFormat outFormat = PixelFormat::B8G8R8A8_UNORM;
+    ColorSpace outColorSpace = ColorSpace::BT709_SDR;
+    uint32_t bitDepth = 8;
+
+    if (desc.Format == DXGI_FORMAT_R10G10B10A2_UNORM) {
+        outFormat = PixelFormat::R10G10B10A2_UNORM;
+        outColorSpace = ColorSpace::BT2020_PQ;
+        bitDepth = 10;
+    } else if (desc.Format == DXGI_FORMAT_R16G16B16A16_FLOAT) {
+        outFormat = PixelFormat::R10G10B10A2_UNORM;
+        outColorSpace = ColorSpace::Linear_ScRGB;
+        bitDepth = 16;
+    }
+
     CapturedFrame frame{
         .width = displayInfo_.width,
         .height = displayInfo_.height,
-        .format = PixelFormat::B8G8R8A8_UNORM,
+        .format = outFormat,
+        .colorSpace = outColorSpace,
+        .bitDepth = bitDepth,
         .timestampNs = timestampNs,
         .frameNumber = frameCounter_,
         .nativeResource = sharedTexture_.Get()

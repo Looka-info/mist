@@ -49,7 +49,11 @@ public:
 
 private:
     [[nodiscard]] common::Result<void> initDuplication();
+#if defined(_WIN32)
+    [[nodiscard]] common::Result<void> recreateSharedTexture(uint32_t width, uint32_t height, DXGI_FORMAT format = DXGI_FORMAT_B8G8R8A8_UNORM);
+#else
     [[nodiscard]] common::Result<void> recreateSharedTexture(uint32_t width, uint32_t height);
+#endif
 
     mutable std::mutex mutex_;
     CaptureConfig config_;
@@ -58,6 +62,7 @@ private:
     uint64_t frameCounter_{0};
     bool isCapturing_{false};
     bool frameAcquired_{false};
+    uint32_t currentFormat_{0};
 
     platform::windows::HighResolutionTimer timer_;
 

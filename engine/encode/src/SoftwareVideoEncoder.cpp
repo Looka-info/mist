@@ -65,7 +65,24 @@ common::Result<void> SoftwareVideoEncoder::encode(const capture::CapturedFrame& 
     size_t targetFrameBytes = (static_cast<size_t>(config_.bitrateKbps) * 1000) / (8 * std::max(1u, config_.targetFps));
     size_t payloadSize = isKeyframe ? (targetFrameBytes * 3) : std::max<size_t>(64, targetFrameBytes / 2);
 
-    if (config_.codec == VideoCodec::HEVC) {
+    if (config_.codec == VideoCodec::AV1) {
+        // Temporal Delimiter OBU (type 2, has_size 1, size 0)
+        pkt.data.insert(pkt.data.end(), {0x12, 0x00});
+
+        if (isKeyframe) {
+            // Sequence Header OBU (type 1, has_size 1, size 4)
+            uint8_t seqHeaderByte = (frame.bitDepth > 8 || frame.format == capture::PixelFormat::P010) ? 0x01 : 0x00;
+            pkt.data.insert(pkt.data.end(), {0x0A, 0x04, seqHeaderByte, 0x1F, 0x00, 0x00});
+
+            // Key Frame OBU (type 6, has_size 1, size 8)
+            // Payload byte 0: bit 7 = 0 (show_existing_frame = 0), bits 6..5 = 00 (KEY_FRAME)
+            pkt.data.insert(pkt.data.end(), {0x32, 0x08, 0x00, 0x88, 0x00, 0x00, 0x11, 0x22, 0x33, 0x44});
+        } else {
+            // Inter Frame OBU (type 6, has_size 1, size 6)
+            // Payload byte 0: bit 7 = 0, bits 6..5 = 01 (INTER_FRAME = 0x20)
+            pkt.data.insert(pkt.data.end(), {0x32, 0x06, 0x20, 0x10, 0x55, 0x66, 0x77, 0x88});
+        }
+    } else if (config_.codec == VideoCodec::HEVC) {
         if (isKeyframe) {
             // VPS (type 32)
             pkt.data.insert(pkt.data.end(), {0x00, 0x00, 0x00, 0x01, 0x40, 0x01, 0x0C, 0x01});

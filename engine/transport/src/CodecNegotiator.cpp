@@ -64,18 +64,35 @@ NegotiatedCodecResult CodecNegotiator::negotiate(
             result.rtpPayloadType = 97;
             result.sdpFormatString = "AV1/90000";
             result.isHardwareAccelerated = true;
-            result.rationale = "AV1 preferred and supported by both peers";
+            result.is10Bit = hostCaps.supports10Bit && clientCaps.supports10Bit;
+            result.isHdr = hostCaps.supportsHdr && clientCaps.supportsHdr;
+            result.rationale = "AV1 preferred and supported by both peers (10-bit HDR: " +
+                               std::string(result.isHdr ? "enabled" : "disabled") + ")";
             return result;
         }
     }
 
-    // 4. Default priority: HEVC (if both support) > H264 (if both support) > AV1
+    // 4. Default priority: AV1 (if both support) > HEVC (if both support) > H264 (if both support)
+    if (hostCaps.supportsAv1 && clientCaps.supportsAv1) {
+        result.selectedCodec = encode::VideoCodec::AV1;
+        result.codecName = "AV1";
+        result.rtpPayloadType = 97;
+        result.sdpFormatString = "AV1/90000";
+        result.isHardwareAccelerated = true;
+        result.is10Bit = hostCaps.supports10Bit && clientCaps.supports10Bit;
+        result.isHdr = hostCaps.supportsHdr && clientCaps.supportsHdr;
+        result.rationale = "Both peers support next-gen AV1 codec (maximum compression efficiency)";
+        return result;
+    }
+
     if (hostCaps.supportsHevc && clientCaps.supportsHevc) {
         result.selectedCodec = encode::VideoCodec::HEVC;
         result.codecName = "H265";
         result.rtpPayloadType = 98;
         result.sdpFormatString = "H265/90000";
         result.isHardwareAccelerated = true;
+        result.is10Bit = hostCaps.supports10Bit && clientCaps.supports10Bit;
+        result.isHdr = hostCaps.supportsHdr && clientCaps.supportsHdr;
         result.rationale = "Both peers support hardware-accelerated HEVC/H.265 (higher efficiency)";
         return result;
     }

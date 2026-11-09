@@ -24,6 +24,8 @@ struct DecoderCapability {
     bool isHardwareAccelerated{false};
     bool supportsH264{false};
     bool supportsHevc{false};
+    bool supportsAv1{false};
+    bool supports10Bit{false};
     uint32_t maxResolutionWidth{4096};
     uint32_t maxResolutionHeight{4096};
     std::string deviceName;

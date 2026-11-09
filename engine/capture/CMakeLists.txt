@@ -3,6 +3,7 @@ add_library(mist_capture
     src/WgcCaptureEngine.cpp
     src/CaptureEngineFactory.cpp
     src/ColorConverter.cpp
+    src/HdrToneMapper.cpp
     src/SyntheticFrameGenerator.cpp
     src/CaptureEncodePipeline.cpp
 )

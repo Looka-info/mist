@@ -133,6 +133,13 @@ NvencCapability NvencVideoEncoder::queryCapabilities(ID3D11Device* device) noexc
         cap.supportsHevc = true;
     }
 
+    // Check AV1 support
+    uint32_t av1ProfileCount = 0;
+    status = g_nvenc.nvEncGetEncodeProfileGUIDCount(session, NV_ENC_CODEC_AV1_GUID, &av1ProfileCount);
+    if (status == NV_ENC_SUCCESS && av1ProfileCount > 0) {
+        cap.supportsAv1 = true;
+    }
+
     // Check supported input formats
     uint32_t formatCount = 0;
     status = g_nvenc.nvEncGetInputFormatCount(session, NV_ENC_CODEC_H264_GUID, &formatCount);
@@ -147,6 +154,10 @@ NvencCapability NvencVideoEncoder::queryCapabilities(ID3D11Device* device) noexc
                 }
                 if (formats[i] == NV_ENC_BUFFER_FORMAT_NV12) {
                     cap.supportsNv12Input = true;
+                }
+                if (formats[i] == NV_ENC_BUFFER_FORMAT_YUV420_10BIT) {
+                    cap.supports10Bit = true;
+                    cap.supportsP010Input = true;
                 }
             }
         }
@@ -468,7 +479,13 @@ common::Result<void> NvencVideoEncoder::encode(const capture::CapturedFrame& fra
         regResource.height = frame.height;
         regResource.pitch = 0;
         regResource.subResourceIndex = 0;
-        regResource.bufferFormat = (frame.format == capture::PixelFormat::NV12) ? NV_ENC_BUFFER_FORMAT_NV12 : NV_ENC_BUFFER_FORMAT_ARGB;
+        NV_ENC_BUFFER_FORMAT bufFmt = NV_ENC_BUFFER_FORMAT_ARGB;
+        if (frame.format == capture::PixelFormat::P010) {
+            bufFmt = NV_ENC_BUFFER_FORMAT_YUV420_10BIT;
+        } else if (frame.format == capture::PixelFormat::NV12) {
+            bufFmt = NV_ENC_BUFFER_FORMAT_NV12;
+        }
+        regResource.bufferFormat = bufFmt;
         regResource.bufferUsage = NV_ENC_INPUT_IMAGE;
 
         NVENCSTATUS regStatus = g_nvenc.nvEncRegisterResource(encoderSession_, &regResource);
