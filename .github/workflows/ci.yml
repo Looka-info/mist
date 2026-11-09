@@ -192,6 +192,7 @@ jobs:
         run: |
           node -c web/js/mist-web-client.js
           node -c web/test/run_browser_tests.js
+          node -c web/test/webrtc_integration_test.js
           node web/test/run_browser_tests.js
           echo "WebCodecs JavaScript client syntax and unit tests verified."
 
