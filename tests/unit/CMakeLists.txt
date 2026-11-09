@@ -41,6 +41,7 @@ add_executable(mist_unit_tests
     TestHevcCodec.cpp
     TestEncoderFallbacks.cpp
     TestLowLatencyTuning.cpp
+    TestFecAndRecovery.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

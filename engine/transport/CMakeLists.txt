@@ -86,6 +86,8 @@ add_library(mist_transport STATIC
     src/LowLatencyTuning.cpp
     src/PacedSender.cpp
     src/NackPliController.cpp
+    src/ForwardErrorCorrection.cpp
+    src/AudioPlcController.cpp
 )
 
 target_include_directories(mist_transport PUBLIC
