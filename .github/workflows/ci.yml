@@ -42,8 +42,15 @@ jobs:
       - name: Run Rust Workspace Tests
         run: cargo test --workspace --verbose
 
-      - name: Build Slint Desktop Executable (Release)
-        run: cargo build --package mist-desktop --release
+      - name: Build Rust Binaries and Stage Signaling (Release)
+        run: |
+          cargo build --package mist-desktop --package mist-signaling --release
+          if (!(Test-Path "bin")) { New-Item -ItemType Directory -Path "bin" -Force }
+          $sigCandidates = @("target/release/mist-signaling.exe", "services/signaling/target/release/mist-signaling.exe") | Where-Object { Test-Path $_ }
+          if ($sigCandidates) {
+            Copy-Item $sigCandidates[0] "bin/mist-signaling.exe" -Force
+            Write-Host "Staged bin/mist-signaling.exe from $($sigCandidates[0])" -ForegroundColor Green
+          }
 
       - name: Configure CMake Media Engine (Release)
         run: |

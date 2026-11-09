@@ -48,6 +48,7 @@ if(MSVC)
         /wd4127 # conditional expression is constant
         /wd4702 # unreachable code
         /wd4458 # declaration hides class member
+        /wd4312 # conversion from int to pointer of greater size
     )
     if(MIST_TREAT_WARNINGS_AS_ERRORS)
         target_compile_options(mist_warnings INTERFACE /WX)

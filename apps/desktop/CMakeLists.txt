@@ -68,18 +68,20 @@ else()
 
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe
-        COMMAND ${CARGO_EXECUTABLE} build --package mist-desktop ${RUST_CONFIG_FLAG}
+        COMMAND ${CARGO_EXECUTABLE} build --package mist-desktop --package mist-signaling ${RUST_CONFIG_FLAG}
         COMMAND ${CMAKE_COMMAND}
             -DSOURCE_1=${CMAKE_SOURCE_DIR}/target/${RUST_TARGET_SUBDIR}/mist-desktop.exe
             -DSOURCE_2=D:/rust/target/${RUST_TARGET_SUBDIR}/mist-desktop.exe
             -DSOURCE_3=${CMAKE_SOURCE_DIR}/bin/mist_desktop.exe
             -DDESTINATION=${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DRUST_TARGET_SUBDIR=${RUST_TARGET_SUBDIR}
             -P ${CMAKE_SOURCE_DIR}/cmake/stage_desktop.cmake
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe"
             "${CMAKE_SOURCE_DIR}/bin/mist_desktop.exe"
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Building and staging Mist Desktop (Rust + Slint) -> ${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe"
+        COMMENT "Building and staging Mist Desktop and Signaling -> ${CMAKE_CURRENT_BINARY_DIR}/mist_desktop.exe"
     )
 
     add_custom_target(mist_desktop ALL
