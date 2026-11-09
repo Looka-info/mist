@@ -147,6 +147,12 @@ private:
 
     std::chrono::steady_clock::time_point lastFpsCalcTime_{};
     uint64_t lastFrameCount_{0};
+
+    static constexpr size_t kMaxPacketQueue = 60;
+    mutable std::mutex queueMutex_;
+    std::queue<encode::EncodedPacket> packetQueue_;
+    uint64_t packetCountInWindow_{0};
+    double smoothedFps_{0.0};
 };
 
 } // namespace mist::decode

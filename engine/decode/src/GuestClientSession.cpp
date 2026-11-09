@@ -180,8 +180,38 @@ common::Result<void> GuestClientSession::ingestVideoPacket(const encode::Encoded
         transitionState(SessionLifecycleState::Streaming);
     }
 
+    {
+        std::lock_guard<std::mutex> qLock(queueMutex_);
+        if (packetQueue_.size() >= kMaxPacketQueue) {
+            packetQueue_.pop();
+            std::lock_guard<std::mutex> sLock(statsMutex_);
+            ++stats_.framesDropped;
+        }
+        packetQueue_.push(packet);
+    }
+
+    encode::EncodedPacket currentPacket;
+    {
+        std::lock_guard<std::mutex> qLock(queueMutex_);
+        currentPacket = std::move(packetQueue_.front());
+        packetQueue_.pop();
+    }
+
+    ++packetCountInWindow_;
+    auto now = std::chrono::steady_clock::now();
+    auto elapsedSec = std::chrono::duration<double>(now - lastFpsCalcTime_).count();
+    if (elapsedSec >= 1.0) {
+        smoothedFps_ = static_cast<double>(packetCountInWindow_) / elapsedSec;
+        {
+            std::lock_guard<std::mutex> lock(statsMutex_);
+            stats_.currentFps = smoothedFps_;
+        }
+        packetCountInWindow_ = 0;
+        lastFpsCalcTime_ = now;
+    }
+
     auto startT = std::chrono::steady_clock::now();
-    auto subRes = decoder_->submitPacket(packet);
+    auto subRes = decoder_->submitPacket(currentPacket);
     if (!subRes.hasValue()) {
         std::lock_guard<std::mutex> lock(statsMutex_);
         ++stats_.framesDropped;
@@ -198,23 +228,21 @@ common::Result<void> GuestClientSession::ingestVideoPacket(const encode::Encoded
         if (stats_.averageDecodeLatencyMs <= 0.0) {
             stats_.averageDecodeLatencyMs = latencyMs;
         } else {
-            stats_.averageDecodeLatencyMs = stats_.averageDecodeLatencyMs * 0.95 + latencyMs * 0.05;
+            stats_.averageDecodeLatencyMs = 0.9 * stats_.averageDecodeLatencyMs + 0.1 * latencyMs;
         }
     }
 
     if (getRes.hasValue()) {
-        DecodedFrame frame = getRes.value();
+        auto frame = getRes.value();
         {
             std::lock_guard<std::mutex> lock(statsMutex_);
             ++stats_.framesDecoded;
             ++stats_.framesPresented;
         }
 
-        {
-            std::lock_guard<std::mutex> lock(callbackMutex_);
-            if (frameCallback_) {
-                frameCallback_(frame);
-            }
+        std::lock_guard<std::mutex> lock(callbackMutex_);
+        if (frameCallback_) {
+            frameCallback_(frame);
         }
 
         (void)decoder_->releaseFrame(frame);
