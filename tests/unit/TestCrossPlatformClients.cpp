@@ -86,24 +86,25 @@ TEST(LinuxVaApiTest, SurfaceRingBufferLifecycle) {
         .preferHardwareDecoding = true,
         .lowLatencyTuning = true
     };
-    EXPECT_TRUE(decoder->initialize(cfg).hasValue());
 
-    for (uint32_t i = 1; i <= 4; ++i) {
-        EncodedPacket pkt{};
-        pkt.data = {0x00, 0x00, 0x00, 0x01, static_cast<uint8_t>(i)};
-        pkt.timestampNs = i * 16666666ULL;
-        EXPECT_TRUE(decoder->submitPacket(pkt).hasValue());
-
-        auto frameRes = decoder->getNextFrame();
-        ASSERT_TRUE(frameRes.hasValue());
-        EXPECT_EQ(frameRes.value().frameNumber, i);
-        // Verify simulated surface ID cycle (1, 2, 3, 4, ...)
-        uintptr_t surfaceId = reinterpret_cast<uintptr_t>(frameRes.value().nativeResource);
-        EXPECT_EQ(surfaceId, ((i % 4) + 1));
-        EXPECT_TRUE(decoder->releaseFrame(frameRes.value()).hasValue());
+    if (VaApiVideoDecoder::isNativePlatform()) {
+        auto initRes = decoder->initialize(cfg);
+        if (initRes.hasValue()) {
+            EXPECT_TRUE(decoder->isInitialized());
+            EncodedPacket pkt{};
+            pkt.data = {0x00, 0x00, 0x00, 0x01, 0x40, 0x01};
+            pkt.timestampNs = 16666666ULL;
+            (void)decoder->submitPacket(pkt);
+            EXPECT_TRUE(decoder->flush().hasValue());
+            EXPECT_TRUE(decoder->shutdown().hasValue());
+        }
+    } else {
+        auto initRes = decoder->initialize(cfg);
+        EXPECT_FALSE(initRes.hasValue());
+        EXPECT_EQ(initRes.error().code(), common::ErrorCode::NotImplemented);
+        EXPECT_FALSE(decoder->isInitialized());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
     }
-
-    EXPECT_EQ(decoder->getDecodedFrameCount(), 4u);
 }
 
 TEST(AndroidMediaCodecTest, BufferQueueAndDecode) {

@@ -95,6 +95,21 @@ private:
 #endif
 };
 
+enum class VaSurfaceState : uint8_t {
+    Available = 0,
+    Decoding,
+    Decoded,
+    InUse,
+    Released
+};
+
+struct VaSurfaceSlot {
+    uint32_t surfaceId{0};
+    VaSurfaceState state{VaSurfaceState::Available};
+    uint64_t frameNumber{0};
+    uint64_t timestampNs{0};
+};
+
 // Linux VA-API hardware decoder implementation
 class VaApiVideoDecoder : public IVideoDecoder {
 public:
@@ -120,9 +135,20 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
+#if defined(__linux__) && !defined(__ANDROID__)
+    int drmFd_{-1};
+    void* vaDisplay_{nullptr};
+    uint32_t vaConfig_{0};
+    uint32_t vaContext_{0};
+    std::vector<VaSurfaceSlot> surfacePool_;
+    static constexpr size_t kMaxVaSurfaces = 8;
+    bool initVaDisplay();
+    bool createVaContext(uint32_t width, uint32_t height);
+    void destroyVaResources();
+#else
     [[maybe_unused]] void* vaDisplay_{nullptr};
     [[maybe_unused]] uint32_t vaContext_{0};
-    uint32_t vaSurfaces_[4]{0, 0, 0, 0};
+#endif
 };
 
 // Android NDK AMediaCodec hardware decoder implementation

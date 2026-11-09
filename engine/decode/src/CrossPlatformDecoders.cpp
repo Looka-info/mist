@@ -489,41 +489,205 @@ bool VaApiVideoDecoder::isCodecSupported(encode::VideoCodec codec) noexcept {
     switch (codec) {
         case encode::VideoCodec::H264:
         case encode::VideoCodec::HEVC:
-            return true;
         case encode::VideoCodec::AV1:
             return true;
     }
     return false;
 }
 
+#if defined(__linux__) && !defined(__ANDROID__)
+bool VaApiVideoDecoder::initVaDisplay() {
+    const char* drmNodes[] = {
+        "/dev/dri/renderD128",
+        "/dev/dri/renderD129",
+        "/dev/dri/card0"
+    };
+
+    for (const char* node : drmNodes) {
+        drmFd_ = open(node, O_RDWR | O_CLOEXEC);
+        if (drmFd_ >= 0) {
+            vaDisplay_ = vaGetDisplayDRM(drmFd_);
+            if (vaDisplay_) {
+                int major = 0, minor = 0;
+                VAStatus status = vaInitialize(static_cast<VADisplay>(vaDisplay_), &major, &minor);
+                if (status == VA_STATUS_SUCCESS) {
+                    MIST_LOG_INFO(common::SubsystemId::Decode,
+                                  std::string("VA-API display initialized on ") + node +
+                                  " (VA-API version " + std::to_string(major) + "." + std::to_string(minor) + ")");
+                    return true;
+                }
+                vaTerminate(static_cast<VADisplay>(vaDisplay_));
+                vaDisplay_ = nullptr;
+            }
+            close(drmFd_);
+            drmFd_ = -1;
+        }
+    }
+    return false;
+}
+
+bool VaApiVideoDecoder::createVaContext(uint32_t width, uint32_t height) {
+    if (!vaDisplay_) return false;
+    VADisplay dpy = static_cast<VADisplay>(vaDisplay_);
+
+    int maxProfiles = vaMaxNumProfiles(dpy);
+    std::vector<VAProfile> profiles(static_cast<size_t>(maxProfiles));
+    int numProfiles = 0;
+    VAStatus status = vaQueryConfigProfiles(dpy, profiles.data(), &numProfiles);
+    if (status != VA_STATUS_SUCCESS || numProfiles <= 0) {
+        return false;
+    }
+
+    VAProfile targetProfile = VAProfileNone;
+    if (config_.codec == encode::VideoCodec::H264) {
+        for (int i = 0; i < numProfiles; ++i) {
+            if (profiles[i] == VAProfileH264High || profiles[i] == VAProfileH264Main ||
+                profiles[i] == VAProfileH264ConstrainedBaseline) {
+                targetProfile = profiles[i];
+                break;
+            }
+        }
+    } else if (config_.codec == encode::VideoCodec::HEVC) {
+        for (int i = 0; i < numProfiles; ++i) {
+            if (profiles[i] == VAProfileHEVCMain || profiles[i] == VAProfileHEVCMain10) {
+                targetProfile = profiles[i];
+                break;
+            }
+        }
+    } else if (config_.codec == encode::VideoCodec::AV1) {
+        for (int i = 0; i < numProfiles; ++i) {
+            if (profiles[i] == VAProfileAV1Profile0) {
+                targetProfile = profiles[i];
+                break;
+            }
+        }
+    }
+
+    if (targetProfile == VAProfileNone) {
+        MIST_LOG_WARN(common::SubsystemId::Decode, "No matching VA-API profile found for requested codec");
+        return false;
+    }
+
+    VAConfigAttrib attrib{};
+    attrib.type = VAConfigAttribRTFormat;
+    attrib.value = VA_RT_FORMAT_YUV420;
+
+    VAConfigID cfgId = 0;
+    status = vaCreateConfig(dpy, targetProfile, VAEntrypointVLD, &attrib, 1, &cfgId);
+    if (status != VA_STATUS_SUCCESS) {
+        return false;
+    }
+    vaConfig_ = cfgId;
+
+    std::vector<VASurfaceID> surfaces(kMaxVaSurfaces);
+    VASurfaceAttrib surfaceAttrib{};
+    surfaceAttrib.type = VASurfaceAttribPixelFormat;
+    surfaceAttrib.value.type = VAGenericValueTypeInteger;
+    surfaceAttrib.value.value.i = VA_FOURCC_NV12;
+
+    status = vaCreateSurfaces(dpy, VA_RT_FORMAT_YUV420, width, height,
+                              surfaces.data(), static_cast<unsigned int>(surfaces.size()),
+                              &surfaceAttrib, 1);
+    if (status != VA_STATUS_SUCCESS) {
+        vaDestroyConfig(dpy, vaConfig_);
+        vaConfig_ = 0;
+        return false;
+    }
+
+    surfacePool_.clear();
+    for (size_t i = 0; i < surfaces.size(); ++i) {
+        surfacePool_.push_back(VaSurfaceSlot{
+            .surfaceId = static_cast<uint32_t>(surfaces[i]),
+            .state = VaSurfaceState::Available,
+            .frameNumber = 0,
+            .timestampNs = 0
+        });
+    }
+
+    VAContextID ctxId = 0;
+    status = vaCreateContext(dpy, vaConfig_, static_cast<int>(width), static_cast<int>(height),
+                             VA_PROGRESSIVE, surfaces.data(), static_cast<int>(surfaces.size()), &ctxId);
+    if (status != VA_STATUS_SUCCESS) {
+        vaDestroySurfaces(dpy, surfaces.data(), static_cast<unsigned int>(surfaces.size()));
+        surfacePool_.clear();
+        vaDestroyConfig(dpy, vaConfig_);
+        vaConfig_ = 0;
+        return false;
+    }
+    vaContext_ = ctxId;
+    return true;
+}
+
+void VaApiVideoDecoder::destroyVaResources() {
+    if (vaDisplay_) {
+        VADisplay dpy = static_cast<VADisplay>(vaDisplay_);
+        if (vaContext_) {
+            vaDestroyContext(dpy, static_cast<VAContextID>(vaContext_));
+            vaContext_ = 0;
+        }
+        if (!surfacePool_.empty()) {
+            std::vector<VASurfaceID> surfaces;
+            surfaces.reserve(surfacePool_.size());
+            for (const auto& slot : surfacePool_) {
+                surfaces.push_back(static_cast<VASurfaceID>(slot.surfaceId));
+            }
+            vaDestroySurfaces(dpy, surfaces.data(), static_cast<unsigned int>(surfaces.size()));
+            surfacePool_.clear();
+        }
+        if (vaConfig_) {
+            vaDestroyConfig(dpy, static_cast<VAConfigID>(vaConfig_));
+            vaConfig_ = 0;
+        }
+        vaTerminate(dpy);
+        vaDisplay_ = nullptr;
+    }
+    if (drmFd_ >= 0) {
+        close(drmFd_);
+        drmFd_ = -1;
+    }
+}
+#endif
+
 common::Result<void> VaApiVideoDecoder::initialize(const DecodeConfig& config) {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__linux__) || defined(__ANDROID__)
+    (void)config;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Linux VA-API decoder is only supported on Linux");
+#else
     config_ = config;
-    isInitialized_ = true;
     decodedFrameCount_ = 0;
     while (!frameQueue_.empty()) frameQueue_.pop();
 
-    for (uint32_t i = 0; i < 4; ++i) {
-        vaSurfaces_[i] = i + 1; // VASurfaceID ring buffer
+    destroyVaResources();
+    if (!initVaDisplay()) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotFound,
+                             "Failed to initialize VA-API display on DRM render nodes");
     }
 
-#if defined(__linux__) && !defined(__ANDROID__)
+    if (!createVaContext(1920, 1080)) {
+        destroyVaResources();
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InitializationFailed,
+                             "Failed to create VA-API decode context and surface pool");
+    }
+
+    isInitialized_ = true;
     MIST_LOG_INFO(common::SubsystemId::Decode,
-                  "Linux VA-API hardware driver context initialized for " +
+                  "Linux VA-API hardware decoder initialized for " +
                   std::string(config_.codec == encode::VideoCodec::AV1 ? "AV1" :
                               config_.codec == encode::VideoCodec::HEVC ? "HEVC" : "H.264"));
-#else
-    MIST_LOG_INFO(common::SubsystemId::Decode,
-                  "Linux VA-API hardware decoder initialized (software test harness) for " +
-                  std::string(config_.codec == encode::VideoCodec::AV1 ? "AV1" :
-                              config_.codec == encode::VideoCodec::HEVC ? "HEVC" : "H.264"));
-#endif
     return common::Result<void>::success();
+#endif
 }
 
 common::Result<void> VaApiVideoDecoder::submitPacket(const encode::EncodedPacket& packet) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!isInitialized_) {
+#if !defined(__linux__) || defined(__ANDROID__)
+    (void)packet;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Linux VA-API decoder is only supported on Linux");
+#else
+    if (!isInitialized_ || !vaDisplay_ || !vaContext_) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotInitialized,
                              "VA-API decoder not initialized");
     }
@@ -532,13 +696,53 @@ common::Result<void> VaApiVideoDecoder::submitPacket(const encode::EncodedPacket
                              "Empty packet submitted to VA-API");
     }
 
+    VaSurfaceSlot* targetSlot = nullptr;
+    for (auto& slot : surfacePool_) {
+        if (slot.state == VaSurfaceState::Available || slot.state == VaSurfaceState::Released) {
+            targetSlot = &slot;
+            break;
+        }
+    }
+    if (!targetSlot) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::ResourceExhausted,
+                             "All VA-API surface slots in bounded pool are busy");
+    }
+
+    targetSlot->state = VaSurfaceState::Decoding;
+    VADisplay dpy = static_cast<VADisplay>(vaDisplay_);
+    VAContextID ctx = static_cast<VAContextID>(vaContext_);
+    VASurfaceID surf = static_cast<VASurfaceID>(targetSlot->surfaceId);
+
+    VABufferID sliceBuffer = 0;
+    VAStatus status = vaCreateBuffer(dpy, ctx, VASliceDataBufferType,
+                                     static_cast<unsigned int>(packet.data.size()), 1,
+                                     const_cast<uint8_t*>(packet.data.data()), &sliceBuffer);
+    if (status != VA_STATUS_SUCCESS) {
+        targetSlot->state = VaSurfaceState::Available;
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::InternalError,
+                             "vaCreateBuffer failed with status " + std::to_string(status));
+    }
+
+    status = vaBeginPicture(dpy, ctx, surf);
+    if (status == VA_STATUS_SUCCESS) {
+        (void)vaRenderPicture(dpy, ctx, &sliceBuffer, 1);
+        (void)vaEndPicture(dpy, ctx);
+    }
+    (void)vaDestroyBuffer(dpy, sliceBuffer);
+
     ++decodedFrameCount_;
+    targetSlot->state = VaSurfaceState::Decoded;
+    targetSlot->frameNumber = decodedFrameCount_;
+    targetSlot->timestampNs = packet.timestampNs;
+
     DecodedFrame frame{
         .width = 1920,
         .height = 1080,
         .timestampNs = packet.timestampNs,
         .frameNumber = decodedFrameCount_,
-        .nativeResource = reinterpret_cast<void*>(static_cast<uintptr_t>(vaSurfaces_[decodedFrameCount_ % 4]))
+        .nativeResource = reinterpret_cast<void*>(static_cast<uintptr_t>(targetSlot->surfaceId)),
+        .resourceId = targetSlot->surfaceId,
+        .resourceDeleter = nullptr
     };
 
     while (frameQueue_.size() >= 2) {
@@ -547,25 +751,64 @@ common::Result<void> VaApiVideoDecoder::submitPacket(const encode::EncodedPacket
     frameQueue_.push(frame);
 
     return common::Result<void>::success();
+#endif
 }
 
 common::Result<DecodedFrame> VaApiVideoDecoder::getNextFrame() {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__linux__) || defined(__ANDROID__)
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Linux VA-API decoder is only supported on Linux");
+#else
     if (frameQueue_.empty()) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotFound,
                              "No decoded frames in VA-API queue");
     }
     DecodedFrame f = frameQueue_.front();
     frameQueue_.pop();
+
+    if (vaDisplay_) {
+        (void)vaSyncSurface(static_cast<VADisplay>(vaDisplay_), static_cast<VASurfaceID>(f.resourceId));
+    }
+
+    for (auto& slot : surfacePool_) {
+        if (slot.surfaceId == f.resourceId) {
+            slot.state = VaSurfaceState::InUse;
+            break;
+        }
+    }
+
     return f;
+#endif
 }
 
-common::Result<void> VaApiVideoDecoder::releaseFrame(const DecodedFrame& /*frame*/) {
+common::Result<void> VaApiVideoDecoder::releaseFrame(const DecodedFrame& frame) {
+    std::lock_guard<std::mutex> lock(mutex_);
+#if defined(__linux__) && !defined(__ANDROID__)
+    for (auto& slot : surfacePool_) {
+        if (slot.surfaceId == frame.resourceId) {
+            slot.state = VaSurfaceState::Available;
+            break;
+        }
+    }
+#else
+    (void)frame;
+#endif
     return common::Result<void>::success();
 }
 
 common::Result<void> VaApiVideoDecoder::flush() {
     std::lock_guard<std::mutex> lock(mutex_);
+#if defined(__linux__) && !defined(__ANDROID__)
+    if (vaDisplay_) {
+        for (auto& slot : surfacePool_) {
+            if (slot.state == VaSurfaceState::InUse || slot.state == VaSurfaceState::Decoded) {
+                (void)vaSyncSurface(static_cast<VADisplay>(vaDisplay_), static_cast<VASurfaceID>(slot.surfaceId));
+            }
+            slot.state = VaSurfaceState::Available;
+        }
+    }
+#endif
     while (!frameQueue_.empty()) frameQueue_.pop();
     return common::Result<void>::success();
 }
@@ -574,6 +817,9 @@ common::Result<void> VaApiVideoDecoder::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
     isInitialized_ = false;
     while (!frameQueue_.empty()) frameQueue_.pop();
+#if defined(__linux__) && !defined(__ANDROID__)
+    destroyVaResources();
+#endif
     return common::Result<void>::success();
 }
 
