@@ -231,7 +231,7 @@ TEST(HdrToneMapperTest, ConvertR10G10B10A2AndToneMapP010ToNv12) {
     constexpr uint32_t height = 4;
 
     // Create synthetic R10G10B10A2 frame (all mid-grey: 512 in 10-bit)
-    uint32_t midPixel = 512 | (512 << 10) | (512 << 20) | (3 << 30);
+    uint32_t midPixel = 512u | (512u << 10) | (512u << 20) | (3u << 30);
     std::vector<uint32_t> srcR10(width * height, midPixel);
 
     std::vector<uint16_t> dstY(width * height, 0);

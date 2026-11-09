@@ -44,6 +44,7 @@ if(MSVC)
         /wd4244 # conversion from type1 to type2 (possible loss of data)
         /wd4267 # conversion from size_t to type (possible loss of data)
         /wd4389 # signed/unsigned mismatch
+        /wd4245 # conversion signed/unsigned mismatch
         /wd4127 # conditional expression is constant
         /wd4702 # unreachable code
         /wd4458 # declaration hides class member
