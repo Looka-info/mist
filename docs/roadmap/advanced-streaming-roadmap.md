@@ -326,14 +326,25 @@
 - **Commit Hash:** `e38c091`
 
 ### 17. Relative Mouse Mode and Clipboard Synchronization
-- **Status:** Not Started
-- **Architecture:** Confined relative mouse delta streaming with DPI normalization; permission-gated text clipboard sync.
-- **Files Changed:** TBD
-- **Tests Added:** TBD
-- **Benchmark Evidence:** TBD
-- **Hardware Requirements:** Win32 Raw Input.
-- **Known Limitations:** Text-only clipboard sync (files excluded).
-- **Commit Hash:** —
+- **Status:** Completed
+- **Architecture:** Confined relative mouse delta streaming (`RelativeMouseController`) with viewport confinement, automatic cursor centering and hiding, dynamic DPI normalization (accounting for client-to-host DPI scaling ratio and sensitivity), configurable emergency ungrab key detection (`Escape` and `Ctrl+Alt`); and permission-gated bidirectional text clipboard synchronization (`ClipboardSyncController`) with UTF-8 validation, 1 MB payload limits, echo suppression using 64-bit FNV-1a content hashing, and native Win32 clipboard integration.
+- **Files Changed:**
+  - `engine/input/include/mist/input/InputTypes.h`
+  - `engine/input/include/mist/input/InputProtocol.h`
+  - `engine/input/src/InputProtocol.cpp`
+  - `engine/input/src/InputDispatcher.cpp`
+  - `engine/input/include/mist/input/RelativeMouse.h`
+  - `engine/input/src/RelativeMouse.cpp`
+  - `engine/input/include/mist/input/ClipboardSync.h`
+  - `engine/input/src/ClipboardSync.cpp`
+  - `engine/input/CMakeLists.txt`
+  - `tests/unit/TestRelativeMouseAndClipboard.cpp`
+  - `tests/unit/CMakeLists.txt`
+- **Tests Added:** Relative mouse mode transitions and locking (`RelativeMouseTest.ModeTransitionsAndLocking`), DPI normalization and sensitivity scaling (`RelativeMouseTest.DpiNormalizationAndSensitivity`), ungrab hotkey detection on Escape and Ctrl+Alt (`RelativeMouseTest.UngrabHotkeyDetection`), clipboard permission gating and 1 MB size limit enforcement (`ClipboardSyncTest.PermissionGatingAndSizeLimits`), echo suppression and hash checking (`ClipboardSyncTest.EchoSuppressionAndHashing`), and protocol serialization roundtrip (`ClipboardSyncTest.ProtocolSerializationRoundtrip`).
+- **Benchmark Evidence:** 6 dedicated unit tests passing 100% in 0.09s; zero copy on relative delta dispatch; sub-millisecond hash validation and echo suppression.
+- **Hardware Requirements:** Win32 Raw Input and Win32 Clipboard.
+- **Known Limitations:** Text-only clipboard synchronization; file, folder, and rich OLE object transfers are excluded.
+- **Commit Hash:** `1ebb990`
 
 ### 18. Windows Graphics Capture Fallback
 - **Status:** Not Started
