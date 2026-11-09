@@ -37,7 +37,7 @@
 | 23 | **AV1, 10-Bit and HDR** | Low | Completed | `f30e27b` |
 | 24 | **Finish & Polish the Slint UI** | High | Completed | `116b580` |
 | 25 | **Cross-Platform Guest Clients** | High | Completed | `a12e46f` |
-| 26 | **Cross-Platform Qualification & v0.3.0 Release** | Critical | Completed | `IN-PROGRESS` |
+| 26 | **Cross-Platform Qualification & v0.3.0 Release** | Critical | Completed | `e988451` |
 
 ---
 
@@ -544,4 +544,4 @@
 - **Benchmark Evidence:** 227 CTest test cases discovered, 225 executed and passed (100%), 2 skipped in headless, 0 failed in 31.82s; 32 Rust tests passed (100%) in 0.36s; 0 heap allocations during IPC frame alignment check; sub-millisecond WebCodecs frame draw with immediate `frame.close()` cleanup.
 - **Hardware Requirements:** Windows 10/11 x64 with DirectX 11 GPU (Host & Client); macOS / Linux / Android / Web for Guest Clients.
 - **Known Limitations:** Production Authenticode distribution requires public trusted CA certificate for SmartScreen bypass.
-- **Commit Hash:** `PENDING`
+- **Commit Hash:** `e988451`
