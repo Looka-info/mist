@@ -66,6 +66,18 @@ std::vector<uint8_t> packMessage(InputPacketHeader header, InputType type, const
     return buffer;
 }
 
+constexpr uint64_t FNV1A_OFFSET = 14695981039346656037ULL;
+constexpr uint64_t FNV1A_PRIME  = 1099511628211ULL;
+
+inline uint64_t computeFnv1a(std::string_view text) noexcept {
+    uint64_t hash = FNV1A_OFFSET;
+    for (char c : text) {
+        hash ^= static_cast<uint8_t>(c);
+        hash *= FNV1A_PRIME;
+    }
+    return hash;
+}
+
 } // namespace
 
 std::vector<uint8_t> InputProtocol::serializeKeyEvent(const InputPacketHeader& header, const KeyEvent& event) {
@@ -136,18 +148,35 @@ std::vector<uint8_t> InputProtocol::serializeResetState(const InputPacketHeader&
     return buffer;
 }
 
+std::vector<uint8_t> InputProtocol::serializeClipboardEvent(const InputPacketHeader& header, const std::string& text) {
+    InputPacketHeader hdr = header;
+    hdr.inputType = static_cast<uint8_t>(InputType::ClipboardEvent);
+    size_t copyLen = std::min(text.size(), MAX_CLIPBOARD_TEXT_BYTES);
+    std::vector<uint8_t> buffer(sizeof(InputPacketHeader) + copyLen);
+    std::memcpy(buffer.data(), &hdr, sizeof(InputPacketHeader));
+    if (copyLen > 0) {
+        std::memcpy(buffer.data() + sizeof(InputPacketHeader), text.data(), copyLen);
+    }
+    return buffer;
+}
+
 common::Result<std::pair<InputPacketHeader, InputEvent>> InputProtocol::deserialize(std::span<const uint8_t> bytes) {
     if (bytes.size() < sizeof(InputPacketHeader)) {
         return common::Error(common::SubsystemId::Input, common::ErrorCode::InvalidArgument,
                              "Input packet too small to contain header");
     }
-    if (bytes.size() > MAX_INPUT_PACKET_SIZE) {
-        return common::Error(common::SubsystemId::Input, common::ErrorCode::InvalidArgument,
-                             "Input packet exceeds maximum permitted size");
-    }
 
     InputPacketHeader header{};
     std::memcpy(&header, bytes.data(), sizeof(InputPacketHeader));
+
+    size_t maxSize = (static_cast<InputType>(header.inputType) == InputType::ClipboardEvent)
+                         ? (sizeof(InputPacketHeader) + MAX_CLIPBOARD_TEXT_BYTES)
+                         : MAX_INPUT_PACKET_SIZE;
+
+    if (bytes.size() > maxSize) {
+        return common::Error(common::SubsystemId::Input, common::ErrorCode::InvalidArgument,
+                             "Input packet exceeds maximum permitted size");
+    }
 
     if (header.version != INPUT_PROTOCOL_VERSION) {
         return common::Error(common::SubsystemId::Input, common::ErrorCode::InvalidArgument,
@@ -263,6 +292,16 @@ common::Result<std::pair<InputPacketHeader, InputEvent>> InputProtocol::deserial
             PermissionMessage msg{};
             msg.action = PermissionAction::Revoked;
             return std::make_pair(header, InputEvent(msg));
+        }
+
+        case InputType::ClipboardEvent: {
+            if (payloadSize > MAX_CLIPBOARD_TEXT_BYTES) {
+                return common::Error(common::SubsystemId::Input, common::ErrorCode::InvalidArgument, "Clipboard payload exceeds maximum allowed size");
+            }
+            std::string text(reinterpret_cast<const char*>(payloadPtr), payloadSize);
+            uint64_t hash = computeFnv1a(text);
+            ClipboardEvent ev{std::move(text), hash};
+            return std::make_pair(header, InputEvent(ev));
         }
 
         default:

@@ -248,6 +248,8 @@ void InputDispatcher::processItem(const QueuedInputItem& item) {
             if (ev.action == PermissionAction::Revoked) {
                 (void)reset();
             }
+        } else if constexpr (std::is_same_v<T, ClipboardEvent>) {
+            telemetry::MetricRegistry::instance().getOrCreateCounter("input.clipboard_events")->increment();
         }
     }, item.event);
 }

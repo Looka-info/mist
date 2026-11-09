@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <array>
 #include <variant>
@@ -10,6 +11,7 @@ namespace mist::input {
 constexpr uint16_t INPUT_PROTOCOL_VERSION = 1;
 constexpr size_t MAX_SESSION_ID_LENGTH = 32;
 constexpr size_t MAX_INPUT_PACKET_SIZE = 256;
+constexpr size_t MAX_CLIPBOARD_TEXT_BYTES = 1024 * 1024; // 1 MB limit
 
 enum class InputType : uint8_t {
     Unknown = 0,
@@ -112,13 +114,19 @@ struct PermissionMessage {
     uint8_t requestedFeatures{0x07}; // Bit 0: Keyboard, Bit 1: Mouse, Bit 2: Gamepad
 };
 
+struct ClipboardEvent {
+    std::string text;
+    uint64_t hash{0};
+};
+
 using InputEvent = std::variant<
     KeyEvent,
     MouseMoveEvent,
     MouseButtonEvent,
     MouseWheelEvent,
     GamepadState,
-    PermissionMessage
+    PermissionMessage,
+    ClipboardEvent
 >;
 
 #pragma pack(push, 1)

@@ -44,6 +44,11 @@ public:
         const InputPacketHeader& header
     );
 
+    [[nodiscard]] static std::vector<uint8_t> serializeClipboardEvent(
+        const InputPacketHeader& header,
+        const std::string& text
+    );
+
     // Unified deserialization
     [[nodiscard]] static common::Result<std::pair<InputPacketHeader, InputEvent>> deserialize(
         std::span<const uint8_t> bytes

@@ -6,6 +6,8 @@ add_library(mist_input STATIC
     src/MouseInput.cpp
     src/GamepadInput.cpp
     src/MultiGuestGamepadManager.cpp
+    src/RelativeMouse.cpp
+    src/ClipboardSync.cpp
     src/InputDispatcher.cpp
     src/InputReceiver.cpp
     src/ClientInputCapture.cpp
