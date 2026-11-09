@@ -218,8 +218,10 @@ common::Result<void> D3D11VideoDecoder::initializeMft() {
         if (SUCCEEDED(hr)) {
             hr = decoderTransform_->ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, reinterpret_cast<ULONG_PTR>(dxgiManager_.Get()));
             if (SUCCEEDED(hr)) {
+                isZeroCopyEnabled_ = true;
                 MIST_LOG_INFO(common::SubsystemId::Decode, std::string("Bound D3D11 DXGI Device Manager to ") + codecName + " Decoder MFT.");
             } else {
+                isZeroCopyEnabled_ = false;
                 MIST_LOG_WARN(common::SubsystemId::Decode, "ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER) failed, continuing with software decoding fallback.");
             }
         }
@@ -410,6 +412,7 @@ common::Result<void> D3D11VideoDecoder::drainOutput() {
                     if (SUCCEEDED(dxgiBuffer->GetResource(IID_PPV_ARGS(&d3dTexture))) && d3dTexture) {
                         rawTexture = d3dTexture.Get();
                         rawTexture->AddRef();
+                        stats_.hardwareGpuSurfaces++;
                     }
                 }
 
@@ -429,6 +432,7 @@ common::Result<void> D3D11VideoDecoder::drainOutput() {
                     if (SUCCEEDED(device_->CreateTexture2D(&desc, nullptr, fallbackTex.GetAddressOf()))) {
                         rawTexture = fallbackTex.Get();
                         rawTexture->AddRef();
+                        stats_.systemMemoryFallbacks++;
                     }
                 }
 
@@ -522,6 +526,7 @@ void D3D11VideoDecoder::cleanup() noexcept {
     }
     dxgiManager_.Reset();
 #endif
+    isZeroCopyEnabled_ = false;
     isInitialized_ = false;
 }
 

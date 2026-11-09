@@ -68,8 +68,11 @@ public:
         uint64_t framesDecoded{0};
         uint64_t framesQueueDiscarded{0};
         uint64_t decoderErrors{0};
+        uint64_t hardwareGpuSurfaces{0};
+        uint64_t systemMemoryFallbacks{0};
     };
     [[nodiscard]] DecoderStats getDecoderStats() const noexcept;
+    [[nodiscard]] bool isZeroCopyEnabled() const noexcept { return isZeroCopyEnabled_; }
 
 private:
     [[nodiscard]] common::Result<void> initializeMft();
@@ -80,6 +83,7 @@ private:
     DecoderStats stats_{};
     DecodeConfig config_;
     bool isInitialized_{false};
+    bool isZeroCopyEnabled_{false};
     uint32_t width_{1920};
     uint32_t height_{1080};
     uint64_t frameCounter_{0};

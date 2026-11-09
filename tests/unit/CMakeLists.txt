@@ -42,6 +42,7 @@ add_executable(mist_unit_tests
     TestEncoderFallbacks.cpp
     TestLowLatencyTuning.cpp
     TestFecAndRecovery.cpp
+    TestD3D11VaPipeline.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

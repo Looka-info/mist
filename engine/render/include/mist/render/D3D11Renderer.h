@@ -47,6 +47,8 @@ public:
 #if defined(_WIN32)
     [[nodiscard]] HWND getHwnd() const noexcept { return hwnd_; }
     [[nodiscard]] ID3D11Device* getD3D11Device() const noexcept { return device_.Get(); }
+    [[nodiscard]] bool isTearingSupported() const noexcept { return tearingSupported_; }
+    [[nodiscard]] bool isVideoProcessorActive() const noexcept { return useVideoProcessor_; }
 #endif
 
 private:
