@@ -19,7 +19,28 @@ pub struct VideoConfig {
     pub bitrate_kbps: u32,
     pub profile: QualityProfile,
     pub vsync: bool,
+    #[serde(default = "default_codec")]
+    pub codec: String,
+    #[serde(default)]
+    pub hdr_enabled: bool,
+    #[serde(default = "default_backend")]
+    pub capture_backend: String,
+    #[serde(default)]
+    pub display_index: u32,
+    #[serde(default = "default_true")]
+    pub relative_mouse: bool,
+    #[serde(default)]
+    pub wol_mac_address: String,
+    #[serde(default = "default_virtual_display_res")]
+    pub virtual_display_resolution: String,
+    #[serde(default)]
+    pub virtual_display_enabled: bool,
 }
+
+fn default_codec() -> String { "auto".to_string() }
+fn default_backend() -> String { "auto".to_string() }
+fn default_true() -> bool { true }
+fn default_virtual_display_res() -> String { "1920x1080@60".to_string() }
 
 impl Default for VideoConfig {
     fn default() -> Self {
@@ -30,6 +51,14 @@ impl Default for VideoConfig {
             bitrate_kbps: DEFAULT_BITRATE_KBPS,
             profile: QualityProfile::Balanced,
             vsync: true,
+            codec: default_codec(),
+            hdr_enabled: false,
+            capture_backend: default_backend(),
+            display_index: 0,
+            relative_mouse: true,
+            wol_mac_address: String::new(),
+            virtual_display_resolution: default_virtual_display_res(),
+            virtual_display_enabled: false,
         }
     }
 }

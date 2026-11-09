@@ -210,4 +210,33 @@ impl DesktopController {
     pub fn get_permission_audit_log(&self) -> Vec<mist_domain::PermissionAuditEvent> {
         self.pairing_manager.lock().unwrap().permission_audit_log().to_vec()
     }
+
+    pub fn send_wol(&self, mac_str: &str) -> Result<()> {
+        mist_platform_windows::send_wake_on_lan(mac_str)
+            .map_err(|e| mist_core::MistError::Internal(e))
+    }
+
+    pub fn cycle_display(&self) -> u32 {
+        let mut cfg = self.config.lock().unwrap();
+        cfg.video.display_index = (cfg.video.display_index + 1) % 4;
+        let idx = cfg.video.display_index;
+        let _ = cfg.save();
+        idx
+    }
+
+    pub fn toggle_relative_mouse(&self) -> bool {
+        let mut cfg = self.config.lock().unwrap();
+        cfg.video.relative_mouse = !cfg.video.relative_mouse;
+        let val = cfg.video.relative_mouse;
+        let _ = cfg.save();
+        val
+    }
+
+    pub fn toggle_virtual_display(&self) -> bool {
+        let mut cfg = self.config.lock().unwrap();
+        cfg.video.virtual_display_enabled = !cfg.video.virtual_display_enabled;
+        let val = cfg.video.virtual_display_enabled;
+        let _ = cfg.save();
+        val
+    }
 }

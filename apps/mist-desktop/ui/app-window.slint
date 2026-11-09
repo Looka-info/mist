@@ -57,6 +57,23 @@ export component MainWindow inherits Window {
     in property <string> gateway-ping: "Unavailable";
     in property <string> internet-ping: "Unavailable";
 
+    // Advanced Streaming & Session state
+    in property <string> session-codec: "AV1 (10-Bit HDR)";
+    in property <int> session-display-idx: 0;
+    in property <bool> session-relative-mouse: true;
+    in property <int> session-gamepads-count: 1;
+    in property <bool> session-rumble-active: false;
+    in property <int> host-active-guests: 0;
+    in property <bool> host-virtual-display: false;
+
+    // Advanced Settings State
+    in-out property <string> settings-codec: "auto";
+    in-out property <bool> settings-hdr: false;
+    in-out property <string> settings-capture-backend: "auto";
+    in-out property <string> settings-wol-mac: "";
+    in-out property <bool> settings-virtual-display: false;
+    in-out property <string> settings-virtual-display-res: "1080p60";
+
     // Dialog state (Host Approval)
     in property <bool> dialog-open: false;
     in property <string> dialog-title: "Incoming Connection Request";
@@ -77,11 +94,15 @@ export component MainWindow inherits Window {
     callback paste-code();
     callback code-typed(string);
     callback revoke-device(string);
-    callback save-settings(bool, bool, int, int, string, string, bool);
+    callback save-settings(bool, bool, int, int, string, string, bool, string, bool, string, string, bool, string);
     callback dialog-confirmed();
     callback dialog-cancelled();
     callback disconnect-stream();
     callback toggle-fullscreen();
+    callback send-wol(string);
+    callback cycle-display();
+    callback toggle-relative-mouse();
+    callback toggle-virtual-display();
 
     HorizontalLayout {
         // Navigation Rail on the left (hidden during fullscreen live session)
@@ -166,6 +187,8 @@ export component MainWindow inherits Window {
                     wifi-signal: root.wifi-signal;
                     wifi-band: root.wifi-band;
                     nvenc-ready: root.nvenc-ready;
+                    active-guests: root.host-active-guests;
+                    virtual-display-active: root.host-virtual-display;
                     toggle-sharing => {
                         if root.is-sharing {
                             root.stop-share();
@@ -212,8 +235,31 @@ export component MainWindow inherits Window {
                 }
 
                 if root.active-tab == 5 : SettingsScreen {
+                    codec <=> root.settings-codec;
+                    hdr-enabled <=> root.settings-hdr;
+                    capture-backend <=> root.settings-capture-backend;
+                    wol-mac <=> root.settings-wol-mac;
+                    virtual-display-enabled <=> root.settings-virtual-display;
+                    virtual-display-res <=> root.settings-virtual-display-res;
+
+                    send-wol(mac) => { root.send-wol(mac); }
+                    toggle-virtual-display => { root.toggle-virtual-display(); }
                     save-clicked => {
-                        root.save-settings(self.dark-theme, self.high-contrast, self.fps, self.bitrate-kbps, self.signaling-url, self.stun-server, self.audio-enabled);
+                        root.save-settings(
+                            self.dark-theme,
+                            self.high-contrast,
+                            self.fps,
+                            self.bitrate-kbps,
+                            self.signaling-url,
+                            self.stun-server,
+                            self.audio-enabled,
+                            self.codec,
+                            self.hdr-enabled,
+                            self.capture-backend,
+                            self.wol-mac,
+                            self.virtual-display-enabled,
+                            self.virtual-display-res
+                        );
                     }
                     reset-clicked => {
                         self.dark-theme = true;
@@ -223,6 +269,12 @@ export component MainWindow inherits Window {
                         self.signaling-url = "ws://127.0.0.1:8080";
                         self.stun-server = "stun:stun.l.google.com:19302";
                         self.audio-enabled = true;
+                        self.codec = "auto";
+                        self.hdr-enabled = false;
+                        self.capture-backend = "auto";
+                        self.wol-mac = "";
+                        self.virtual-display-enabled = false;
+                        self.virtual-display-res = "1080p60";
                     }
                 }
 
@@ -235,8 +287,16 @@ export component MainWindow inherits Window {
                     rtt-text: root.telem-rtt;
                     jitter-text: root.telem-jitter;
                     loss-text: root.telem-loss;
+                    active-codec: root.session-codec;
+                    active-display-idx: root.session-display-idx;
+                    relative-mouse-active: root.session-relative-mouse;
+                    active-gamepads-count: root.session-gamepads-count;
+                    gamepad-rumble-active: root.session-rumble-active;
+
                     disconnect-clicked => { root.disconnect-stream(); }
                     fullscreen-clicked => { root.toggle-fullscreen(); }
+                    cycle-display => { root.cycle-display(); }
+                    toggle-relative-mouse => { root.toggle-relative-mouse(); }
                 }
             }
         }

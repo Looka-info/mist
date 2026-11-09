@@ -15,7 +15,7 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
     let main_window = MainWindow::new()?;
     let controller = Arc::new(DesktopController::new());
 
-    // Populate initial system info
+    // Populate initial system info & configuration
     {
         let wifi = controller.wifi_info.lock().unwrap();
         main_window.set_wifi_adapter(wifi.adapter_name.clone().into());
@@ -26,6 +26,28 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
         let hw = controller.hardware_info.lock().unwrap();
         main_window.set_gpu_name(hw.gpu_name.clone().into());
         main_window.set_nvenc_ready(hw.nvenc_supported);
+
+        let cfg = controller.config.lock().unwrap();
+        main_window.set_settings_codec(cfg.video.codec.clone().into());
+        main_window.set_settings_hdr(cfg.video.hdr_enabled);
+        main_window.set_settings_capture_backend(cfg.video.capture_backend.clone().into());
+        main_window.set_settings_wol_mac(cfg.video.wol_mac_address.clone().into());
+        main_window.set_settings_virtual_display(cfg.video.virtual_display_enabled);
+        main_window.set_settings_virtual_display_res(cfg.video.virtual_display_resolution.clone().into());
+        main_window.set_session_codec(
+            if cfg.video.hdr_enabled {
+                "AV1 (10-Bit HDR)".into()
+            } else if cfg.video.codec == "hevc" {
+                "HEVC (H.265)".into()
+            } else if cfg.video.codec == "h264" {
+                "H.264 (Universal)".into()
+            } else {
+                "AV1 / HEVC (Auto)".into()
+            }
+        );
+        main_window.set_session_display_idx(cfg.video.display_index as i32);
+        main_window.set_session_relative_mouse(cfg.video.relative_mouse);
+        main_window.set_host_virtual_display(cfg.video.virtual_display_enabled);
     }
 
     // Refresh trusted devices list
@@ -356,7 +378,7 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
     {
         let win_weak = main_window.as_weak();
         let ctrl = controller.clone();
-        main_window.on_save_settings(move |dark, high_cont, fps, bitrate_kbps, sig_url, stun, audio| {
+        main_window.on_save_settings(move |dark, high_cont, fps, bitrate_kbps, sig_url, stun, audio, codec, hdr, backend, wol, virt_disp, virt_res| {
             {
                 let mut cfg = ctrl.config.lock().unwrap();
                 cfg.ui.dark_theme = dark;
@@ -366,6 +388,12 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                 cfg.network.signaling_url = sig_url.to_string();
                 cfg.network.stun_server = stun.to_string();
                 cfg.audio.enabled = audio;
+                cfg.video.codec = codec.to_string();
+                cfg.video.hdr_enabled = hdr;
+                cfg.video.capture_backend = backend.to_string();
+                cfg.video.wol_mac_address = wol.to_string();
+                cfg.video.virtual_display_enabled = virt_disp;
+                cfg.video.virtual_display_resolution = virt_res.to_string();
                 let _ = cfg.save();
             }
 
@@ -373,7 +401,71 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             ctrl.session_supervisor.lock().unwrap().update_config(bitrate_kbps as u32, fps as u32);
 
             if let Some(win) = win_weak.upgrade() {
+                win.set_host_virtual_display(virt_disp);
                 win.set_toast_message("Settings saved and applied.".into());
+                win.set_toast_visible(true);
+            }
+        });
+    }
+
+    // Wake-on-LAN dispatch
+    {
+        let win_weak = main_window.as_weak();
+        let ctrl = controller.clone();
+        main_window.on_send_wol(move |mac| {
+            let res = ctrl.send_wol(&mac);
+            if let Some(win) = win_weak.upgrade() {
+                match res {
+                    Ok(()) => {
+                        win.set_toast_message(format!("Magic packet broadcasted to {}", mac).into());
+                    }
+                    Err(e) => {
+                        win.set_toast_message(format!("WoL error: {}", e).into());
+                    }
+                }
+                win.set_toast_visible(true);
+            }
+        });
+    }
+
+    // Multi-monitor cycle
+    {
+        let win_weak = main_window.as_weak();
+        let ctrl = controller.clone();
+        main_window.on_cycle_display(move || {
+            let next_idx = ctrl.cycle_display();
+            if let Some(win) = win_weak.upgrade() {
+                win.set_session_display_idx(next_idx as i32);
+                win.set_toast_message(format!("Switched to Display {}", next_idx).into());
+                win.set_toast_visible(true);
+            }
+        });
+    }
+
+    // Toggle relative mouse confinement
+    {
+        let win_weak = main_window.as_weak();
+        let ctrl = controller.clone();
+        main_window.on_toggle_relative_mouse(move || {
+            let val = ctrl.toggle_relative_mouse();
+            if let Some(win) = win_weak.upgrade() {
+                win.set_session_relative_mouse(val);
+                win.set_toast_message(if val { "Relative Mouse Confined (Esc to free)".into() } else { "Mouse Unconfined".into() });
+                win.set_toast_visible(true);
+            }
+        });
+    }
+
+    // Toggle headless virtual display
+    {
+        let win_weak = main_window.as_weak();
+        let ctrl = controller.clone();
+        main_window.on_toggle_virtual_display(move || {
+            let val = ctrl.toggle_virtual_display();
+            if let Some(win) = win_weak.upgrade() {
+                win.set_settings_virtual_display(val);
+                win.set_host_virtual_display(val);
+                win.set_toast_message(if val { "IddCx Virtual Display Activated".into() } else { "Virtual Display Detached".into() });
                 win.set_toast_visible(true);
             }
         });

@@ -16,6 +16,13 @@ export component LiveSessionScreen {
     in property <bool> input-active: true;
     in property <string> quality-profile: "Balanced (12 Mbps)";
 
+    // Advanced Live Session State
+    in property <string> active-codec: "AV1 (10-Bit HDR)";
+    in property <int> active-display-idx: 0;
+    in-out property <bool> relative-mouse-active: true;
+    in property <int> active-gamepads-count: 1;
+    in property <bool> gamepad-rumble-active: false;
+
     // Overlay state
     in-out property <bool> overlay-visible: true;
     in-out property <bool> overlay-detailed: false;
@@ -24,7 +31,7 @@ export component LiveSessionScreen {
     in property <string> decode-latency-text: "1.8 ms";
     in property <string> present-latency-text: "0.5 ms";
     in property <string> total-latency-text: "12.3 ms";
-    in property <string> codec-text: "HEVC / H.265";
+    in property <string> codec-text: "AV1 / NV_ENC_CODEC_AV1_GUID";
     in property <string> backend-text: "NVIDIA NVENC → D3D11VA";
     in property <int> fec-recovered: 0;
     in property <int> audio-plc: 0;
@@ -33,6 +40,8 @@ export component LiveSessionScreen {
     callback fullscreen-clicked();
     callback change-profile(string);
     callback toggle-overlay();
+    callback cycle-display();
+    callback toggle-relative-mouse();
 
     VerticalLayout {
         padding: Theme.space-md;
@@ -94,9 +103,11 @@ export component LiveSessionScreen {
                 padding: Theme.space-md;
 
                 Rectangle {
-                    height: 40px;
-                    background: #101A15AA;
+                    height: 44px;
+                    background: #101A15DD;
                     border-radius: Theme.radius-pill;
+                    border-width: 1px;
+                    border-color: Theme.surface-border;
 
                     HorizontalLayout {
                         padding-left: Theme.space-lg;
@@ -115,23 +126,46 @@ export component LiveSessionScreen {
                                 vertical-alignment: center;
                             }
 
-                            Text {
-                                text: "Audio: " + (root.audio-active ? "WASAPI 48kHz" : "Muted");
-                                color: root.audio-active ? Theme.accent : Theme.text-disabled;
-                                font-size: 12px;
-                                vertical-alignment: center;
+                            // Active Codec Badge
+                            Rectangle {
+                                background: #1B3626;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: Theme.accent;
+                                height: 22px;
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    Text {
+                                        text: root.active-codec;
+                                        color: Theme.accent;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        vertical-alignment: center;
+                                    }
+                                }
                             }
 
+                            // Display selector
                             Text {
-                                text: "Input: " + (root.input-active ? "Active" : "Disabled");
-                                color: root.input-active ? Theme.accent : Theme.text-disabled;
-                                font-size: 12px;
-                                vertical-alignment: center;
-                            }
-
-                            Text {
-                                text: "Profile: " + root.quality-profile;
+                                text: "Display " + root.active-display-idx;
                                 color: Theme.text-secondary;
+                                font-size: 12px;
+                                vertical-alignment: center;
+                            }
+
+                            // Relative mouse state
+                            Text {
+                                text: root.relative-mouse-active ? "Mouse: Locked" : "Mouse: Free";
+                                color: root.relative-mouse-active ? Theme.accent : Theme.text-secondary;
+                                font-size: 12px;
+                                vertical-alignment: center;
+                            }
+
+                            // Gamepad slots
+                            Text {
+                                text: "🎮 Slots: " + root.active-gamepads-count + (root.gamepad-rumble-active ? " [Rumble]" : "");
+                                color: Theme.text-primary;
                                 font-size: 12px;
                                 vertical-alignment: center;
                             }
@@ -140,6 +174,21 @@ export component LiveSessionScreen {
                         HorizontalLayout {
                             spacing: Theme.space-md;
                             alignment: center;
+
+                            SecondaryButton {
+                                text: "Cycle Display";
+                                min-width: 100px;
+                                clicked => { root.cycle-display(); }
+                            }
+
+                            SecondaryButton {
+                                text: root.relative-mouse-active ? "Free Mouse" : "Lock Mouse";
+                                min-width: 90px;
+                                clicked => {
+                                    root.relative-mouse-active = !root.relative-mouse-active;
+                                    root.toggle-relative-mouse();
+                                }
+                            }
 
                             SecondaryButton {
                                 text: root.overlay-visible ? "Hide HUD (F8)" : "Show HUD (F8)";

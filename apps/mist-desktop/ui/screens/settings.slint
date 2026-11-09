@@ -13,8 +13,20 @@ export component SettingsScreen {
     in-out property <string> stun-server: "stun:stun.l.google.com:19302";
     in-out property <bool> audio-enabled: true;
 
+    // Advanced Video & Codec settings
+    in-out property <string> codec: "auto";
+    in-out property <bool> hdr-enabled: false;
+    in-out property <string> capture-backend: "auto";
+
+    // Remote Host & Headless Virtual Display
+    in-out property <string> wol-mac: "";
+    in-out property <bool> virtual-display-enabled: false;
+    in-out property <string> virtual-display-res: "1080p60";
+
     callback save-clicked();
     callback reset-clicked();
+    callback send-wol(string);
+    callback toggle-virtual-display();
 
     Flickable {
         VerticalLayout {
@@ -34,7 +46,7 @@ export component SettingsScreen {
                 }
 
                 Text {
-                    text: "Configure video streaming quality, audio endpoints, network servers, and interface appearance.";
+                    text: "Configure video streaming quality, hardware codecs, audio endpoints, network servers, and remote power.";
                     color: Theme.text-secondary;
                     font-size: 14px;
                 }
@@ -70,7 +82,7 @@ export component SettingsScreen {
                 }
             }
 
-            // Video Encoding Section
+            // Video Encoding & Codec Section
             Rectangle {
                 background: Theme.surface;
                 border-radius: Theme.radius-large;
@@ -82,18 +94,61 @@ export component SettingsScreen {
                     spacing: Theme.space-md;
 
                     Text {
-                        text: "Video Streaming & Quality";
+                        text: "Video Streaming & Codecs";
                         color: Theme.text-primary;
                         font-size: 16px;
                         font-weight: 600;
                     }
 
+                    // Codec Selection
                     HorizontalLayout {
                         alignment: space-between;
 
                         VerticalLayout {
                             spacing: Theme.space-xs;
-                            Text { text: "Target Frame Rate"; color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Video Codec: " + (root.codec == "auto" ? "Auto-Negotiated" : root.codec == "av1" ? "AV1 (Next-Gen)" : root.codec == "hevc" ? "HEVC / H.265" : "H.264 (Universal)"); color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "AV1 offers ~30% higher compression efficiency on RTX 40-series and modern devices"; color: Theme.text-secondary; font-size: 12px; }
+                        }
+
+                        HorizontalLayout {
+                            spacing: Theme.space-sm;
+
+                            SecondaryButton {
+                                text: "Auto";
+                                min-width: 60px;
+                                clicked => { root.codec = "auto"; }
+                            }
+                            SecondaryButton {
+                                text: "AV1";
+                                min-width: 60px;
+                                clicked => { root.codec = "av1"; }
+                            }
+                            SecondaryButton {
+                                text: "HEVC";
+                                min-width: 60px;
+                                clicked => { root.codec = "hevc"; }
+                            }
+                            SecondaryButton {
+                                text: "H.264";
+                                min-width: 60px;
+                                clicked => { root.codec = "h264"; }
+                            }
+                        }
+                    }
+
+                    // HDR10 Toggle
+                    PermissionSwitch {
+                        text: "HDR10 & 10-Bit Color (BT.2020 PQ & P010 surface capture)";
+                        checked <=> root.hdr-enabled;
+                    }
+
+                    // Frame Rate Selection
+                    HorizontalLayout {
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Target Frame Rate: " + root.fps + " FPS"; color: Theme.text-primary; font-size: 14px; font-weight: 500; }
                             Text { text: "Controls rendering and encoder presentation cadence"; color: Theme.text-secondary; font-size: 12px; }
                         }
 
@@ -120,6 +175,7 @@ export component SettingsScreen {
                         }
                     }
 
+                    // Streaming Bitrate Selection
                     HorizontalLayout {
                         alignment: space-between;
 
@@ -149,6 +205,114 @@ export component SettingsScreen {
                                 min-width: 70px;
                                 clicked => { root.bitrate-kbps = 20000; }
                             }
+                        }
+                    }
+
+                    // Capture Engine Backend
+                    HorizontalLayout {
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Screen Capture Backend: " + (root.capture-backend == "auto" ? "Automatic (Cascading)" : root.capture-backend == "dxgi" ? "DXGI Desktop Duplication" : "Windows.Graphics.Capture"); color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "DXGI for discrete GPUs, WGC for hybrid multi-GPU laptops"; color: Theme.text-secondary; font-size: 12px; }
+                        }
+
+                        HorizontalLayout {
+                            spacing: Theme.space-sm;
+
+                            SecondaryButton {
+                                text: "Auto";
+                                min-width: 70px;
+                                clicked => { root.capture-backend = "auto"; }
+                            }
+                            SecondaryButton {
+                                text: "DXGI";
+                                min-width: 70px;
+                                clicked => { root.capture-backend = "dxgi"; }
+                            }
+                            SecondaryButton {
+                                text: "WGC";
+                                min-width: 70px;
+                                clicked => { root.capture-backend = "wgc"; }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Remote Host & Headless Virtual Display Section
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: "Remote Host & Headless Display Management";
+                        color: Theme.text-primary;
+                        font-size: 16px;
+                        font-weight: 600;
+                    }
+
+                    PermissionSwitch {
+                        text: "IddCx Virtual Display Driver (for headless hosts & custom resolutions)";
+                        checked <=> root.virtual-display-enabled;
+                    }
+
+                    HorizontalLayout {
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Virtual EDID Resolution: " + root.virtual-display-res; color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Generates VESA EDID 1.4 block tailored for connected client"; color: Theme.text-secondary; font-size: 12px; }
+                        }
+
+                        HorizontalLayout {
+                            spacing: Theme.space-sm;
+
+                            SecondaryButton {
+                                text: "1080p60";
+                                min-width: 80px;
+                                clicked => { root.virtual-display-res = "1080p60"; }
+                            }
+                            SecondaryButton {
+                                text: "1440p120";
+                                min-width: 80px;
+                                clicked => { root.virtual-display-res = "1440p120"; }
+                            }
+                            SecondaryButton {
+                                text: "4K60";
+                                min-width: 80px;
+                                clicked => { root.virtual-display-res = "4K60"; }
+                            }
+                        }
+                    }
+
+                    // Wake-on-LAN
+                    Text {
+                        text: "Wake-on-LAN Host MAC Address";
+                        color: Theme.text-secondary;
+                        font-size: 13px;
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.space-md;
+
+                        TextField {
+                            text <=> root.wol-mac;
+                            placeholder: "e.g. 00:11:22:33:44:55";
+                        }
+
+                        PrimaryButton {
+                            text: "Send WoL Magic Packet";
+                            min-width: 180px;
+                            clicked => { root.send-wol(root.wol-mac); }
                         }
                     }
                 }

@@ -15,11 +15,14 @@ export component HostScreen {
     in property <string> wifi-band: "5 GHz";
     in property <bool> nvenc-ready: true;
     in property <string> status-message: "Ready to share screen";
+    in property <int> active-guests: 0;
+    in property <bool> virtual-display-active: false;
 
     in-out property <bool> allow-keyboard: true;
     in-out property <bool> allow-mouse: true;
     in-out property <bool> allow-gamepad: true;
     in-out property <bool> allow-audio: true;
+    in-out property <bool> allow-clipboard: true;
 
     callback toggle-sharing();
     callback copy-code();
@@ -161,6 +164,11 @@ export component HostScreen {
                         PermissionSwitch {
                             text: "Stream Host System Audio";
                             checked <=> root.allow-audio;
+                        }
+
+                        PermissionSwitch {
+                            text: "Synchronize Clipboard (Bi-directional)";
+                            checked <=> root.allow-clipboard;
                         }
                     }
                 }

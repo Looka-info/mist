@@ -217,3 +217,54 @@ pub fn set_clipboard_text(text: &str) -> bool {
         !res.is_null()
     }
 }
+
+/// Dispatches an AMD standard 102-byte Magic Packet over UDP broadcast to wake a remote host machine.
+pub fn send_wake_on_lan(mac_str: &str) -> Result<(), String> {
+    let clean: String = mac_str
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .collect();
+    if clean.len() != 12 {
+        return Err(format!("Invalid MAC address: expected 12 hex digits (e.g. 00:11:22:33:44:55), got {}", clean.len()));
+    }
+
+    let mut mac_bytes = [0u8; 6];
+    for i in 0..6 {
+        mac_bytes[i] = u8::from_str_radix(&clean[i * 2..i * 2 + 2], 16)
+            .map_err(|e| format!("Failed to parse hex digit: {}", e))?;
+    }
+
+    // Magic packet: 6 bytes 0xFF followed by 16 iterations of target MAC address
+    let mut packet = [0u8; 102];
+    packet[..6].fill(0xFF);
+    for i in 0..16 {
+        let offset = 6 + i * 6;
+        packet[offset..offset + 6].copy_from_slice(&mac_bytes);
+    }
+
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0")
+        .map_err(|e| format!("Failed to bind UDP socket: {}", e))?;
+    socket.set_broadcast(true)
+        .map_err(|e| format!("Failed to set broadcast mode: {}", e))?;
+    socket.send_to(&packet, "255.255.255.255:9")
+        .map_err(|e| format!("Failed to send broadcast packet: {}", e))?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wake_on_lan_mac_parsing_and_broadcast() {
+        assert!(send_wake_on_lan("00:11:22:33:44:55").is_ok());
+        assert!(send_wake_on_lan("AA-BB-CC-DD-EE-FF").is_ok());
+        assert!(send_wake_on_lan("0123456789ab").is_ok());
+
+        // Rejections
+        assert!(send_wake_on_lan("00:11:22:33").is_err());
+        assert!(send_wake_on_lan("").is_err());
+        assert!(send_wake_on_lan("invalid-mac-address").is_err());
+    }
+}
