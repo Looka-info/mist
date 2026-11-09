@@ -40,6 +40,7 @@ if(MSVC)
         /volatile:iso
         /wd4201 # nameless struct/union
         /wd4100 # unreferenced formal parameter
+        /wd4005 # macro redefinition
         /wd4244 # conversion from type1 to type2 (possible loss of data)
         /wd4267 # conversion from size_t to type (possible loss of data)
         /wd4389 # signed/unsigned mismatch
