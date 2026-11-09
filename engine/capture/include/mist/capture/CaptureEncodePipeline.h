@@ -61,6 +61,7 @@ public:
 
     [[nodiscard]] PipelineReport generateReport() const;
     [[nodiscard]] bool isRunning() const noexcept { return isRunning_.load(); }
+    [[nodiscard]] capture::CaptureBackend getActiveCaptureBackend() const noexcept;
 
     using EncodedPacketCallback = std::function<void(const encode::EncodedPacket&)>;
     void setEncodedPacketCallback(EncodedPacketCallback cb) { packetCb_ = std::move(cb); }
@@ -77,7 +78,7 @@ private:
     encode::EncodeConfig encConfig_;
     bool useSynthetic_{false};
 
-    std::unique_ptr<capture::DxgiCaptureEngine> captureEngine_;
+    std::unique_ptr<capture::ICaptureEngine> captureEngine_;
     std::unique_ptr<capture::SyntheticFrameGenerator> syntheticGen_;
     std::unique_ptr<capture::ColorConverter> colorConverter_;
     std::unique_ptr<encode::IVideoEncoder> encoder_;

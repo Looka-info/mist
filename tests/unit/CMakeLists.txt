@@ -45,6 +45,7 @@ add_executable(mist_unit_tests
     TestD3D11VaPipeline.cpp
     TestMultiGuestGamepad.cpp
     TestRelativeMouseAndClipboard.cpp
+    TestWgcCapture.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

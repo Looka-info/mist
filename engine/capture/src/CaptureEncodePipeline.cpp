@@ -1,4 +1,6 @@
 #include "mist/capture/CaptureEncodePipeline.h"
+#include "mist/capture/CaptureEngineFactory.h"
+#include "mist/capture/WgcCaptureEngine.h"
 #include "mist/common/Logger.h"
 #include <fstream>
 #include <sstream>
@@ -101,13 +103,22 @@ common::Result<void> CaptureEncodePipeline::initialize(
     ID3D11DeviceContext* sharedContext = nullptr;
 
     if (!useSynthetic_) {
-        captureEngine_ = std::make_unique<capture::DxgiCaptureEngine>();
-        auto capRes = captureEngine_->initialize(capConfig_);
-        if (!capRes) {
+        auto [engine, capRes] = capture::CaptureEngineFactory::createAndInitialize(
+            capConfig_, capture::CaptureBackend::DxgiDuplication, true
+        );
+        if (!capRes.hasValue() || !engine) {
             return capRes;
         }
-        sharedDevice = captureEngine_->getD3D11Device();
-        sharedContext = captureEngine_->getD3D11Context();
+        captureEngine_ = std::move(engine);
+        if (captureEngine_->getBackend() == capture::CaptureBackend::DxgiDuplication) {
+            auto* dxgi = static_cast<capture::DxgiCaptureEngine*>(captureEngine_.get());
+            sharedDevice = dxgi->getD3D11Device();
+            sharedContext = dxgi->getD3D11Context();
+        } else if (captureEngine_->getBackend() == capture::CaptureBackend::WindowsGraphicsCapture) {
+            auto* wgc = static_cast<capture::WgcCaptureEngine*>(captureEngine_.get());
+            sharedDevice = wgc->getD3D11Device();
+            sharedContext = wgc->getD3D11Context();
+        }
     } else {
         auto devRes = platform::windows::D3D11DeviceManager::createDevice(0);
         if (!devRes) {
@@ -402,6 +413,16 @@ PipelineReport CaptureEncodePipeline::generateReport() const {
         .encodeLatencyUs = histEncodeLatency_->snapshot(),
         .captureToBitstreamLatencyUs = histCaptureToBitstream_->snapshot()
     };
+}
+
+capture::CaptureBackend CaptureEncodePipeline::getActiveCaptureBackend() const noexcept {
+    if (useSynthetic_) {
+        return capture::CaptureBackend::Synthetic;
+    }
+    if (captureEngine_) {
+        return captureEngine_->getBackend();
+    }
+    return capture::CaptureBackend::Synthetic;
 }
 
 } // namespace mist::pipeline

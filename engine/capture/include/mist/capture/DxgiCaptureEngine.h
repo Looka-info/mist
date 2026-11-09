@@ -37,6 +37,7 @@ public:
     [[nodiscard]] common::Result<CapturedFrame> acquireNextFrame(uint32_t timeoutMs) override;
     [[nodiscard]] common::Result<void> releaseFrame(const CapturedFrame& frame) override;
     [[nodiscard]] bool isCapturing() const noexcept override;
+    [[nodiscard]] CaptureBackend getBackend() const noexcept override { return CaptureBackend::DxgiDuplication; }
 
     [[nodiscard]] const platform::windows::DisplayInfo& getDisplayInfo() const noexcept { return displayInfo_; }
     [[nodiscard]] const PointerShape& getPointerShape() const noexcept { return pointerShape_; }

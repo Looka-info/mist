@@ -13,11 +13,28 @@ enum class PixelFormat : uint8_t {
     NV12
 };
 
+enum class CaptureBackend : uint8_t {
+    DxgiDuplication = 0,
+    WindowsGraphicsCapture = 1,
+    Synthetic = 2
+};
+
+[[nodiscard]] constexpr std::string_view captureBackendToString(CaptureBackend b) noexcept {
+    switch (b) {
+        case CaptureBackend::DxgiDuplication: return "DXGI Desktop Duplication";
+        case CaptureBackend::WindowsGraphicsCapture: return "Windows.Graphics.Capture";
+        case CaptureBackend::Synthetic: return "Synthetic Generator";
+    }
+    return "Unknown";
+}
+
 struct CaptureConfig {
     uint32_t displayIndex{0};
     uint32_t targetFps{60};
     PixelFormat format{PixelFormat::NV12};
     bool captureCursor{true};
+    bool disableBorder{true};
+    bool simulationOnly{false};
 };
 
 struct CapturedFrame {
@@ -39,6 +56,7 @@ public:
     [[nodiscard]] virtual common::Result<CapturedFrame> acquireNextFrame(uint32_t timeoutMs) = 0;
     [[nodiscard]] virtual common::Result<void> releaseFrame(const CapturedFrame& frame) = 0;
     [[nodiscard]] virtual bool isCapturing() const noexcept = 0;
+    [[nodiscard]] virtual CaptureBackend getBackend() const noexcept = 0;
 };
 
 } // namespace mist::capture

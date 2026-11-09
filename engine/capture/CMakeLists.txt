@@ -1,5 +1,7 @@
 add_library(mist_capture
     src/DxgiCaptureEngine.cpp
+    src/WgcCaptureEngine.cpp
+    src/CaptureEngineFactory.cpp
     src/ColorConverter.cpp
     src/SyntheticFrameGenerator.cpp
     src/CaptureEncodePipeline.cpp
