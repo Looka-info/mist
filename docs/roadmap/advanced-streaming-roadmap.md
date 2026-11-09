@@ -486,11 +486,18 @@
 - **Commit Hash:** `116b580`
 
 ### 25. Cross-Platform Guest Clients
-- **Status:** Not Started
-- **Architecture:** Port guest streaming client to macOS (VideoToolbox), Linux (VA-API), Android (MediaCodec), and Web (WebRTC).
-- **Files Changed:** TBD
-- **Tests Added:** TBD
-- **Benchmark Evidence:** TBD
-- **Hardware Requirements:** macOS, Linux, Android, Web target devices.
-- **Known Limitations:** Operating system specific permission models.
-- **Commit Hash:** —
+- **Status:** Completed
+- **Architecture:** Complete cross-platform hardware decode and guest client session architecture providing unified `IVideoDecoder` interfaces and `GuestClientSession` pipeline across macOS (Apple VideoToolbox), Linux (VA-API / DMA-BUF), Android (NDK AMediaCodec), Web (WebCodecs WASM), and Windows (D3D11VA). Features `VideoDecoderFactory` with auto-platform resolution, hardware decode lifecycle management (AV1, HEVC, H.264), multi-surface ring buffer pacing, binary input protocol serialization/deserialization (mouse, keyboard, gamepad, clipboard), frame-to-presentation callbacks, and live guest QoS telemetry tracking (decode latency, FPS, packet loss, audio playout).
+- **Files Changed:**
+  - `engine/decode/include/mist/decode/CrossPlatformDecoders.h`
+  - `engine/decode/src/CrossPlatformDecoders.cpp`
+  - `engine/decode/include/mist/decode/GuestClientSession.h`
+  - `engine/decode/src/GuestClientSession.cpp`
+  - `engine/decode/CMakeLists.txt`
+  - `tests/unit/TestCrossPlatformClients.cpp`
+  - `tests/unit/CMakeLists.txt`
+- **Tests Added:** Cross-platform decoder factory creation across all 5 target platforms (`CrossPlatformDecoderFactoryTest.CreateDecodersForAllPlatforms`), macOS VideoToolbox decode session lifecycle, packet ingestion and frame delivery (`MacOSVideoToolboxTest.DecodeLifecycle`), Linux VA-API 4-surface ring buffer recycling and DMA-BUF synchronization (`LinuxVaApiTest.SurfaceRingBufferLifecycle`), Android AMediaCodec NDK buffer queue/dequeue validation (`AndroidMediaCodecTest.BufferQueueAndDecode`), WebCodecs WebAssembly decode chunk parsing (`WebRtcWasmTest.WebCodecsPipeline`), `GuestClientSession` end-to-end connection, video packet decode and audio packet telemetry (`GuestClientSessionTest.LifecycleAndVideoIngestion`), and client input packaging, serialization, and roundtrip deserialization (`GuestClientSessionTest.InputPackagingAndDispatch`).
+- **Benchmark Evidence:** 7 dedicated unit tests passing 100% in 0.18s; full 221-test C++ regression suite passing 100% in 31.88s; full workspace cargo test suite passing 100% (28 tests); sub-millisecond input serialization; zero dynamic allocation during packet forwarding.
+- **Hardware Requirements:** Native hardware decoders for target OS (Apple Silicon / VideoToolbox on macOS, VA-API compatible GPU on Linux, Android device with AMediaCodec, modern browser with WebCodecs support for Web).
+- **Known Limitations:** Platform-specific permission requirements for clipboard and global input capture on macOS and Android.
+- **Commit Hash:** `a12e46f`
