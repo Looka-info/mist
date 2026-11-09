@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[allow(clippy::upper_case_acronyms)]
 pub type HANDLE = *mut std::ffi::c_void;
 pub const INVALID_HANDLE_VALUE: HANDLE = -1isize as HANDLE;
 pub const PIPE_ACCESS_DUPLEX: u32 = 0x00000003;

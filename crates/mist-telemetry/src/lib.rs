@@ -272,8 +272,10 @@ mod tests {
 
     #[test]
     fn test_stream_overlay_health_degradation() {
-        let mut stats = StreamOverlayStats::default();
-        stats.rtt_ms = 45.0;
+        let mut stats = StreamOverlayStats {
+            rtt_ms: 45.0,
+            ..Default::default()
+        };
         assert_eq!(stats.health_status(), "Fair");
 
         stats.packet_loss_percent = 5.0;

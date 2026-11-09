@@ -240,8 +240,7 @@ impl DesktopController {
     }
 
     pub fn send_wol(&self, mac_str: &str) -> Result<()> {
-        mist_platform_windows::send_wake_on_lan(mac_str)
-            .map_err(|e| mist_core::MistError::Internal(e))
+        mist_platform_windows::send_wake_on_lan(mac_str).map_err(mist_core::MistError::Internal)
     }
 
     pub fn cycle_display(&self) -> u32 {

@@ -25,7 +25,7 @@ pub const MAX_FAILED_ATTEMPTS: u32 = 5;
 pub const LOCKOUT_DURATION_SECS: u64 = 60; // 60 seconds
 pub const REPLAY_WINDOW_SECS: u64 = 60; // 60 seconds allowed skew / replay protection window
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RemotePairingRequest {
     pub client_device_id: String,
     pub client_device_name: String,
@@ -37,20 +37,6 @@ pub struct RemotePairingRequest {
     pub timestamp: u64,
     #[serde(default)]
     pub client_fingerprint: String,
-}
-
-impl Default for RemotePairingRequest {
-    fn default() -> Self {
-        Self {
-            client_device_id: String::new(),
-            client_device_name: String::new(),
-            pairing_code: String::new(),
-            requested_permissions: 0,
-            nonce: String::new(),
-            timestamp: 0,
-            client_fingerprint: String::new(),
-        }
-    }
 }
 
 impl RemotePairingRequest {
@@ -80,7 +66,7 @@ impl RemotePairingRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RemotePairingResponse {
     pub success: bool,
     pub status: String,
@@ -92,21 +78,6 @@ pub struct RemotePairingResponse {
     pub host_fingerprint: String,
     #[serde(default)]
     pub sas_code: String,
-}
-
-impl Default for RemotePairingResponse {
-    fn default() -> Self {
-        Self {
-            success: false,
-            status: String::new(),
-            auth_token: String::new(),
-            session_id: String::new(),
-            approved_permissions: 0,
-            error_message: String::new(),
-            host_fingerprint: String::new(),
-            sas_code: String::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

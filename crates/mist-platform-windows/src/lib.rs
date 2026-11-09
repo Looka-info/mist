@@ -115,6 +115,8 @@ pub fn query_hardware_info() -> HardwareInfo {
     hw
 }
 
+/// # Safety
+/// Caller must provide valid HWND window handles.
 pub unsafe fn embed_child_window(
     child_hwnd: u64,
     parent_hwnd: u64,
@@ -147,6 +149,8 @@ pub unsafe fn embed_child_window(
     );
 }
 
+/// # Safety
+/// Caller must provide valid HWND window handles.
 pub unsafe fn resize_child_window(child_hwnd: u64, x: i32, y: i32, width: u32, height: u32) {
     if child_hwnd == 0 {
         return;
@@ -162,6 +166,8 @@ pub unsafe fn resize_child_window(child_hwnd: u64, x: i32, y: i32, width: u32, h
     );
 }
 
+/// # Safety
+/// Caller must provide valid HWND window handles.
 pub unsafe fn hide_child_window(child_hwnd: u64) {
     if child_hwnd == 0 {
         return;

@@ -33,6 +33,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     }
     msg.extend_from_slice(&bit_len.to_be_bytes());
 
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     for chunk in msg.chunks_exact(64) {
         let mut w = [0u32; 64];
         for i in 0..16 {
@@ -155,10 +156,8 @@ pub fn normalize_fingerprint(fp: &str) -> String {
 pub fn extract_sdp_fingerprint(sdp: &str) -> Option<String> {
     for line in sdp.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("a=fingerprint:") {
-            let parts: Vec<&str> = trimmed["a=fingerprint:".len()..]
-                .split_whitespace()
-                .collect();
+        if let Some(stripped) = trimmed.strip_prefix("a=fingerprint:") {
+            let parts: Vec<&str> = stripped.split_whitespace().collect();
             if parts.len() >= 2 {
                 return Some(normalize_fingerprint(parts[1]));
             }

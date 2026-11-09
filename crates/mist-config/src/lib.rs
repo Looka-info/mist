@@ -73,11 +73,7 @@ impl Default for VideoConfig {
 
 impl VideoConfig {
     pub fn validate(&mut self) {
-        if self.bitrate_kbps < MIN_BITRATE_KBPS {
-            self.bitrate_kbps = MIN_BITRATE_KBPS;
-        } else if self.bitrate_kbps > MAX_BITRATE_KBPS {
-            self.bitrate_kbps = MAX_BITRATE_KBPS;
-        }
+        self.bitrate_kbps = self.bitrate_kbps.clamp(MIN_BITRATE_KBPS, MAX_BITRATE_KBPS);
         if self.fps == 0 {
             self.fps = 60;
         }

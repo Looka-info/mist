@@ -167,8 +167,9 @@ fn test_remote_pairing_tcp_flow() {
         0x0F,
     );
 
-    let resp = RemotePairingClient::submit_request("127.0.0.1", bound_port, req, Duration::from_secs(5))
-        .expect("Client should receive response");
+    let resp =
+        RemotePairingClient::submit_request("127.0.0.1", bound_port, req, Duration::from_secs(5))
+            .expect("Client should receive response");
 
     assert!(resp.success);
     assert_eq!(resp.status, "approved");
