@@ -34,6 +34,7 @@ add_executable(mist_unit_tests
     TestDesktopApp.cpp
     TestNatTraversal.cpp
     TestTurnRelay.cpp
+    TestPeerIdentity.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

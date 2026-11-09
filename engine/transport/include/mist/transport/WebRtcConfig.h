@@ -38,6 +38,9 @@ struct WebRtcTransportConfig {
     bool enablePortMapping{false}; // Requires explicit user consent for UPnP/NAT-PMP
     uint32_t portMappingLeaseSeconds{3600};
     uint32_t maxIceRestarts{3};
+
+    // Peer identity & security verification
+    std::string expectedRemoteFingerprint;
 };
 
 enum class WebRtcState {

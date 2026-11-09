@@ -126,6 +126,87 @@ pub fn generate_secure_token(prefix: &str, byte_len: usize) -> String {
     format!("{}-{}", prefix, hex_encode(&raw))
 }
 
+/// Constant-time byte slice comparison to defeat side-channel timing attacks.
+pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+/// Normalizes a certificate fingerprint into uppercase hexadecimal characters with no colons or hyphens.
+pub fn normalize_fingerprint(fp: &str) -> String {
+    fp.chars()
+        .filter(|c| *c != ':' && *c != ' ' && *c != '-')
+        .flat_map(|c| c.to_uppercase())
+        .collect()
+}
+
+/// Extracts the DTLS certificate fingerprint from an SDP description string.
+pub fn extract_sdp_fingerprint(sdp: &str) -> Option<String> {
+    for line in sdp.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("a=fingerprint:") {
+            let parts: Vec<&str> = trimmed["a=fingerprint:".len()..].split_whitespace().collect();
+            if parts.len() >= 2 {
+                return Some(normalize_fingerprint(parts[1]));
+            }
+        }
+    }
+    None
+}
+
+/// Computes a deterministic 6-digit Short Authentication String (SAS, e.g. "724-918")
+/// from host and guest certificate fingerprints, session ID, and authorization token.
+pub fn calculate_sas(host_fp: &str, guest_fp: &str, session_id: &str, auth_token: &str) -> String {
+    let norm_host = normalize_fingerprint(host_fp);
+    let norm_guest = normalize_fingerprint(guest_fp);
+    let material = format!("{}|{}|{}|{}", norm_host, norm_guest, session_id, auth_token);
+
+    let digest = sha256(material.as_bytes());
+    let val = u32::from_be_bytes([digest[0], digest[1], digest[2], digest[3]]);
+    let sas_num = val % 1_000_000;
+    format!("{:03}-{:03}", sas_num / 1000, sas_num % 1000)
+}
+
+/// Standard HMAC-SHA256 (RFC 2104 / FIPS 198-1).
+pub fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
+    let mut key_block = [0u8; 64];
+    if key.len() > 64 {
+        let hashed = sha256(key);
+        key_block[..32].copy_from_slice(&hashed);
+    } else {
+        key_block[..key.len()].copy_from_slice(key);
+    }
+
+    let mut ipad = [0x36u8; 64];
+    let mut opad = [0x5cu8; 64];
+    for i in 0..64 {
+        ipad[i] ^= key_block[i];
+        opad[i] ^= key_block[i];
+    }
+
+    let mut inner_data = Vec::with_capacity(64 + message.len());
+    inner_data.extend_from_slice(&ipad);
+    inner_data.extend_from_slice(message);
+    let inner_hash = sha256(&inner_data);
+
+    let mut outer_data = Vec::with_capacity(64 + 32);
+    outer_data.extend_from_slice(&opad);
+    outer_data.extend_from_slice(&inner_hash);
+    sha256(&outer_data)
+}
+
+/// Verifies HMAC-SHA256 in constant time.
+pub fn verify_hmac(key: &[u8], message: &[u8], expected_tag: &[u8; 32]) -> bool {
+    let tag = hmac_sha256(key, message);
+    constant_time_eq(&tag, expected_tag)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,5 +242,43 @@ mod tests {
         assert_ne!(tok1, tok2);
         // "mist-auth-" (10 chars) + 64 hex chars = 74 chars
         assert_eq!(tok1.len(), 10 + 64);
+    }
+
+    #[test]
+    fn test_hmac_sha256_rfc4231() {
+        // RFC 4231 Test Case 1
+        let key = [0x0bu8; 20];
+        let data = b"Hi There";
+        let tag = hmac_sha256(&key, data);
+        assert_eq!(
+            hex_encode(&tag),
+            "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
+        );
+        assert!(verify_hmac(&key, data, &tag));
+    }
+
+    #[test]
+    fn test_sas_computation_and_fingerprints() {
+        let host_fp = "11:22:33:44:55:66:77:88";
+        let guest_fp = "AA:BB:CC:DD:EE:FF:00:11";
+        let session_id = "mist-sess-42";
+        let token = "mist-auth-secret-123";
+
+        let sas1 = calculate_sas(host_fp, guest_fp, session_id, token);
+        let sas2 = calculate_sas(host_fp, guest_fp, session_id, token);
+
+        assert_eq!(sas1.len(), 7);
+        assert_eq!(&sas1[3..4], "-");
+        assert_eq!(sas1, sas2);
+
+        let altered = calculate_sas("99:99:99:99:55:66:77:88", guest_fp, session_id, token);
+        assert_ne!(sas1, altered);
+    }
+
+    #[test]
+    fn test_sdp_fingerprint_extraction() {
+        let sdp = "v=0\r\no=- 123 2 IN IP4 127.0.0.1\r\na=fingerprint:sha-256 4A:AD:B9:B1:3F:82:18:3B:54:02:12:DF:3E:5D:49:6B:19:E5:7C:AB:D5:08:05:3A:1E:0A:C4:4E:57:3E:45:9E\r\n";
+        let fp = extract_sdp_fingerprint(sdp).unwrap();
+        assert_eq!(fp, "4AADB9B13F82183B540212DF3E5D496B19E57CABD508053A1E0AC44E573E459E");
     }
 }

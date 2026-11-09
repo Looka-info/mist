@@ -11,6 +11,7 @@
 #include "mist/transport/DataChannelManager.h"
 #include "mist/transport/qos/AdaptiveBitrateController.h"
 #include "mist/services/ISignalingClient.h"
+#include "mist/security/PeerIdentityVerifier.h"
 #include <memory>
 #include <mutex>
 
@@ -63,11 +64,17 @@ public:
     [[nodiscard]] common::Result<void> requestVideoBitrate(uint32_t bitrateBps);
     [[nodiscard]] common::Result<void> restartIce();
 
+    // Security & Peer Identity Verification
+    [[nodiscard]] security::SecurityDiagnostics getSecurityDiagnostics() const noexcept { return identityVerifier_.getDiagnostics(); }
+    [[nodiscard]] std::string getShortAuthString() const noexcept { return identityVerifier_.getShortAuthString(); }
+    [[nodiscard]] security::PeerIdentityVerifier& getIdentityVerifier() noexcept { return identityVerifier_; }
+
 private:
     void setupSignalingRouting();
 
     mutable std::mutex mutex_;
     WebRtcTransportConfig config_;
+    security::PeerIdentityVerifier identityVerifier_;
     TransportConfig genericConfig_;
 
     std::shared_ptr<PeerConnectionManager> pcManager_;

@@ -113,6 +113,9 @@ common::Result<void> WebRtcTransport::initializeWebRtc(
         }
     }
 
+    identityVerifier_.setExpectedRemoteFingerprint(config_.expectedRemoteFingerprint);
+    identityVerifier_.setSessionContext(config_.sessionId, config_.authToken);
+
     setupSignalingRouting();
 
     isInitialized_ = true;
@@ -126,6 +129,7 @@ void WebRtcTransport::setupSignalingRouting() {
 
     if (signalingClient_) {
         pcManager_->setLocalDescriptionCallback([this](const std::string& type, const std::string& sdp) {
+            identityVerifier_.setLocalFingerprint(security::PeerIdentityVerifier::extractFingerprintFromSdp(sdp));
             services::SignalingMessage msg{};
             msg.type = (type == "offer") ? services::SignalingMessageType::Offer : services::SignalingMessageType::Answer;
             msg.payloadJson = sdp;
@@ -158,9 +162,17 @@ void WebRtcTransport::setupSignalingRouting() {
             if (!pcManager_) return;
             switch (msg.type) {
                 case services::SignalingMessageType::Offer:
+                    if (auto vRes = identityVerifier_.verifyRemoteDescription(msg.payloadJson); !vRes.hasValue()) {
+                        MIST_LOG_ERROR(common::SubsystemId::Transport, "Offer identity verification failed: " + vRes.error().message());
+                        break;
+                    }
                     (void)pcManager_->setRemoteDescription("offer", msg.payloadJson);
                     break;
                 case services::SignalingMessageType::Answer:
+                    if (auto vRes = identityVerifier_.verifyRemoteDescription(msg.payloadJson); !vRes.hasValue()) {
+                        MIST_LOG_ERROR(common::SubsystemId::Transport, "Answer identity verification failed: " + vRes.error().message());
+                        break;
+                    }
                     (void)pcManager_->setRemoteDescription("answer", msg.payloadJson);
                     break;
                 case services::SignalingMessageType::IceCandidate: {

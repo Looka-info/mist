@@ -139,6 +139,8 @@ pub struct AuthorizedSessionTicket {
     pub expires_at: String,
     pub permissions: DevicePermissions,
     pub consumed: bool,
+    #[serde(default)]
+    pub client_fingerprint: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -221,6 +223,48 @@ impl QualityProfile {
             Self::Balanced => 60,
             Self::Quality => 60,
             Self::Adaptive => 60,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SecurityTrustState {
+    Unverified,
+    Verified,
+    FingerprintMismatch,
+    IdentityChanged,
+}
+
+impl SecurityTrustState {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unverified => "Unverified",
+            Self::Verified => "Verified",
+            Self::FingerprintMismatch => "Fingerprint Mismatch",
+            Self::IdentityChanged => "Identity Changed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecurityStatus {
+    pub is_encrypted: bool,
+    pub cipher_suite: String,
+    pub peer_fingerprint: String,
+    pub sas_code: String,
+    pub trust_state: SecurityTrustState,
+    pub status_message: String,
+}
+
+impl Default for SecurityStatus {
+    fn default() -> Self {
+        Self {
+            is_encrypted: false,
+            cipher_suite: String::new(),
+            peer_fingerprint: String::new(),
+            sas_code: String::new(),
+            trust_state: SecurityTrustState::Unverified,
+            status_message: "No active secure transport session".to_string(),
         }
     }
 }

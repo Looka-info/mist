@@ -111,6 +111,8 @@ impl DesktopController {
                 session_id: format!("mist-sess-{}", std::process::id()),
                 approved_permissions: 0x0F,
                 error_message: String::new(),
+                host_fingerprint: String::new(),
+                sas_code: String::new(),
             };
 
             self.pending_decisions.lock().unwrap().insert(id, Some(resp));
@@ -135,6 +137,8 @@ impl DesktopController {
                 session_id: String::new(),
                 approved_permissions: 0,
                 error_message: "Host explicitly denied the connection request.".to_string(),
+                host_fingerprint: String::new(),
+                sas_code: String::new(),
             };
 
             self.pending_decisions.lock().unwrap().insert(id, Some(resp));

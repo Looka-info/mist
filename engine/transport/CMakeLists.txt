@@ -101,6 +101,7 @@ endif()
 target_link_libraries(mist_transport PUBLIC
     datachannel-static
     mist_common
+    mist_security
     mist_encode
     mist_decode
     mist_audio

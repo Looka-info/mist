@@ -1,6 +1,7 @@
 add_library(mist_security
     src/Security.cpp
     src/PairingManager.cpp
+    src/PeerIdentityVerifier.cpp
 )
 
 target_include_directories(mist_security PUBLIC

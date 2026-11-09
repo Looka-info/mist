@@ -143,6 +143,8 @@ fn test_remote_pairing_tcp_flow() {
                     session_id: "sess-tcp-1".to_string(),
                     approved_permissions: 0x0F,
                     error_message: String::new(),
+                    host_fingerprint: String::new(),
+                    sas_code: String::new(),
                 };
                 decisions_clone.lock().unwrap().insert(req_id, Some(resp));
             }),
@@ -568,4 +570,80 @@ fn test_runtime_permission_changes_and_immediate_revocation() {
     assert!(log.iter().any(|e| e.action == "updated"));
     assert!(log.iter().any(|e| e.action == "revoked_to_view_only"));
     assert!(log.iter().any(|e| !e.allowed));
+}
+
+#[test]
+fn test_encryption_verification_and_sas_derivation() {
+    let mut pm = PairingManager::default();
+    let code = pm.generate_pairing_code("sess-tls-1".to_string());
+
+    let client_fp = "4A:AD:B9:B1:3F:82:18:3B:54:02:12:DF:3E:5D:49:6B:19:E5:7C:AB:D5:08:05:3A:1E:0A:C4:4E:57:3E:45:9E";
+    let host_fp = "11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00";
+
+    let req = RemotePairingRequest::new(
+        "tls-guest-pc".to_string(),
+        "TLS Guest Device".to_string(),
+        code,
+        0x0F,
+    )
+    .with_fingerprint(client_fp);
+
+    let req_id = pm.submit_pairing_request(&req).expect("Request submission should succeed");
+
+    // Approve with host fingerprint
+    let (auth_token, client_name, host_sas) = pm
+        .approve_request_with_sas(req_id, DevicePermissions::all(), host_fp)
+        .expect("Approval should succeed");
+
+    assert_eq!(client_name, "TLS Guest Device");
+    assert!(!host_sas.is_empty());
+    assert_eq!(host_sas.len(), 7); // XXX-YYY
+    assert_eq!(&host_sas[3..4], "-");
+
+    // Client independently calculates SAS with identical parameters
+    let guest_sas = mist_pairing::crypto::calculate_sas(host_fp, client_fp, "sess-tls-1", &auth_token);
+    assert_eq!(host_sas, guest_sas, "Host and guest SAS codes must match exactly for verification");
+
+    // Validate session authentication with matching fingerprint
+    let val_res = pm.validate_session_auth_with_fingerprint(
+        "sess-tls-1",
+        "tls-guest-pc",
+        &auth_token,
+        client_fp,
+    );
+    assert!(val_res.is_ok(), "Authentication with matching DTLS fingerprint must succeed");
+}
+
+#[test]
+fn test_dtls_fingerprint_mismatch_rejected() {
+    let mut pm = PairingManager::default();
+    let code = pm.generate_pairing_code("sess-tls-mitm".to_string());
+
+    let legitimate_fp = "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF";
+    let attacker_fp = "FF:EE:DD:CC:BB:AA:99:88:77:66:55:44:33:22:11:00:FF:EE:DD:CC:BB:AA:99:88:77:66:55:44:33:22:11:00";
+    let host_fp = "12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF:12:34:56:78:90:AB:CD:EF";
+
+    let req = RemotePairingRequest::new(
+        "victim-device".to_string(),
+        "Victim Device".to_string(),
+        code,
+        0x0F,
+    )
+    .with_fingerprint(legitimate_fp);
+
+    let req_id = pm.submit_pairing_request(&req).unwrap();
+    let (auth_token, _, _) = pm
+        .approve_request_with_sas(req_id, DevicePermissions::all(), host_fp)
+        .unwrap();
+
+    // Attacker intercepts token but presents a different DTLS certificate fingerprint
+    let spoof_attempt = pm.validate_session_auth_with_fingerprint(
+        "sess-tls-mitm",
+        "victim-device",
+        &auth_token,
+        attacker_fp,
+    );
+    assert!(spoof_attempt.is_err(), "Authentication with mismatched DTLS fingerprint must be rejected");
+    let err_str = spoof_attempt.unwrap_err().to_string();
+    assert!(err_str.contains("Peer identity mismatch"), "Error should explain fingerprint mismatch: {}", err_str);
 }

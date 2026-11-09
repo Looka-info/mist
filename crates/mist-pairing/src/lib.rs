@@ -35,6 +35,8 @@ pub struct RemotePairingRequest {
     pub nonce: String,
     #[serde(default)]
     pub timestamp: u64,
+    #[serde(default)]
+    pub client_fingerprint: String,
 }
 
 impl Default for RemotePairingRequest {
@@ -46,6 +48,7 @@ impl Default for RemotePairingRequest {
             requested_permissions: 0,
             nonce: String::new(),
             timestamp: 0,
+            client_fingerprint: String::new(),
         }
     }
 }
@@ -67,7 +70,13 @@ impl RemotePairingRequest {
             requested_permissions,
             nonce,
             timestamp,
+            client_fingerprint: String::new(),
         }
+    }
+
+    pub fn with_fingerprint(mut self, fingerprint: impl Into<String>) -> Self {
+        self.client_fingerprint = fingerprint.into();
+        self
     }
 }
 
@@ -79,6 +88,25 @@ pub struct RemotePairingResponse {
     pub session_id: String,
     pub approved_permissions: u32,
     pub error_message: String,
+    #[serde(default)]
+    pub host_fingerprint: String,
+    #[serde(default)]
+    pub sas_code: String,
+}
+
+impl Default for RemotePairingResponse {
+    fn default() -> Self {
+        Self {
+            success: false,
+            status: String::new(),
+            auth_token: String::new(),
+            session_id: String::new(),
+            approved_permissions: 0,
+            error_message: String::new(),
+            host_fingerprint: String::new(),
+            sas_code: String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +116,7 @@ pub struct PendingRequest {
     pub client_device_name: String,
     pub session_id: String,
     pub requested_permissions: DevicePermissions,
+    pub client_fingerprint: String,
     pub timestamp: Instant,
 }
 
@@ -551,6 +580,7 @@ impl PairingManager {
             client_device_name: req.client_device_name.clone(),
             session_id,
             requested_permissions,
+            client_fingerprint: req.client_fingerprint.clone(),
             timestamp: Instant::now(),
         });
 
@@ -578,13 +608,14 @@ impl PairingManager {
         &self.pending_requests
     }
 
-    /// Approves pending pairing request, issues a 256-bit cryptographic auth token,
-    /// creates a session ticket bound to the approved session/peer identity, and persists guest records.
-    pub fn approve_request(
+    /// Approves pending pairing request with host certificate fingerprint, returning (auth_token, client_device_name, sas_code).
+    /// Derives deterministic Short Authentication String (SAS) for visual verification.
+    pub fn approve_request_with_sas(
         &mut self,
         request_id: u64,
         approved_permissions: DevicePermissions,
-    ) -> Option<(String, String)> {
+        host_fingerprint: &str,
+    ) -> Option<(String, String, String)> {
         if let Some(idx) = self.pending_requests.iter().position(|r| r.request_id == request_id) {
             let req = self.pending_requests.remove(idx);
 
@@ -592,7 +623,19 @@ impl PairingManager {
             let auth_token = crypto::generate_secure_token("mist-auth", 32);
             let token_hash = crypto::sha256_hex(auth_token.as_bytes());
 
-            // Bind session ticket to session_id and client_device_id
+            // Compute Short Authentication String (SAS) if fingerprints are provided
+            let sas_code = if !host_fingerprint.is_empty() && !req.client_fingerprint.is_empty() {
+                crypto::calculate_sas(
+                    host_fingerprint,
+                    &req.client_fingerprint,
+                    &req.session_id,
+                    &auth_token,
+                )
+            } else {
+                String::new()
+            };
+
+            // Bind session ticket to session_id, client_device_id, and DTLS fingerprint
             let now = Utc::now();
             let expires_at = (now + chrono::Duration::hours(24)).to_rfc3339();
 
@@ -605,6 +648,7 @@ impl PairingManager {
                 expires_at,
                 permissions: approved_permissions.clone(),
                 consumed: false,
+                client_fingerprint: req.client_fingerprint.clone(),
             };
             self.authorized_tickets.insert(token_hash.clone(), ticket);
 
@@ -642,20 +686,32 @@ impl PairingManager {
             self.save_trusted_devices();
             self.save_guest_identities();
 
-            Some((auth_token, req.client_device_name))
+            Some((auth_token, req.client_device_name, sas_code))
         } else {
             None
         }
     }
 
-    /// Host-side validation of incoming session authentication.
-    /// Verifies token authenticity, expiration, session binding, and client device binding.
+    /// Approves pending pairing request, issues a 256-bit cryptographic auth token,
+    /// creates a session ticket bound to the approved session/peer identity, and persists guest records.
+    pub fn approve_request(
+        &mut self,
+        request_id: u64,
+        approved_permissions: DevicePermissions,
+    ) -> Option<(String, String)> {
+        self.approve_request_with_sas(request_id, approved_permissions, "")
+            .map(|(token, name, _sas)| (token, name))
+    }
+
+    /// Host-side validation of incoming session authentication with optional DTLS certificate fingerprint verification.
+    /// Verifies token authenticity, expiration, session binding, client device binding, and DTLS fingerprint.
     /// Returns the authoritative host-granted permissions (never untrusted guest claims).
-    pub fn validate_session_auth(
+    pub fn validate_session_auth_with_fingerprint(
         &mut self,
         session_id: &str,
         client_device_id: &str,
         auth_token: &str,
+        client_fingerprint: &str,
     ) -> Result<DevicePermissions> {
         if self.is_device_banned(client_device_id) {
             return Err(MistError::Pairing(
@@ -684,6 +740,16 @@ impl PairingManager {
                 )));
             }
 
+            if !ticket.client_fingerprint.is_empty() && !client_fingerprint.is_empty() {
+                let norm_ticket = crypto::normalize_fingerprint(&ticket.client_fingerprint);
+                let norm_in = crypto::normalize_fingerprint(client_fingerprint);
+                if !crypto::constant_time_eq(norm_ticket.as_bytes(), norm_in.as_bytes()) {
+                    return Err(MistError::Pairing(
+                        "Peer identity mismatch: DTLS certificate fingerprint does not match paired identity.".to_string(),
+                    ));
+                }
+            }
+
             if let Ok(exp) = chrono::DateTime::parse_from_rfc3339(&ticket.expires_at) {
                 if Utc::now() > exp {
                     return Err(MistError::Pairing("Authentication token has expired.".to_string()));
@@ -702,6 +768,18 @@ impl PairingManager {
         }
 
         Ok(permissions)
+    }
+
+    /// Host-side validation of incoming session authentication.
+    /// Verifies token authenticity, expiration, session binding, and client device binding.
+    /// Returns the authoritative host-granted permissions (never untrusted guest claims).
+    pub fn validate_session_auth(
+        &mut self,
+        session_id: &str,
+        client_device_id: &str,
+        auth_token: &str,
+    ) -> Result<DevicePermissions> {
+        self.validate_session_auth_with_fingerprint(session_id, client_device_id, auth_token, "")
     }
 
     /// Revokes an active session authorization token.
@@ -988,6 +1066,8 @@ impl RemotePairingServer {
                                         error_message:
                                             "Pairing request timed out awaiting host approval."
                                                 .to_string(),
+                                        host_fingerprint: String::new(),
+                                        sas_code: String::new(),
                                     })
                                 }
                                 Err(e) => RemotePairingResponse {
@@ -997,6 +1077,8 @@ impl RemotePairingServer {
                                     session_id: String::new(),
                                     approved_permissions: 0,
                                     error_message: e.to_string(),
+                                    host_fingerprint: String::new(),
+                                    sas_code: String::new(),
                                 },
                             };
 
