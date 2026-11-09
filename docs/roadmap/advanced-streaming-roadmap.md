@@ -16,7 +16,7 @@
 | 2 | **TURN Relay Fallback** | Critical | **Unit Tested** | `1b6b2bd` |
 | 3 | **Host-Side Authentication** | Critical | **Unit Tested** | `87697fc` |
 | 4 | **Host Approval Flow** | High | **Unit Tested** | `2c09677` |
-| 5 | **Per-Guest Permissions** | High | **Unit Tested** | Pending |
+| 5 | **Per-Guest Permissions** | High | **Unit Tested** | `c1d604e` |
 | 6 | **Encryption Verification & Peer Identity** | High | Not Started | — |
 | 7 | **Encode-Once, Send-to-Many** | High | Not Started | — |
 | 8 | **Per-Guest Adaptive Bitrate & Resolution** | Medium | Not Started | — |
@@ -120,7 +120,7 @@
 - **Benchmark Evidence:** Per-guest permission evaluation < 100ns in input dispatch hot-path; sliding-window rate limiter prevents flooding up to 2000 ev/s.
 - **Hardware Requirements:** Host input dispatcher.
 - **Known Limitations:** Remote clipboard sync requires guest clipboard permission bit 0x10.
-- **Commit Hash:** Pending
+- **Commit Hash:** `c1d604e`
 
 ### 6. Encryption Verification and Peer Identity
 - **Status:** Not Started
