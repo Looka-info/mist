@@ -89,6 +89,9 @@ common::Result<void> PeerConnectionManager::initialize(const WebRtcTransportConf
         {
             std::lock_guard<std::mutex> lock(mutex_);
             MIST_LOG_INFO(common::SubsystemId::Transport, "Local ICE candidate gathered (mid: " + midStr + "): " + candStr);
+            if (auto parsed = IceCandidatePrioritizer::parseSdpCandidate(candStr)) {
+                localParsedCandidates_.push_back(*parsed);
+            }
             if (localCandidateCb_) {
                 cb = localCandidateCb_;
             } else {
@@ -265,6 +268,9 @@ common::Result<void> PeerConnectionManager::addRemoteCandidate(const std::string
     if (!hasRemoteDescription_) {
         MIST_LOG_INFO(common::SubsystemId::Transport, "Queueing candidate before remote description (mid: " + mid + "): " + candidate);
         pendingRemoteCandidates_.emplace_back(candidate, mid);
+        if (auto parsed = IceCandidatePrioritizer::parseSdpCandidate(candidate)) {
+            remoteParsedCandidates_.push_back(*parsed);
+        }
         return common::Result<void>::success();
     }
 
@@ -275,6 +281,9 @@ common::Result<void> PeerConnectionManager::addRemoteCandidate(const std::string
             cand.hintMid(mid);
         }
         pc_->addRemoteCandidate(cand);
+        if (auto parsed = IceCandidatePrioritizer::parseSdpCandidate(candidate)) {
+            remoteParsedCandidates_.push_back(*parsed);
+        }
         return common::Result<void>::success();
     } catch (const std::exception& e) {
         return common::Error(common::SubsystemId::Transport, common::ErrorCode::InternalError,
@@ -289,6 +298,9 @@ common::Result<void> PeerConnectionManager::close() {
         pc = std::move(pc_);
         hasRemoteDescription_ = false;
         pendingRemoteCandidates_.clear();
+        localParsedCandidates_.clear();
+        remoteParsedCandidates_.clear();
+        portMappingManager_.releaseAllMappings();
         state_ = WebRtcState::Closed;
     }
     if (pc) {
@@ -342,6 +354,12 @@ common::Result<void> PeerConnectionManager::restartIce() {
     std::shared_ptr<rtc::PeerConnection> pc;
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (!iceRestartController_.canAttemptRestart()) {
+            return common::Error(common::SubsystemId::Transport, common::ErrorCode::ResourceExhausted,
+                                 "ICE restart rate-limited or maximum retries exceeded (" +
+                                 std::to_string(iceRestartController_.getAttemptCount()) + ")");
+        }
+        iceRestartController_.recordRestartAttempt();
         pc = pc_;
     }
     if (!pc) {
@@ -355,6 +373,51 @@ common::Result<void> PeerConnectionManager::restartIce() {
         return common::Error(common::SubsystemId::Transport, common::ErrorCode::InternalError,
                              "Failed to restart ICE: " + std::string(e.what()));
     }
+}
+
+std::vector<ParsedIceCandidate> PeerConnectionManager::getLocalCandidates() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return localParsedCandidates_;
+}
+
+std::vector<ParsedIceCandidate> PeerConnectionManager::getRemoteCandidates() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return remoteParsedCandidates_;
+}
+
+NatDiagnostics PeerConnectionManager::getNatDiagnostics() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    NatDiagnostics diag{};
+    diag.detectedNatType = IceCandidatePrioritizer::classifyNatBehavior(localParsedCandidates_);
+
+    for (const auto& c : localParsedCandidates_) {
+        if (c.type == CandidateType::Host) diag.hostCandidatesCount++;
+        else if (c.type == CandidateType::ServerReflexive) diag.srflxCandidatesCount++;
+        else if (c.type == CandidateType::Relayed) diag.relayCandidatesCount++;
+
+        if (c.family == AddressFamily::IPv4) diag.ipv4CandidatesCount++;
+        else if (c.family == AddressFamily::IPv6) diag.ipv6CandidatesCount++;
+
+        if (c.isCgnat) diag.isBehindCgnat = true;
+    }
+
+    std::string locType, remType;
+    if (getSelectedCandidatePair(&locType, &remType)) {
+        diag.activeLocalCandidateType = locType;
+        diag.activeRemoteCandidateType = remType;
+        diag.selectedPairSummary = locType + " <-> " + remType;
+        diag.hasDirectRoute = (locType != "relay" && remType != "relay");
+    }
+
+    bool bothSymmetric = (diag.detectedNatType == NatType::Symmetric);
+    diag.failureReason = IceCandidatePrioritizer::classifyFailure(
+        true,
+        !localParsedCandidates_.empty(),
+        (state_ == WebRtcState::Connected),
+        bothSymmetric
+    );
+
+    return diag;
 }
 
 } // namespace mist::transport

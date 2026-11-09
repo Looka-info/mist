@@ -49,6 +49,7 @@ public:
     void setInputDataCallback(InputDataCallback cb);
 
     [[nodiscard]] TransportStatsSnapshot getStatsSnapshot() const noexcept;
+    [[nodiscard]] NatDiagnostics getNatDiagnostics() const noexcept;
     [[nodiscard]] const WebRtcTransportConfig& getConfig() const noexcept { return config_; }
 
     [[nodiscard]] std::shared_ptr<PeerConnectionManager> getPeerConnectionManager() const noexcept { return pcManager_; }

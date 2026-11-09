@@ -383,4 +383,16 @@ TransportStatsSnapshot WebRtcTransport::getStatsSnapshot() const noexcept {
     return TransportStatsSnapshot{};
 }
 
+NatDiagnostics WebRtcTransport::getNatDiagnostics() const noexcept {
+    std::shared_ptr<PeerConnectionManager> pcm;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        pcm = pcManager_;
+    }
+    if (pcm) {
+        return pcm->getNatDiagnostics();
+    }
+    return NatDiagnostics{};
+}
+
 } // namespace mist::transport

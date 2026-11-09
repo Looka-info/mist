@@ -68,10 +68,17 @@ impl Default for AudioConfig {
 pub struct NetworkConfig {
     pub signaling_url: String,
     pub stun_server: String,
+    pub stun_servers: Vec<String>,
     pub turn_server: String,
     pub turn_username: String,
     pub turn_password: String,
     pub pairing_port: u16,
+    pub enable_upnp: bool,
+    pub enable_nat_pmp: bool,
+    pub port_mapping_lease_seconds: u32,
+    pub enable_ipv6: bool,
+    pub ice_min_port: u16,
+    pub ice_max_port: u16,
 }
 
 impl Default for NetworkConfig {
@@ -79,10 +86,20 @@ impl Default for NetworkConfig {
         Self {
             signaling_url: "ws://127.0.0.1:8080".to_string(),
             stun_server: "stun:stun.l.google.com:19302".to_string(),
+            stun_servers: vec![
+                "stun:stun.l.google.com:19302".to_string(),
+                "stun:stun1.l.google.com:19302".to_string(),
+            ],
             turn_server: String::new(),
             turn_username: String::new(),
             turn_password: String::new(),
             pairing_port: 8085,
+            enable_upnp: false,
+            enable_nat_pmp: false,
+            port_mapping_lease_seconds: 3600,
+            enable_ipv6: true,
+            ice_min_port: 0,
+            ice_max_port: 0,
         }
     }
 }

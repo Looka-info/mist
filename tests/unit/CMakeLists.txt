@@ -32,6 +32,7 @@ add_executable(mist_unit_tests
     TestCongestionControl.cpp
     TestPairing.cpp
     TestDesktopApp.cpp
+    TestNatTraversal.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

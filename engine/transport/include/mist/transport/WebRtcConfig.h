@@ -30,6 +30,14 @@ struct WebRtcTransportConfig {
     bool enableAudio{false};
     uint32_t audioClockRate{48000};
     uint32_t audioBitrateKbps{128};
+
+    // NAT traversal and ICE configuration
+    bool enableIpv6{true};
+    bool enableIceUdp{true};
+    bool enableIceTcp{true};
+    bool enablePortMapping{false}; // Requires explicit user consent for UPnP/NAT-PMP
+    uint32_t portMappingLeaseSeconds{3600};
+    uint32_t maxIceRestarts{3};
 };
 
 enum class WebRtcState {

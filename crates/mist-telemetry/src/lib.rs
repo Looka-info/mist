@@ -103,3 +103,57 @@ impl NetworkDiagnostics {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RouteType {
+    DirectHost,
+    DirectSrflx,
+    Relayed,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NatType {
+    Unknown,
+    OpenInternetDirect,
+    FullCone,
+    AddressRestrictedCone,
+    PortRestrictedCone,
+    Symmetric,
+    CarrierGradeNat,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NatDiagnostics {
+    pub nat_type: NatType,
+    pub route_type: RouteType,
+    pub is_behind_cgnat: bool,
+    pub is_behind_symmetric_nat: bool,
+    pub host_candidates_count: u32,
+    pub srflx_candidates_count: u32,
+    pub relay_candidates_count: u32,
+    pub ipv4_candidates_count: u32,
+    pub ipv6_candidates_count: u32,
+    pub selected_pair: String,
+    pub upnp_active: bool,
+    pub failure_reason: Option<String>,
+}
+
+impl Default for NatDiagnostics {
+    fn default() -> Self {
+        Self {
+            nat_type: NatType::Unknown,
+            route_type: RouteType::Unknown,
+            is_behind_cgnat: false,
+            is_behind_symmetric_nat: false,
+            host_candidates_count: 0,
+            srflx_candidates_count: 0,
+            relay_candidates_count: 0,
+            ipv4_candidates_count: 0,
+            ipv6_candidates_count: 0,
+            selected_pair: "none".to_string(),
+            upnp_active: false,
+            failure_reason: None,
+        }
+    }
+}

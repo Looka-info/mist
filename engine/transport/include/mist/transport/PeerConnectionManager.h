@@ -2,6 +2,7 @@
 
 #include "mist/common/Result.h"
 #include "mist/transport/WebRtcConfig.h"
+#include "mist/transport/NatTraversal.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -39,6 +40,11 @@ public:
     [[nodiscard]] bool isConnected() const noexcept { return state_ == WebRtcState::Connected; }
     [[nodiscard]] bool getSelectedCandidatePair(std::string* localType, std::string* remoteType) const;
     [[nodiscard]] common::Result<void> restartIce();
+    [[nodiscard]] NatDiagnostics getNatDiagnostics() const noexcept;
+    [[nodiscard]] std::vector<ParsedIceCandidate> getLocalCandidates() const;
+    [[nodiscard]] std::vector<ParsedIceCandidate> getRemoteCandidates() const;
+    [[nodiscard]] IceRestartController& getIceRestartController() noexcept { return iceRestartController_; }
+    [[nodiscard]] PortMappingManager& getPortMappingManager() noexcept { return portMappingManager_; }
 
 private:
     mutable std::mutex mutex_;
@@ -52,6 +58,10 @@ private:
     std::vector<std::pair<std::string, std::string>> pendingCandidates_;
     bool hasRemoteDescription_{false};
     std::vector<std::pair<std::string, std::string>> pendingRemoteCandidates_;
+    std::vector<ParsedIceCandidate> localParsedCandidates_;
+    std::vector<ParsedIceCandidate> remoteParsedCandidates_;
+    IceRestartController iceRestartController_;
+    PortMappingManager portMappingManager_;
 };
 
 } // namespace mist::transport
