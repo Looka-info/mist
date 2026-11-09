@@ -47,9 +47,10 @@ jobs:
           cargo build --package mist-desktop --package mist-signaling --release
           if (!(Test-Path "bin")) { New-Item -ItemType Directory -Path "bin" -Force }
           $sigCandidates = @("target/release/mist-signaling.exe", "services/signaling/target/release/mist-signaling.exe") | Where-Object { Test-Path $_ }
-          if ($sigCandidates) {
-            Copy-Item $sigCandidates[0] "bin/mist-signaling.exe" -Force
-            Write-Host "Staged bin/mist-signaling.exe from $($sigCandidates[0])" -ForegroundColor Green
+          foreach ($sig in $sigCandidates) {
+            Copy-Item $sig "bin/mist-signaling.exe" -Force
+            Write-Host "Staged bin/mist-signaling.exe from $sig" -ForegroundColor Green
+            break
           }
 
       - name: Configure CMake Media Engine (Release)
