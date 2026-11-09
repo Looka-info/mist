@@ -4,6 +4,14 @@ version = "0.2.0"
 edition = "2021"
 description = "High-performance native WebRTC signaling service for Mist"
 
+[lib]
+name = "mist_signaling"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mist-signaling"
+path = "src/main.rs"
+
 [dependencies]
 tokio = { version = "1.38", features = ["full"] }
 tokio-tungstenite = "0.23"

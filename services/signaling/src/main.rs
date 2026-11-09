@@ -1,63 +1,19 @@
-use std::collections::HashMap;
+use futures_util::{SinkExt, StreamExt};
+use mist_signaling::audit_log::{log_audit, AuditEventType, AuditLogRecord};
+use mist_signaling::connection_tracker::{ConnectionTrackerConfig, IpConnectionTracker};
+use mist_signaling::protocol::SignalingMessage;
+use mist_signaling::rate_limiter::{RateLimiter, RateLimiterConfig};
+use mist_signaling::session_store::SessionStore;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum SignalingMessage {
-    Register {
-        session_id: String,
-        role: String,
-        #[serde(default)]
-        token: String,
-    },
-    Offer {
-        session_id: String,
-        sdp: String,
-    },
-    Answer {
-        session_id: String,
-        sdp: String,
-    },
-    Candidate {
-        session_id: String,
-        candidate: String,
-        #[serde(default)]
-        mid: Option<String>,
-    },
-    Bye {
-        session_id: String,
-    },
-    Registered {
-        session_id: String,
-        role: String,
-        peer_connected: bool,
-    },
-    PeerJoined {
-        session_id: String,
-        peer_role: String,
-    },
-    PeerLeft {
-        session_id: String,
-    },
-    Error {
-        message: String,
-    },
-}
-
-struct Session {
-    token: String,
-    host_tx: Option<mpsc::UnboundedSender<Message>>,
-    client_tx: Option<mpsc::UnboundedSender<Message>>,
-}
-
-type SessionMap = Arc<RwLock<HashMap<String, Session>>>;
+type SharedStore = Arc<RwLock<SessionStore>>;
+type SharedRateLimiter = Arc<Mutex<RateLimiter>>;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -79,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             bind_addr = format!("127.0.0.1:{}", args[i + 1]);
             i += 2;
         } else if args[i] == "--help" || args[i] == "-h" {
-            println!("Mist Signaling Service v0.2.0-rc1");
+            println!("Mist Hardened Signaling Service v0.2.0");
             println!("Usage: mist-signaling [--bind <IP:PORT>] [--port <PORT>]");
             return Ok(());
         } else {
@@ -89,19 +45,77 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr: SocketAddr = bind_addr.parse()?;
     let listener = TcpListener::bind(&addr).await?;
-    info!("Mist Signaling server running on ws://{}", addr);
+    info!("Mist Hardened Signaling server running on ws://{}", addr);
 
-    let sessions: SessionMap = Arc::new(RwLock::new(HashMap::new()));
+    let session_ttl = Duration::from_secs(3600); // 1 hour room TTL
+    let session_store: SharedStore = Arc::new(RwLock::new(SessionStore::new(session_ttl)));
+
+    let rate_limiter: SharedRateLimiter = Arc::new(Mutex::new(RateLimiter::new(RateLimiterConfig {
+        max_requests_per_sec: 30,
+        burst_capacity: 50,
+    })));
+
+    let connection_tracker = Arc::new(IpConnectionTracker::new(ConnectionTrackerConfig {
+        max_connections_per_ip: 10,
+        max_total_connections: 1024,
+    }));
+
+    // Background task: prune expired sessions every 60 seconds
+    let store_cleaner = Arc::clone(&session_store);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            let mut store = store_cleaner.write().await;
+            let pruned = store.prune_expired();
+            if pruned > 0 {
+                info!("Pruned {} expired signaling session(s)", pruned);
+            }
+        }
+    });
 
     while let Ok((stream, client_addr)) = listener.accept().await {
-        let sessions_clone = Arc::clone(&sessions);
-        tokio::spawn(handle_connection(stream, client_addr, sessions_clone));
+        // Enforce IP connection limits
+        let guard = match connection_tracker.try_accept(client_addr.ip()).await {
+            Ok(g) => g,
+            Err(reason) => {
+                warn!("Connection rejected from {}: {}", client_addr, reason);
+                log_audit(&AuditLogRecord::new(
+                    AuditEventType::ConnectionRejected,
+                    Some(client_addr.ip()),
+                    None,
+                    None,
+                    reason,
+                ));
+                continue;
+            }
+        };
+
+        log_audit(&AuditLogRecord::new(
+            AuditEventType::ConnectionAccepted,
+            Some(client_addr.ip()),
+            None,
+            None,
+            "WebSocket connection accepted",
+        ));
+
+        let store_clone = Arc::clone(&session_store);
+        let limiter_clone = Arc::clone(&rate_limiter);
+        tokio::spawn(async move {
+            let _guard = guard;
+            handle_connection(stream, client_addr, store_clone, limiter_clone).await;
+        });
     }
 
     Ok(())
 }
 
-async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: SessionMap) {
+async fn handle_connection(
+    stream: TcpStream,
+    addr: SocketAddr,
+    sessions: SharedStore,
+    rate_limiter: SharedRateLimiter,
+) {
     let ws_stream = match tokio_tungstenite::accept_async(stream).await {
         Ok(ws) => ws,
         Err(e) => {
@@ -113,7 +127,6 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: Sessio
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 
-    // Forward outgoing messages from mpsc queue to WebSocket sender
     let outgoing_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if ws_sender.send(msg).await.is_err() {
@@ -124,6 +137,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: Sessio
 
     let mut registered_session_id: Option<String> = None;
     let mut registered_role: Option<String> = None;
+    let mut registered_guest_id: Option<String> = None;
 
     while let Some(msg_result) = ws_receiver.next().await {
         let msg = match msg_result {
@@ -139,6 +153,28 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: Sessio
                 break;
             }
         };
+
+        // Rate limit check
+        {
+            let mut limiter = rate_limiter.lock().await;
+            if !limiter.check_rate_limit(addr.ip()) {
+                warn!("Rate limit exceeded for IP: {}", addr.ip());
+                log_audit(&AuditLogRecord::new(
+                    AuditEventType::RateLimitExceeded,
+                    Some(addr.ip()),
+                    registered_session_id.as_deref(),
+                    registered_role.as_deref(),
+                    "Too many signaling requests",
+                ));
+                let err_msg = SignalingMessage::Error {
+                    message: "Rate limit exceeded. Please throttle requests.".to_string(),
+                };
+                if let Ok(json) = serde_json::to_string(&err_msg) {
+                    let _ = tx.send(Message::Text(json));
+                }
+                continue;
+            }
+        }
 
         let parsed: Result<SignalingMessage, _> = serde_json::from_str(&msg);
         let signaling_msg = match parsed {
@@ -156,13 +192,26 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: Sessio
         };
 
         match signaling_msg {
-            SignalingMessage::Register { session_id, role, token } => {
-                let mut map = sessions.write().await;
-                let session = map.entry(session_id.clone()).or_insert_with(|| Session {
-                    token: token.clone(),
-                    host_tx: None,
-                    client_tx: None,
-                });
+            SignalingMessage::Register { session_id, role, token, guest_id } => {
+                let mut store = sessions.write().await;
+                let session = store.get_or_create(&session_id, &token);
+
+                if session.is_expired() {
+                    let err = SignalingMessage::Error {
+                        message: "Session room has expired".to_string(),
+                    };
+                    if let Ok(json) = serde_json::to_string(&err) {
+                        let _ = tx.send(Message::Text(json));
+                    }
+                    log_audit(&AuditLogRecord::new(
+                        AuditEventType::SessionExpired,
+                        Some(addr.ip()),
+                        Some(&session_id),
+                        Some(&role),
+                        "Attempted registration to expired room",
+                    ));
+                    continue;
+                }
 
                 if !session.token.is_empty() && !token.is_empty() && session.token != token {
                     let err = SignalingMessage::Error {
@@ -171,32 +220,55 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: Sessio
                     if let Ok(json) = serde_json::to_string(&err) {
                         let _ = tx.send(Message::Text(json));
                     }
+                    log_audit(&AuditLogRecord::new(
+                        AuditEventType::AuthenticationFailed,
+                        Some(addr.ip()),
+                        Some(&session_id),
+                        Some(&role),
+                        "Room token mismatch",
+                    ));
                     continue;
                 }
 
                 registered_session_id = Some(session_id.clone());
                 registered_role = Some(role.clone());
+                registered_guest_id = guest_id.clone();
+
+                log_audit(&AuditLogRecord::new(
+                    AuditEventType::PeerRegistered,
+                    Some(addr.ip()),
+                    Some(&session_id),
+                    Some(&role),
+                    format!("Peer registered as {} (guest={:?})", role, guest_id),
+                ));
 
                 let peer_connected = if role == "host" {
                     session.host_tx = Some(tx.clone());
-                    if let Some(ref client_tx) = session.client_tx {
+                    // Notify any existing guests
+                    for (g_id, g_info) in &session.guests {
                         let notification = SignalingMessage::PeerJoined {
                             session_id: session_id.clone(),
                             peer_role: "host".to_string(),
+                            guest_id: Some(g_id.clone()),
                         };
                         if let Ok(json) = serde_json::to_string(&notification) {
-                            let _ = client_tx.send(Message::Text(json));
+                            let _ = g_info.tx.send(Message::Text(json));
                         }
-                        true
-                    } else {
-                        false
                     }
+                    !session.guests.is_empty()
                 } else {
-                    session.client_tx = Some(tx.clone());
+                    let effective_guest_id = guest_id.clone().unwrap_or_else(|| addr.to_string());
+                    session.guests.insert(effective_guest_id.clone(), mist_signaling::GuestInfo {
+                        guest_id: effective_guest_id.clone(),
+                        tx: tx.clone(),
+                        joined_at: std::time::Instant::now(),
+                    });
+
                     if let Some(ref host_tx) = session.host_tx {
                         let notification = SignalingMessage::PeerJoined {
                             session_id: session_id.clone(),
                             peer_role: "client".to_string(),
+                            guest_id: Some(effective_guest_id),
                         };
                         if let Ok(json) = serde_json::to_string(&notification) {
                             let _ = host_tx.send(Message::Text(json));
@@ -211,62 +283,63 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: Sessio
                     session_id,
                     role,
                     peer_connected,
+                    guest_id,
                 };
                 if let Ok(json) = serde_json::to_string(&reg_ack) {
                     let _ = tx.send(Message::Text(json));
                 }
             }
 
-            SignalingMessage::Offer { session_id, sdp } => {
-                let map = sessions.read().await;
-                if let Some(session) = map.get(&session_id) {
-                    if let Some(ref client_tx) = session.client_tx {
-                        let forward = SignalingMessage::Offer { session_id, sdp };
-                        if let Ok(json) = serde_json::to_string(&forward) {
-                            let _ = client_tx.send(Message::Text(json));
+            SignalingMessage::Offer { session_id, sdp, target_guest_id } => {
+                let store = sessions.read().await;
+                if let Some(session) = store.get(&session_id) {
+                    if let Some(ref target_id) = target_guest_id {
+                        if let Some(guest) = session.guests.get(target_id) {
+                            let forward = SignalingMessage::Offer { session_id, sdp, target_guest_id };
+                            if let Ok(json) = serde_json::to_string(&forward) {
+                                let _ = guest.tx.send(Message::Text(json));
+                            }
                         }
-                    } else {
-                        let err = SignalingMessage::Error {
-                            message: "Client not connected to session".to_string(),
-                        };
-                        if let Ok(json) = serde_json::to_string(&err) {
-                            let _ = tx.send(Message::Text(json));
+                    } else if let Some((_, guest)) = session.guests.iter().next() {
+                        let forward = SignalingMessage::Offer { session_id, sdp, target_guest_id };
+                        if let Ok(json) = serde_json::to_string(&forward) {
+                            let _ = guest.tx.send(Message::Text(json));
                         }
                     }
                 }
             }
 
-            SignalingMessage::Answer { session_id, sdp } => {
-                let map = sessions.read().await;
-                if let Some(session) = map.get(&session_id) {
+            SignalingMessage::Answer { session_id, sdp, guest_id } => {
+                let store = sessions.read().await;
+                if let Some(session) = store.get(&session_id) {
                     if let Some(ref host_tx) = session.host_tx {
-                        let forward = SignalingMessage::Answer { session_id, sdp };
+                        let forward = SignalingMessage::Answer { session_id, sdp, guest_id };
                         if let Ok(json) = serde_json::to_string(&forward) {
                             let _ = host_tx.send(Message::Text(json));
                         }
-                    } else {
-                        let err = SignalingMessage::Error {
-                            message: "Host not connected to session".to_string(),
-                        };
-                        if let Ok(json) = serde_json::to_string(&err) {
-                            let _ = tx.send(Message::Text(json));
-                        }
                     }
                 }
             }
 
-            SignalingMessage::Candidate { session_id, candidate, mid } => {
-                let map = sessions.read().await;
-                if let Some(session) = map.get(&session_id) {
+            SignalingMessage::Candidate { session_id, candidate, mid, guest_id } => {
+                let store = sessions.read().await;
+                if let Some(session) = store.get(&session_id) {
                     let forward = SignalingMessage::Candidate {
                         session_id,
                         candidate,
                         mid,
+                        guest_id: guest_id.clone(),
                     };
                     if let Ok(json) = serde_json::to_string(&forward) {
                         if registered_role.as_deref() == Some("host") {
-                            if let Some(ref client_tx) = session.client_tx {
-                                let _ = client_tx.send(Message::Text(json));
+                            if let Some(ref target_id) = guest_id {
+                                if let Some(guest) = session.guests.get(target_id) {
+                                    let _ = guest.tx.send(Message::Text(json));
+                                }
+                            } else {
+                                for guest in session.guests.values() {
+                                    let _ = guest.tx.send(Message::Text(json.clone()));
+                                }
                             }
                         } else if let Some(ref host_tx) = session.host_tx {
                             let _ = host_tx.send(Message::Text(json));
@@ -275,7 +348,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: Sessio
                 }
             }
 
-            SignalingMessage::Bye { session_id: _ } => {
+            SignalingMessage::Bye { session_id: _, guest_id: _ } => {
                 break;
             }
 
@@ -285,38 +358,51 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, sessions: Sessio
 
     // Cleanup session on disconnect
     if let (Some(ref session_id), Some(ref role)) = (&registered_session_id, &registered_role) {
-        let mut map = sessions.write().await;
+        let mut store = sessions.write().await;
         let mut should_remove = false;
-        if let Some(session) = map.get_mut(session_id) {
+        if let Some(session) = store.get_mut(session_id) {
             if role == "host" {
                 session.host_tx = None;
-                if let Some(ref client_tx) = session.client_tx {
+                for guest in session.guests.values() {
                     let notify = SignalingMessage::PeerLeft {
                         session_id: session_id.clone(),
+                        guest_id: None,
                     };
                     if let Ok(json) = serde_json::to_string(&notify) {
-                        let _ = client_tx.send(Message::Text(json));
+                        let _ = guest.tx.send(Message::Text(json));
                     }
-                } else {
+                }
+                if session.guests.is_empty() {
                     should_remove = true;
                 }
             } else {
-                session.client_tx = None;
+                let g_id = registered_guest_id.clone().unwrap_or_else(|| addr.to_string());
+                session.guests.remove(&g_id);
                 if let Some(ref host_tx) = session.host_tx {
                     let notify = SignalingMessage::PeerLeft {
                         session_id: session_id.clone(),
+                        guest_id: Some(g_id),
                     };
                     if let Ok(json) = serde_json::to_string(&notify) {
                         let _ = host_tx.send(Message::Text(json));
                     }
-                } else {
+                }
+                if session.host_tx.is_none() && session.guests.is_empty() {
                     should_remove = true;
                 }
             }
         }
         if should_remove {
-            map.remove(session_id);
+            store.remove(session_id);
         }
+
+        log_audit(&AuditLogRecord::new(
+            AuditEventType::PeerLeft,
+            Some(addr.ip()),
+            Some(session_id),
+            Some(role),
+            format!("Peer disconnected (role={})", role),
+        ));
     }
 
     outgoing_task.abort();
