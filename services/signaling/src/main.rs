@@ -19,8 +19,7 @@ type SharedRateLimiter = Arc<Mutex<RateLimiter>>;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -50,10 +49,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let session_ttl = Duration::from_secs(3600); // 1 hour room TTL
     let session_store: SharedStore = Arc::new(RwLock::new(SessionStore::new(session_ttl)));
 
-    let rate_limiter: SharedRateLimiter = Arc::new(Mutex::new(RateLimiter::new(RateLimiterConfig {
-        max_requests_per_sec: 30,
-        burst_capacity: 50,
-    })));
+    let rate_limiter: SharedRateLimiter =
+        Arc::new(Mutex::new(RateLimiter::new(RateLimiterConfig {
+            max_requests_per_sec: 30,
+            burst_capacity: 50,
+        })));
 
     let connection_tracker = Arc::new(IpConnectionTracker::new(ConnectionTrackerConfig {
         max_connections_per_ip: 10,
@@ -192,7 +192,12 @@ async fn handle_connection(
         };
 
         match signaling_msg {
-            SignalingMessage::Register { session_id, role, token, guest_id } => {
+            SignalingMessage::Register {
+                session_id,
+                role,
+                token,
+                guest_id,
+            } => {
                 let mut store = sessions.write().await;
                 let session = store.get_or_create(&session_id, &token);
 
@@ -258,11 +263,14 @@ async fn handle_connection(
                     !session.guests.is_empty()
                 } else {
                     let effective_guest_id = guest_id.clone().unwrap_or_else(|| addr.to_string());
-                    session.guests.insert(effective_guest_id.clone(), mist_signaling::GuestInfo {
-                        guest_id: effective_guest_id.clone(),
-                        tx: tx.clone(),
-                        joined_at: std::time::Instant::now(),
-                    });
+                    session.guests.insert(
+                        effective_guest_id.clone(),
+                        mist_signaling::GuestInfo {
+                            guest_id: effective_guest_id.clone(),
+                            tx: tx.clone(),
+                            joined_at: std::time::Instant::now(),
+                        },
+                    );
 
                     if let Some(ref host_tx) = session.host_tx {
                         let notification = SignalingMessage::PeerJoined {
@@ -290,18 +298,30 @@ async fn handle_connection(
                 }
             }
 
-            SignalingMessage::Offer { session_id, sdp, target_guest_id } => {
+            SignalingMessage::Offer {
+                session_id,
+                sdp,
+                target_guest_id,
+            } => {
                 let store = sessions.read().await;
                 if let Some(session) = store.get(&session_id) {
                     if let Some(ref target_id) = target_guest_id {
                         if let Some(guest) = session.guests.get(target_id) {
-                            let forward = SignalingMessage::Offer { session_id, sdp, target_guest_id };
+                            let forward = SignalingMessage::Offer {
+                                session_id,
+                                sdp,
+                                target_guest_id,
+                            };
                             if let Ok(json) = serde_json::to_string(&forward) {
                                 let _ = guest.tx.send(Message::Text(json));
                             }
                         }
                     } else if let Some((_, guest)) = session.guests.iter().next() {
-                        let forward = SignalingMessage::Offer { session_id, sdp, target_guest_id };
+                        let forward = SignalingMessage::Offer {
+                            session_id,
+                            sdp,
+                            target_guest_id,
+                        };
                         if let Ok(json) = serde_json::to_string(&forward) {
                             let _ = guest.tx.send(Message::Text(json));
                         }
@@ -309,11 +329,19 @@ async fn handle_connection(
                 }
             }
 
-            SignalingMessage::Answer { session_id, sdp, guest_id } => {
+            SignalingMessage::Answer {
+                session_id,
+                sdp,
+                guest_id,
+            } => {
                 let store = sessions.read().await;
                 if let Some(session) = store.get(&session_id) {
                     if let Some(ref host_tx) = session.host_tx {
-                        let forward = SignalingMessage::Answer { session_id, sdp, guest_id };
+                        let forward = SignalingMessage::Answer {
+                            session_id,
+                            sdp,
+                            guest_id,
+                        };
                         if let Ok(json) = serde_json::to_string(&forward) {
                             let _ = host_tx.send(Message::Text(json));
                         }
@@ -321,7 +349,12 @@ async fn handle_connection(
                 }
             }
 
-            SignalingMessage::Candidate { session_id, candidate, mid, guest_id } => {
+            SignalingMessage::Candidate {
+                session_id,
+                candidate,
+                mid,
+                guest_id,
+            } => {
                 let store = sessions.read().await;
                 if let Some(session) = store.get(&session_id) {
                     let forward = SignalingMessage::Candidate {
@@ -348,7 +381,10 @@ async fn handle_connection(
                 }
             }
 
-            SignalingMessage::Bye { session_id: _, guest_id: _ } => {
+            SignalingMessage::Bye {
+                session_id: _,
+                guest_id: _,
+            } => {
                 break;
             }
 
@@ -376,7 +412,9 @@ async fn handle_connection(
                     should_remove = true;
                 }
             } else {
-                let g_id = registered_guest_id.clone().unwrap_or_else(|| addr.to_string());
+                let g_id = registered_guest_id
+                    .clone()
+                    .unwrap_or_else(|| addr.to_string());
                 session.guests.remove(&g_id);
                 if let Some(ref host_tx) = session.host_tx {
                     let notify = SignalingMessage::PeerLeft {

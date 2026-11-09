@@ -85,11 +85,21 @@ impl DevicePermissions {
 
     pub fn to_mask(&self) -> u32 {
         let mut mask = 0u32;
-        if self.keyboard { mask |= 0x01; }
-        if self.mouse { mask |= 0x02; }
-        if self.gamepad { mask |= 0x04; }
-        if self.audio { mask |= 0x08; }
-        if self.clipboard { mask |= 0x10; }
+        if self.keyboard {
+            mask |= 0x01;
+        }
+        if self.mouse {
+            mask |= 0x02;
+        }
+        if self.gamepad {
+            mask |= 0x04;
+        }
+        if self.audio {
+            mask |= 0x08;
+        }
+        if self.clipboard {
+            mask |= 0x10;
+        }
         mask
     }
 

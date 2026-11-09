@@ -121,7 +121,11 @@ fn test_protocol_multi_guest_serde() {
     // Deserialization roundtrip
     let deserialized: SignalingMessage = serde_json::from_str(&json).unwrap();
     match deserialized {
-        SignalingMessage::Offer { session_id, sdp, target_guest_id } => {
+        SignalingMessage::Offer {
+            session_id,
+            sdp,
+            target_guest_id,
+        } => {
             assert_eq!(session_id, "sess-123");
             assert_eq!(sdp, "v=0...");
             assert_eq!(target_guest_id, Some("guest-99".to_string()));
@@ -133,7 +137,11 @@ fn test_protocol_multi_guest_serde() {
     let legacy_json = r#"{"type":"offer","session_id":"sess-old","sdp":"v=0..."}"#;
     let legacy: SignalingMessage = serde_json::from_str(legacy_json).unwrap();
     match legacy {
-        SignalingMessage::Offer { session_id, target_guest_id, .. } => {
+        SignalingMessage::Offer {
+            session_id,
+            target_guest_id,
+            ..
+        } => {
             assert_eq!(session_id, "sess-old");
             assert_eq!(target_guest_id, None);
         }

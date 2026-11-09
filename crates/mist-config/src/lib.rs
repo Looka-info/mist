@@ -37,10 +37,18 @@ pub struct VideoConfig {
     pub virtual_display_enabled: bool,
 }
 
-fn default_codec() -> String { "auto".to_string() }
-fn default_backend() -> String { "auto".to_string() }
-fn default_true() -> bool { true }
-fn default_virtual_display_res() -> String { "1920x1080@60".to_string() }
+fn default_codec() -> String {
+    "auto".to_string()
+}
+fn default_backend() -> String {
+    "auto".to_string()
+}
+fn default_true() -> bool {
+    true
+}
+fn default_virtual_display_res() -> String {
+    "1920x1080@60".to_string()
+}
 
 impl Default for VideoConfig {
     fn default() -> Self {
@@ -195,8 +203,13 @@ impl AppConfig {
         let p = Self::config_path();
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| MistError::Config(format!("Serialization error: {}", e)))?;
-        fs::write(&p, content)
-            .map_err(|e| MistError::Io(format!("Failed to write config file {}: {}", p.display(), e)))?;
+        fs::write(&p, content).map_err(|e| {
+            MistError::Io(format!(
+                "Failed to write config file {}: {}",
+                p.display(),
+                e
+            ))
+        })?;
         Ok(())
     }
 }

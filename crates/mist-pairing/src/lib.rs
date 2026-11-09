@@ -284,7 +284,11 @@ impl PairingManager {
         reason: Option<String>,
     ) -> bool {
         let name = device_name
-            .or_else(|| self.guest_identities.get(device_id).map(|g| g.device_name.clone()))
+            .or_else(|| {
+                self.guest_identities
+                    .get(device_id)
+                    .map(|g| g.device_name.clone())
+            })
             .or_else(|| self.trusted_devices.get(device_id).map(|d| d.name.clone()))
             .unwrap_or_else(|| "Unknown Device".to_string());
 
@@ -298,10 +302,12 @@ impl PairingManager {
         self.banned_devices.insert(device_id.to_string(), record);
 
         // Remove any pending requests from this device
-        self.pending_requests.retain(|r| r.client_device_id != device_id);
+        self.pending_requests
+            .retain(|r| r.client_device_id != device_id);
 
         // Revoke any active session tickets for this device immediately
-        self.authorized_tickets.retain(|_, t| t.client_device_id != device_id);
+        self.authorized_tickets
+            .retain(|_, t| t.client_device_id != device_id);
 
         // Mark guest identity as not trusted
         if let Some(guest) = self.guest_identities.get_mut(device_id) {
@@ -325,7 +331,8 @@ impl PairingManager {
     /// Terminates the current active session for a guest without revoking trusted status or banning.
     pub fn kick_guest(&mut self, device_id: &str) -> bool {
         let before_count = self.authorized_tickets.len();
-        self.authorized_tickets.retain(|_, t| t.client_device_id != device_id);
+        self.authorized_tickets
+            .retain(|_, t| t.client_device_id != device_id);
         self.authorized_tickets.len() < before_count
     }
 
@@ -616,7 +623,11 @@ impl PairingManager {
         approved_permissions: DevicePermissions,
         host_fingerprint: &str,
     ) -> Option<(String, String, String)> {
-        if let Some(idx) = self.pending_requests.iter().position(|r| r.request_id == request_id) {
+        if let Some(idx) = self
+            .pending_requests
+            .iter()
+            .position(|r| r.request_id == request_id)
+        {
             let req = self.pending_requests.remove(idx);
 
             // Generate cryptographically secure 256-bit token
@@ -721,10 +732,9 @@ impl PairingManager {
 
         let hash = crypto::sha256_hex(auth_token.as_bytes());
         let permissions = {
-            let ticket = self
-                .authorized_tickets
-                .get_mut(&hash)
-                .ok_or_else(|| MistError::Pairing("Authentication token not recognized or revoked.".to_string()))?;
+            let ticket = self.authorized_tickets.get_mut(&hash).ok_or_else(|| {
+                MistError::Pairing("Authentication token not recognized or revoked.".to_string())
+            })?;
 
             if ticket.session_id != session_id {
                 return Err(MistError::Pairing(format!(
@@ -752,7 +762,9 @@ impl PairingManager {
 
             if let Ok(exp) = chrono::DateTime::parse_from_rfc3339(&ticket.expires_at) {
                 if Utc::now() > exp {
-                    return Err(MistError::Pairing("Authentication token has expired.".to_string()));
+                    return Err(MistError::Pairing(
+                        "Authentication token has expired.".to_string(),
+                    ));
                 }
             }
 
@@ -812,7 +824,11 @@ impl PairingManager {
     }
 
     pub fn deny_request(&mut self, request_id: u64) -> bool {
-        if let Some(idx) = self.pending_requests.iter().position(|r| r.request_id == request_id) {
+        if let Some(idx) = self
+            .pending_requests
+            .iter()
+            .position(|r| r.request_id == request_id)
+        {
             self.pending_requests.remove(idx);
             true
         } else {
@@ -912,8 +928,16 @@ impl PairingManager {
             .values()
             .find(|t| t.client_device_id == device_id)
             .map(|t| t.permissions.clone())
-            .or_else(|| self.guest_identities.get(device_id).map(|g| g.permissions.clone()))
-            .or_else(|| self.trusted_devices.get(device_id).map(|d| d.permissions.clone()));
+            .or_else(|| {
+                self.guest_identities
+                    .get(device_id)
+                    .map(|g| g.permissions.clone())
+            })
+            .or_else(|| {
+                self.trusted_devices
+                    .get(device_id)
+                    .map(|d| d.permissions.clone())
+            });
 
         let perms = match perms {
             Some(p) => p,
@@ -923,7 +947,9 @@ impl PairingManager {
                     device_id: DeviceId::new(device_id),
                     action: format!("action_{}", action),
                     allowed: false,
-                    detail: "Action denied: device identity not found in active sessions or ledger.".to_string(),
+                    detail:
+                        "Action denied: device identity not found in active sessions or ledger."
+                            .to_string(),
                 });
                 return false;
             }
@@ -944,7 +970,10 @@ impl PairingManager {
                 device_id: DeviceId::new(device_id),
                 action: format!("action_{}", action),
                 allowed: false,
-                detail: format!("Action denied: host permission bit for '{}' is disabled.", action),
+                detail: format!(
+                    "Action denied: host permission bit for '{}' is disabled.",
+                    action
+                ),
             });
         }
 
@@ -985,9 +1014,12 @@ impl RemotePairingServer {
         decision_receiver: Arc<Mutex<HashMap<u64, Option<RemotePairingResponse>>>>,
     ) -> Result<()> {
         let addr = format!("0.0.0.0:{}", port);
-        let listener = TcpListener::bind(&addr)
-            .map_err(|e| MistError::Io(format!("Failed to bind pairing server on {}: {}", addr, e)))?;
-        listener.set_nonblocking(true).map_err(|e| MistError::Io(e.to_string()))?;
+        let listener = TcpListener::bind(&addr).map_err(|e| {
+            MistError::Io(format!("Failed to bind pairing server on {}: {}", addr, e))
+        })?;
+        listener
+            .set_nonblocking(true)
+            .map_err(|e| MistError::Io(e.to_string()))?;
 
         *self.is_running.lock().unwrap() = true;
         let is_running = self.is_running.clone();
@@ -1119,8 +1151,9 @@ impl RemotePairingClient {
         timeout: Duration,
     ) -> Result<RemotePairingResponse> {
         let addr = format!("{}:{}", host, port);
-        let stream = TcpStream::connect(&addr)
-            .map_err(|e| MistError::Pairing(format!("Failed to connect to host at {}: {}", addr, e)))?;
+        let stream = TcpStream::connect(&addr).map_err(|e| {
+            MistError::Pairing(format!("Failed to connect to host at {}: {}", addr, e))
+        })?;
 
         stream
             .set_read_timeout(Some(timeout))
@@ -1143,8 +1176,12 @@ impl RemotePairingClient {
             .map_err(|e| MistError::Pairing(format!("Failed to encode request: {}", e)))?;
 
         let len_buf = (payload.len() as u32).to_be_bytes();
-        stream.write_all(&len_buf).map_err(|e| MistError::Io(e.to_string()))?;
-        stream.write_all(&payload).map_err(|e| MistError::Io(e.to_string()))?;
+        stream
+            .write_all(&len_buf)
+            .map_err(|e| MistError::Io(e.to_string()))?;
+        stream
+            .write_all(&payload)
+            .map_err(|e| MistError::Io(e.to_string()))?;
         stream.flush().map_err(|e| MistError::Io(e.to_string()))?;
 
         let mut resp_len_buf = [0u8; 4];
@@ -1157,11 +1194,15 @@ impl RemotePairingClient {
 
         let resp_len = u32::from_be_bytes(resp_len_buf) as usize;
         if resp_len > 65536 {
-            return Err(MistError::Pairing("Response exceeds maximum size limit".to_string()));
+            return Err(MistError::Pairing(
+                "Response exceeds maximum size limit".to_string(),
+            ));
         }
 
         let mut resp_payload = vec![0u8; resp_len];
-        stream.read_exact(&mut resp_payload).map_err(|e| MistError::Io(e.to_string()))?;
+        stream
+            .read_exact(&mut resp_payload)
+            .map_err(|e| MistError::Io(e.to_string()))?;
 
         let resp: RemotePairingResponse = serde_json::from_slice(&resp_payload)
             .map_err(|e| MistError::Pairing(format!("Failed to decode host response: {}", e)))?;

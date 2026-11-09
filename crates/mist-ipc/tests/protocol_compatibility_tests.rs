@@ -1,6 +1,6 @@
 use mist_ipc::{
-    IpcMessage, IpcViewportPayload, IpcWindowPayload, MessageType,
-    IPC_HEADER_SIZE, IPC_MAGIC, IPC_VERSION,
+    IpcMessage, IpcViewportPayload, IpcWindowPayload, MessageType, IPC_HEADER_SIZE, IPC_MAGIC,
+    IPC_VERSION,
 };
 
 #[test]

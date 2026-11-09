@@ -9,6 +9,13 @@
 #include <vector>
 #include <cstdint>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#include <VideoToolbox/VideoToolbox.h>
+#include <CoreMedia/CoreMedia.h>
+#include <CoreVideo/CoreVideo.h>
+#endif
+
 namespace mist::decode {
 
 enum class ClientPlatform : uint8_t {
@@ -41,8 +48,8 @@ enum class DecoderQualificationState : uint8_t {
     HardwareVerified
 };
 
-[[nodiscard]] constexpr std::string_view qualificationStateToString(DecoderQualificationState s) noexcept {
-    switch (s) {
+[[nodiscard]] constexpr std::string_view decoderQualificationStateToString(DecoderQualificationState state) noexcept {
+    switch (state) {
         case DecoderQualificationState::NotSupported: return "NotSupported";
         case DecoderQualificationState::NotBuilt: return "NotBuilt";
         case DecoderQualificationState::Built: return "Built";
@@ -63,12 +70,7 @@ struct PlatformCapabilityInfo {
     bool supportsH264{false};
     bool supportsHevc{false};
     bool supportsAv1{false};
-    std::string supportedProfiles;
-    uint32_t maxWidth{0};
-    uint32_t maxHeight{0};
-    std::string activeBackend;
-    std::string initializationResult{"NotAttempted"};
-    DecoderQualificationState qualificationState{DecoderQualificationState::NotSupported};
+    DecoderQualificationState qualificationState{DecoderQualificationState::NotBuilt};
     std::string releaseStatus{"Pending"};
 };
 
@@ -97,8 +99,42 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
-    [[maybe_unused]] void* vtSession_{nullptr};      // VTDecompressionSessionRef on macOS
-    [[maybe_unused]] void* formatDesc_{nullptr};     // CMVideoFormatDescriptionRef on macOS
+#if defined(__APPLE__)
+    VTDecompressionSessionRef vtSession_{nullptr};
+    CMVideoFormatDescriptionRef formatDesc_{nullptr};
+    bool formatCreated_{false};
+
+    static void decompressionOutputCallback(
+        void* decompressionOutputRefCon,
+        void* sourceFrameRefCon,
+        OSStatus status,
+        VTDecodeInfoFlags infoFlags,
+        CVImageBufferRef imageBuffer,
+        CMTime presentationTimeStamp,
+        CMTime presentationDuration);
+
+    bool extractH264Parameters(const uint8_t* data, size_t size);
+    bool extractHevcParameters(const uint8_t* data, size_t size);
+    bool createDecompressionSession();
+#else
+    [[maybe_unused]] void* vtSession_{nullptr};
+    [[maybe_unused]] void* formatDesc_{nullptr};
+#endif
+};
+
+enum class VaSurfaceState : uint8_t {
+    Available = 0,
+    Decoding,
+    Decoded,
+    InUse,
+    Released
+};
+
+struct VaSurfaceSlot {
+    uint32_t surfaceId{0};
+    VaSurfaceState state{VaSurfaceState::Available};
+    uint64_t frameNumber{0};
+    uint64_t timestampNs{0};
 };
 
 // Linux VA-API hardware decoder implementation
@@ -126,12 +162,20 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
-    [[maybe_unused]] int drmFd_{-1};
-    [[maybe_unused]] void* vaDisplay_{nullptr};      // VADisplay on Linux
-    [[maybe_unused]] uint32_t vaConfig_{0};          // VAConfigID
-    [[maybe_unused]] uint32_t vaContext_{0};         // VAContextID
-    [[maybe_unused]] uint32_t vaSurfaces_[8]{};      // VASurfaceID array
-    [[maybe_unused]] uint32_t surfaceCount_{0};
+#if defined(__linux__) && !defined(__ANDROID__)
+    int drmFd_{-1};
+    void* vaDisplay_{nullptr};
+    uint32_t vaConfig_{0};
+    uint32_t vaContext_{0};
+    std::vector<VaSurfaceSlot> surfacePool_;
+    static constexpr size_t kMaxVaSurfaces = 8;
+    bool initVaDisplay();
+    bool createVaContext(uint32_t width, uint32_t height);
+    void destroyVaResources();
+#else
+    [[maybe_unused]] void* vaDisplay_{nullptr};
+    [[maybe_unused]] uint32_t vaContext_{0};
+#endif
 };
 
 // Android NDK AMediaCodec hardware decoder implementation
@@ -159,9 +203,13 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
-    [[maybe_unused]] void* mediaCodec_{nullptr};     // AMediaCodec* on Android
-    [[maybe_unused]] void* mediaFormat_{nullptr};    // AMediaFormat* on Android
-    [[maybe_unused]] void* nativeWindow_{nullptr};   // ANativeWindow* on Android
+#if defined(__ANDROID__)
+    AMediaCodec* mediaCodec_{nullptr};
+    ANativeWindow* nativeWindow_{nullptr};
+#else
+    [[maybe_unused]] void* mediaCodec_{nullptr};
+    [[maybe_unused]] void* nativeWindow_{nullptr};
+#endif
 };
 
 // Web WebCodecs / WebAssembly client decoder implementation

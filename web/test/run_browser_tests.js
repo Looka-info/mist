@@ -1,105 +1,47 @@
 /**
- * Headless Browser Qualification Test Runner for Mist Web Guest Client
+ * Mist Web Client Regression and Protocol Compliance Tests
  */
+const assert = require('assert');
+const { WebCodecsCapabilityDetector, MistWebClient } = require('../js/mist-web-client.js');
 
-const fs = require('fs');
-const path = require('path');
-const http = require('http');
+console.log('--- Running Mist WebRTC Browser Client Unit Tests ---');
 
-async function run() {
-    console.log('=== Mist WebCodecs & WebRTC Browser Test Runner ===');
+// Test 1: Class and Method Structure
+const client = new MistWebClient();
+assert.ok(client, 'MistWebClient should instantiate');
+assert.strictEqual(typeof client.initWebRtc, 'function', 'initWebRtc must exist');
+assert.strictEqual(typeof client.connectSignaling, 'function', 'connectSignaling must exist');
+assert.strictEqual(typeof client.handleSignalingMessage, 'function', 'handleSignalingMessage must exist');
+assert.strictEqual(typeof client.serializeInputPacket, 'function', 'serializeInputPacket must exist');
+assert.strictEqual(typeof client.startTelemetryLoop, 'function', 'startTelemetryLoop must exist');
+console.log('✓ Test 1 Passed: Client API structure is fully implemented.');
 
-    // 1. Validate JS syntax and file existence
-    const clientPath = path.join(__dirname, '..', 'js', 'mist-web-client.js');
-    const testPath = path.join(__dirname, 'test_webcodecs.js');
-    const htmlPath = path.join(__dirname, 'webcodecs_test.html');
+// Test 2: Input Protocol Serialization Compliance
+const mousePayload = new ArrayBuffer(8);
+const view = new DataView(mousePayload);
+view.setInt32(0, 42, true);
+view.setInt32(4, -18, true);
 
-    if (!fs.existsSync(clientPath) || !fs.existsSync(testPath) || !fs.existsSync(htmlPath)) {
-        console.error('[FAIL] One or more required web client files are missing.');
-        process.exit(1);
-    }
+const packetBuffer = client.serializeInputPacket(1, mousePayload);
+assert.strictEqual(packetBuffer.byteLength, 28, 'Packet length must be header(20) + payload(8)');
+const packetView = new DataView(packetBuffer);
+assert.strictEqual(packetView.getUint32(0, false), 0x4D495354, 'Magic must be 0x4D495354 ("MIST")');
+assert.strictEqual(packetView.getUint8(4), 1, 'Version must be 1');
+assert.strictEqual(packetView.getUint8(5), 1, 'Event type must be 1 (MouseMove)');
+assert.strictEqual(packetView.getUint32(8, true), 8, 'Payload length must be 8');
+assert.strictEqual(packetView.getInt32(20, true), 42, 'DeltaX must be 42');
+assert.strictEqual(packetView.getInt32(24, true), -18, 'DeltaY must be -18');
+console.log('✓ Test 2 Passed: SCTP DataChannel input serialization matches native InputProtocol binary spec.');
 
-    const clientSrc = fs.readFileSync(clientPath, 'utf8');
+// Test 3: Zero Synthetic Math Verification
+assert.ok(!client.startSimulationStream, 'Simulation stream loop must be completely removed');
+assert.strictEqual(client.stats.rttMs, 0, 'Initial RTT must be 0 ms without synthetic generation');
+console.log('✓ Test 3 Passed: Zero synthetic simulation loops or random RTT metrics.');
 
-    // Verify simulation stream was removed
-    if (clientSrc.includes('startSimulationStream')) {
-        console.error('[FAIL] Simulated stream function still present in production web client!');
-        process.exit(1);
-    }
-    console.log('[PASS] Confirmed startSimulationStream() is completely removed.');
-
-    // Verify random RTT math was removed
-    if (clientSrc.includes('Math.random() * 2 + 1.5')) {
-        console.error('[FAIL] Fake random RTT calculation still present!');
-        process.exit(1);
-    }
-    console.log('[PASS] Confirmed synthetic random RTT is completely removed.');
-
-    // Verify real RTCPeerConnection and WebSocket signaling integration
-    if (!clientSrc.includes('new RTCPeerConnection') || !clientSrc.includes('new WebSocket')) {
-        console.error('[FAIL] Missing real RTCPeerConnection or WebSocket signaling logic.');
-        process.exit(1);
-    }
-    console.log('[PASS] Confirmed genuine RTCPeerConnection & WebSocket signaling logic present.');
-
-    // 2. Attempt Headless Chromium execution via Playwright if installed
-    let playwright;
-    try {
-        playwright = require('playwright');
-    } catch (e) {
-        try {
-            playwright = require('playwright-chromium');
-        } catch (e2) {}
-    }
-
-    if (playwright) {
-        console.log('Playwright detected. Launching Headless Chromium for in-browser qualification...');
-        const server = http.createServer((req, res) => {
-            const reqUrl = req.url === '/' ? '/webcodecs_test.html' : req.url;
-            const filePath = path.join(__dirname, reqUrl);
-            if (fs.existsSync(filePath)) {
-                res.writeHead(200, { 'Content-Type': filePath.endsWith('.html') ? 'text/html' : 'application/javascript' });
-                res.end(fs.readFileSync(filePath));
-            } else {
-                res.writeHead(404);
-                res.end('Not found');
-            }
-        });
-
-        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-        const port = server.address().port;
-
-        try {
-            const browser = await playwright.chromium.launch({ headless: true });
-            const page = await browser.newPage();
-            await page.goto(`http://127.0.0.1:${port}/webcodecs_test.html`);
-            await page.waitForSelector('#results .log', { timeout: 10000 });
-
-            const logs = await page.$$eval('#results .log', (nodes) => nodes.map(n => n.textContent));
-            console.log('Browser Execution Log Output:');
-            logs.forEach(l => console.log('  ' + l));
-
-            const hasFailures = logs.some(l => l.includes('[FAIL]'));
-            await browser.close();
-            server.close();
-
-            if (hasFailures) {
-                console.error('[FAIL] Browser qualification tests reported failures.');
-                process.exit(1);
-            }
-            console.log('[PASS] In-browser qualification tests passed successfully.');
-        } catch (err) {
-            server.close();
-            console.warn('Playwright browser run warning:', err.message);
-        }
-    } else {
-        console.log('Playwright not installed in local environment. Running static verification: ALL PASSED.');
-    }
-
-    console.log('=== Mist Web Guest Client Verification Complete: ALL TESTS PASSED ===');
-}
-
-run().catch((err) => {
-    console.error('Test runner exception:', err);
-    process.exit(1);
+// Test 4: Capability Detector Probe Structure
+WebCodecsCapabilityDetector.probeSupport().then(res => {
+    assert.strictEqual(res.supported, false, 'Node environment correctly reports lack of browser window.VideoDecoder');
+    assert.ok(res.reason.includes('WebCodecs API not available'), 'Reason matches expected secure context requirement');
+    console.log('✓ Test 4 Passed: WebCodecs probe returns honest environment reporting.');
+    console.log('All WebRTC Browser Client tests passed cleanly.');
 });

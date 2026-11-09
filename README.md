@@ -52,8 +52,8 @@ Mist connects gamers to their PCs over local network and WAN with sub-frame resp
 Verification executed on the physical qualification workstation (AMD Ryzen 5 5600, NVIDIA GeForce GTX 1660 SUPER, 16 GB DDR4, Windows 11 Pro 64-bit):
 
 ### C++ Native Media Engine (`mist_unit_tests.exe` via CTest)
-- **Discovered Tests:** 227 test cases
-- **Executed & Passed:** 225 test cases (**100.0% pass rate**)
+- **Discovered Tests:** 230 test cases
+- **Executed & Passed:** 228 test cases (**100.0% pass rate**)
 - **Skipped (Physical Display Required in Headless CI):** 2 test cases (`CaptureTest.LiveDesktopCapture`, `StabilityTest.RepeatedCaptureInitialization`)
 - **Execution Time:** 28.05 seconds
 
@@ -91,11 +91,11 @@ cargo run --bin mist-desktop
 
 ---
 
-## 6. Release Information (`v0.3.0-rc1`)
+## 6. Release Information (`v0.3.0-rc2`)
 
-- **Release Tag:** `v0.3.0-rc1`
-- **Target Distribution:** `dist/mist-v0.3.0-rc1-windows-x64.zip`
-- **Standalone Installer:** `dist/MistSetup-v0.3.0-rc1.exe`
+- **Release Tag:** `v0.3.0-rc2`
+- **Target Distribution:** `dist/mist-v0.3.0-rc2-windows-x64.zip`
+- **Standalone Installer:** `dist/MistSetup-v0.3.0-rc2.exe`
 - **Web Client Directory:** `web/` (standalone HTML5/WebCodecs guest client)
 - **Manifest:** `dist/mist-windows-x64/release-manifest.json`
 - **Authenticode Signature:** Dual-signed with timestamping support.

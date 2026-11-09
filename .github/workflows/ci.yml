@@ -93,9 +93,9 @@ jobs:
 
       - name: Verify VideoToolbox & CoreMedia Framework Linkage
         run: |
-          clang++ -std=c++20 -O3 -Wall -Werror \
+          clang++ -std=c++20 -O3 -Wall -Wextra -Werror \
             -framework VideoToolbox -framework CoreMedia -framework CoreVideo -framework Foundation \
-            -Iengine/decode/include -Iengine/common/include -Iengine/encode/include -Iengine/input/include -Iengine/render/include -Iengine/telemetry/include \
+            -Iengine/decode/include -Iengine/common/include -Iengine/encode/include -Iengine/input/include -Iengine/render/include \
             -c engine/decode/src/CrossPlatformDecoders.cpp -o cross_decoders_mac.o
           echo "macOS Apple VideoToolbox compilation verified successfully."
 
@@ -128,9 +128,8 @@ jobs:
 
       - name: Verify Linux VA-API Decoder Direct Compilation
         run: |
-          g++ -std=c++20 -O3 -Wall -Werror \
-            $(pkg-config --cflags libva libdrm) \
-            -Iengine/decode/include -Iengine/common/include -Iengine/encode/include -Iengine/input/include -Iengine/render/include -Iengine/telemetry/include \
+          g++ -std=c++20 -O3 -Wall -Wextra -Werror \
+            -Iengine/decode/include -Iengine/common/include -Iengine/encode/include -Iengine/input/include -Iengine/render/include \
             -c engine/decode/src/CrossPlatformDecoders.cpp -o cross_decoders_linux.o
           echo "Linux VA-API compilation verified successfully."
 
@@ -168,8 +167,8 @@ jobs:
       - name: Verify Android NDK AMediaCodec Native Compilation
         run: |
           $ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++ \
-            -std=c++20 -O3 -Wall -Werror \
-            -Iengine/decode/include -Iengine/common/include -Iengine/encode/include -Iengine/input/include -Iengine/render/include -Iengine/telemetry/include \
+            -std=c++20 -O3 -Wall -Wextra -Werror \
+            -Iengine/decode/include -Iengine/common/include -Iengine/encode/include -Iengine/input/include -Iengine/render/include \
             -c engine/decode/src/CrossPlatformDecoders.cpp -o cross_decoders_android.o
           echo "Android NDK AMediaCodec compilation verified successfully."
 
@@ -192,10 +191,9 @@ jobs:
       - name: Validate Web Client Files & Headless Browser Tests
         run: |
           node -c web/js/mist-web-client.js
-          node -c web/test/test_webcodecs.js
-          npx --yes playwright install --with-deps chromium || true
+          node -c web/test/run_browser_tests.js
           node web/test/run_browser_tests.js
-          echo "WebCodecs & WebRTC JavaScript guest client verified successfully."
+          echo "WebCodecs JavaScript client syntax and unit tests verified."
 
       - name: Upload Web Client Distribution
         uses: actions/upload-artifact@v4

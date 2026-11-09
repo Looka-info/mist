@@ -34,6 +34,24 @@ if (WIN32)
         mfuuid
         ole32
     )
+elseif (APPLE)
+    target_link_libraries(mist_decode PRIVATE
+        "-framework VideoToolbox"
+        "-framework CoreMedia"
+        "-framework CoreVideo"
+        "-framework Foundation"
+    )
+elseif (ANDROID)
+    target_link_libraries(mist_decode PRIVATE
+        mediandk
+        android
+    )
+elseif (UNIX)
+    target_link_libraries(mist_decode PRIVATE
+        va
+        va-drm
+        drm
+    )
 endif()
 
 if (APPLE)

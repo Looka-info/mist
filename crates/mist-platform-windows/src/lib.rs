@@ -8,7 +8,7 @@ use windows_sys::Win32::System::DataExchange::{
 use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GHND};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetWindowLongPtrW, SetParent, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, HWND_TOP,
-    SWP_NOACTIVATE, SWP_NOZORDER, SWP_SHOWWINDOW, SWP_HIDEWINDOW, WS_CAPTION, WS_CHILD,
+    SWP_HIDEWINDOW, SWP_NOACTIVATE, SWP_NOZORDER, SWP_SHOWWINDOW, WS_CAPTION, WS_CHILD,
     WS_CLIPSIBLINGS, WS_POPUP, WS_THICKFRAME, WS_VISIBLE,
 };
 
@@ -87,7 +87,11 @@ pub fn query_hardware_info() -> HardwareInfo {
 
     // Query GPU via wmic or powershell
     let output = Command::new("powershell")
-        .args(["-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"])
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
+        ])
         .output();
 
     if let Ok(out) = output {
@@ -96,7 +100,11 @@ pub fn query_hardware_info() -> HardwareInfo {
             let name = line.trim();
             if !name.is_empty() {
                 hw.gpu_name = name.to_string();
-                if name.to_lowercase().contains("nvidia") || name.to_lowercase().contains("geforce") || name.to_lowercase().contains("rtx") || name.to_lowercase().contains("gtx") {
+                if name.to_lowercase().contains("nvidia")
+                    || name.to_lowercase().contains("geforce")
+                    || name.to_lowercase().contains("rtx")
+                    || name.to_lowercase().contains("gtx")
+                {
                     hw.nvenc_supported = true;
                     break;
                 }
@@ -107,7 +115,14 @@ pub fn query_hardware_info() -> HardwareInfo {
     hw
 }
 
-pub unsafe fn embed_child_window(child_hwnd: u64, parent_hwnd: u64, x: i32, y: i32, width: u32, height: u32) {
+pub unsafe fn embed_child_window(
+    child_hwnd: u64,
+    parent_hwnd: u64,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) {
     if child_hwnd == 0 || parent_hwnd == 0 {
         return;
     }
@@ -220,12 +235,12 @@ pub fn set_clipboard_text(text: &str) -> bool {
 
 /// Dispatches an AMD standard 102-byte Magic Packet over UDP broadcast to wake a remote host machine.
 pub fn send_wake_on_lan(mac_str: &str) -> Result<(), String> {
-    let clean: String = mac_str
-        .chars()
-        .filter(|c| c.is_ascii_hexdigit())
-        .collect();
+    let clean: String = mac_str.chars().filter(|c| c.is_ascii_hexdigit()).collect();
     if clean.len() != 12 {
-        return Err(format!("Invalid MAC address: expected 12 hex digits (e.g. 00:11:22:33:44:55), got {}", clean.len()));
+        return Err(format!(
+            "Invalid MAC address: expected 12 hex digits (e.g. 00:11:22:33:44:55), got {}",
+            clean.len()
+        ));
     }
 
     let mut mac_bytes = [0u8; 6];
@@ -244,9 +259,11 @@ pub fn send_wake_on_lan(mac_str: &str) -> Result<(), String> {
 
     let socket = std::net::UdpSocket::bind("0.0.0.0:0")
         .map_err(|e| format!("Failed to bind UDP socket: {}", e))?;
-    socket.set_broadcast(true)
+    socket
+        .set_broadcast(true)
         .map_err(|e| format!("Failed to set broadcast mode: {}", e))?;
-    socket.send_to(&packet, "255.255.255.255:9")
+    socket
+        .send_to(&packet, "255.255.255.255:9")
         .map_err(|e| format!("Failed to send broadcast packet: {}", e))?;
 
     Ok(())

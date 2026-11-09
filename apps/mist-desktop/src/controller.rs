@@ -3,10 +3,11 @@
 use mist_config::AppConfig;
 use mist_core::Result;
 use mist_domain::{DeviceEntry, DevicePermissions};
-use mist_pairing::{
-    PairingManager, RemotePairingResponse, RemotePairingServer,
+use mist_pairing::{PairingManager, RemotePairingResponse, RemotePairingServer};
+use mist_platform_windows::{
+    get_clipboard_text, query_hardware_info, query_wifi_info, set_clipboard_text, HardwareInfo,
+    WifiInfo,
 };
-use mist_platform_windows::{get_clipboard_text, query_hardware_info, query_wifi_info, set_clipboard_text, HardwareInfo, WifiInfo};
 use mist_session::{SessionEvent, SessionSupervisor};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -54,7 +55,11 @@ impl DesktopController {
         *self.hardware_info.lock().unwrap() = query_hardware_info();
     }
 
-    pub fn start_sharing<F>(&self, event_cb: F, approval_prompt_cb: Arc<dyn Fn(u64, String, String) + Send + Sync + 'static>) -> Result<String>
+    pub fn start_sharing<F>(
+        &self,
+        event_cb: F,
+        approval_prompt_cb: Arc<dyn Fn(u64, String, String) + Send + Sync + 'static>,
+    ) -> Result<String>
     where
         F: Fn(SessionEvent) + Send + Sync + 'static,
     {
@@ -115,7 +120,10 @@ impl DesktopController {
                 sas_code: String::new(),
             };
 
-            self.pending_decisions.lock().unwrap().insert(id, Some(resp));
+            self.pending_decisions
+                .lock()
+                .unwrap()
+                .insert(id, Some(resp));
             true
         } else {
             false
@@ -141,7 +149,10 @@ impl DesktopController {
                 sas_code: String::new(),
             };
 
-            self.pending_decisions.lock().unwrap().insert(id, Some(resp));
+            self.pending_decisions
+                .lock()
+                .unwrap()
+                .insert(id, Some(resp));
             true
         } else {
             false
@@ -161,7 +172,10 @@ impl DesktopController {
     }
 
     pub fn revoke_trusted_device(&self, device_id: &str) -> bool {
-        self.pairing_manager.lock().unwrap().revoke_device(device_id)
+        self.pairing_manager
+            .lock()
+            .unwrap()
+            .revoke_device(device_id)
     }
 
     pub fn get_trusted_devices(&self) -> Vec<DeviceEntry> {
@@ -175,10 +189,11 @@ impl DesktopController {
 
     #[allow(dead_code)]
     pub fn ban_device(&self, device_id: &str, reason: Option<&str>) -> bool {
-        self.pairing_manager
-            .lock()
-            .unwrap()
-            .ban_device(device_id, None, reason.map(|s| s.to_string()))
+        self.pairing_manager.lock().unwrap().ban_device(
+            device_id,
+            None,
+            reason.map(|s| s.to_string()),
+        )
     }
 
     #[allow(dead_code)]
@@ -193,22 +208,35 @@ impl DesktopController {
 
     #[allow(dead_code)]
     pub fn get_active_connected_guests(&self) -> Vec<mist_domain::ConnectedGuest> {
-        self.pairing_manager.lock().unwrap().active_connected_guests()
+        self.pairing_manager
+            .lock()
+            .unwrap()
+            .active_connected_guests()
     }
 
     #[allow(dead_code)]
     pub fn update_guest_permissions(&self, device_id: &str, perms: DevicePermissions) -> bool {
-        self.pairing_manager.lock().unwrap().update_device_permissions(device_id, perms)
+        self.pairing_manager
+            .lock()
+            .unwrap()
+            .update_device_permissions(device_id, perms)
     }
 
     #[allow(dead_code)]
     pub fn revoke_guest_permissions(&self, device_id: &str) -> bool {
-        self.pairing_manager.lock().unwrap().revoke_guest_permissions(device_id)
+        self.pairing_manager
+            .lock()
+            .unwrap()
+            .revoke_guest_permissions(device_id)
     }
 
     #[allow(dead_code)]
     pub fn get_permission_audit_log(&self) -> Vec<mist_domain::PermissionAuditEvent> {
-        self.pairing_manager.lock().unwrap().permission_audit_log().to_vec()
+        self.pairing_manager
+            .lock()
+            .unwrap()
+            .permission_audit_log()
+            .to_vec()
     }
 
     pub fn send_wol(&self, mac_str: &str) -> Result<()> {
