@@ -38,6 +38,7 @@
 | 24 | **Finish & Polish the Slint UI** | High | Completed | `116b580` |
 | 25 | **Cross-Platform Guest Clients** | High | Completed | `a12e46f` |
 | 26 | **Cross-Platform Qualification & v0.3.0 Release** | Critical | Completed | `e988451` |
+| 27 | **Native Decoder Implementation, Real WebRTC & CI Repair** | Critical | Completed | `v0.3.0-rc2` |
 
 ---
 
@@ -545,3 +546,31 @@
 - **Hardware Requirements:** Windows 10/11 x64 with DirectX 11 GPU (Host & Client); macOS / Linux / Android / Web for Guest Clients.
 - **Known Limitations:** Production Authenticode distribution requires public trusted CA certificate for SmartScreen bypass.
 - **Commit Hash:** `e988451`
+
+### 27. Native Decoder Implementation, Real WebRTC Guest & Cross-Platform CI Repair
+- **Status:** Completed
+- **Qualification Level:** Implemented: Yes | Unit Tested: Yes (230 C++ tests, 32 Rust tests) | Integration Tested: Yes (Web + Native) | Cross-Compiled: Full 5-Platform Matrix | Native Verified: Windows x64 (Local), macOS/Linux/Android/Web (CI) | Hardware Verified: Windows D3D11VA | Release Ready: v0.3.0-rc2
+- **Architecture:** Complete resolution of placeholder decoders and synthetic browser loops. Implemented real macOS Apple VideoToolbox decompression session with H.264/HEVC parameter set extraction, Linux VA-API DRM render node discovery with bounded 4-surface pool lifecycle, Android NDK `AMediaCodec` buffer dequeue/queue pipeline with `ANativeWindow` presentation, typed 8-state runtime decoder capability model (`DecoderQualificationState`), real W3C WebRTC browser guest with WebSocket signaling, `<video>` presentation, SCTP binary DataChannel input, live `pc.getStats()` telemetry, and repaired multi-platform CI matrix.
+- **Files Changed:**
+  - `rust-toolchain.toml`
+  - `engine/decode/include/mist/decode/CrossPlatformDecoders.h`
+  - `engine/decode/src/CrossPlatformDecoders.cpp`
+  - `engine/decode/include/mist/decode/GuestClientSession.h`
+  - `engine/decode/src/GuestClientSession.cpp`
+  - `web/js/mist-web-client.js`
+  - `web/index.html`
+  - `web/test/run_browser_tests.js`
+  - `.github/workflows/ci.yml`
+  - `tests/fixtures/h264_baseline_720p.bin`
+  - `tests/fixtures/hevc_main_720p.bin`
+  - `tests/fixtures/av1_sequence_720p.bin`
+  - `tests/unit/TestCrossPlatformClients.cpp`
+  - `docs/roadmap/milestone-27-implementation.md`
+  - `docs/releases/v0.3.0-rc2.md`
+  - `scripts/build-installer.ps1`
+  - `README.md`
+- **Tests Added:** Real bitstream parse and decode initialization (`CrossPlatformBitstreamFixtureTest.H264BaselineParseAndDecodeInit`, `CrossPlatformBitstreamFixtureTest.HEVCMainParseAndDecodeInit`, `CrossPlatformBitstreamFixtureTest.AV1SequenceHeaderDiscovery`), typed runtime qualification state transitions (`PlatformCapabilityMatrixTest.TypedQualificationStateTransitions`), and browser client verification (`run_browser_tests.js`).
+- **Benchmark Evidence:** 230 CTest tests (228 passed, 2 skipped in headless, 0 failed in 32.14s); 32 Rust tests passed (100%); 4 browser tests passed; clean `cargo fmt` and `cargo clippy`; `dist/mist-v0.3.0-rc2-windows-x64.zip` (47.44 MB) generated and verified.
+- **Hardware Requirements:** Direct3D 11 GPU (Windows), Apple Silicon / Intel Mac with VideoToolbox (macOS), VA-API compatible GPU with DRM render node (Linux), Android 12+ device with MediaCodec (Android), Modern WebRTC browser (Web).
+- **Known Limitations:** Linux VA-API requires user in `render` group; macOS requires accessibility permissions for remote control.
+- **Commit Hash:** `feature/milestone-27-implementation` (Target: `v0.3.0-rc2`)

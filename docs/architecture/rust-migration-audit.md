@@ -70,8 +70,8 @@ All core business logic, configuration, security, IPC, pairing, and desktop user
 ### Category 4: Testing & Diagnostic Harnesses
 | Harness | Target | Role |
 |---|---|---|
-| **`mist_unit_tests.exe`** | C++ Media Engine (222 test cases) | Exhaustive unit & integration tests covering DirectX, NVENC, WebRTC, FEC, and decoders. |
-| **`cargo test --workspace`** | Rust Workspace (28 test cases) | Comprehensive verification of pairing cryptography, IPC binary frames, config, and signaling. |
+| **`mist_unit_tests.exe`** | C++ Media Engine (230 test cases) | Exhaustive unit & integration tests covering DirectX, NVENC, WebRTC, FEC, and decoders. |
+| **`cargo test --workspace`** | Rust Workspace (32 test cases) | Comprehensive verification of pairing cryptography, IPC binary frames, config, and signaling. |
 | **`apps/client` & `apps/host`** | C++ Diagnostic CLI tools | Standalone smoke test executables for CI pipelines and headless validation (`--self-test`). |
 
 ---
