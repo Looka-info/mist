@@ -2747,7 +2747,7 @@ dependencies = [
 
 [[package]]
 name = "mist-config"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "mist-core",
  "mist-domain",
@@ -2758,7 +2758,7 @@ dependencies = [
 
 [[package]]
 name = "mist-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "thiserror 1.0.69",
@@ -2768,7 +2768,7 @@ dependencies = [
 
 [[package]]
 name = "mist-desktop"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "mist-config",
@@ -2788,7 +2788,7 @@ dependencies = [
 
 [[package]]
 name = "mist-domain"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "mist-core",
@@ -2798,7 +2798,7 @@ dependencies = [
 
 [[package]]
 name = "mist-ipc"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "mist-core",
  "tracing",
@@ -2807,7 +2807,7 @@ dependencies = [
 
 [[package]]
 name = "mist-pairing"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "mist-config",
@@ -2822,7 +2822,7 @@ dependencies = [
 
 [[package]]
 name = "mist-platform-windows"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "mist-core",
  "tracing",
@@ -2831,7 +2831,7 @@ dependencies = [
 
 [[package]]
 name = "mist-session"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "mist-config",
  "mist-core",
@@ -2843,7 +2843,7 @@ dependencies = [
 
 [[package]]
 name = "mist-signaling"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "futures-util",
  "serde",
@@ -2856,7 +2856,7 @@ dependencies = [
 
 [[package]]
 name = "mist-telemetry"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "mist-core",

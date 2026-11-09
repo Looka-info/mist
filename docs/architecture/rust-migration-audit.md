@@ -1,8 +1,8 @@
 # Mist — Comprehensive Rust Migration Audit & Codebase Inventory
 
-**Target Release:** v0.3.0  
-**Baseline Commit:** `3c67de0c`  
-**Active Development Branch:** `feature/advanced-streaming-expansion`  
+**Target Release:** v0.3.0-rc2  
+**Baseline Commit:** `ac289c8c`  
+**Active Development Branch:** `feature/milestone-27-native-qualification`  
 **Classification Date:** November 9, 2026  
 
 ---
@@ -70,8 +70,8 @@ All core business logic, configuration, security, IPC, pairing, and desktop user
 ### Category 4: Testing & Diagnostic Harnesses
 | Harness | Target | Role |
 |---|---|---|
-| **`mist_unit_tests.exe`** | C++ Media Engine (222 test cases) | Exhaustive unit & integration tests covering DirectX, NVENC, WebRTC, FEC, and decoders. |
-| **`cargo test --workspace`** | Rust Workspace (28 test cases) | Comprehensive verification of pairing cryptography, IPC binary frames, config, and signaling. |
+| **`mist_unit_tests.exe`** | C++ Media Engine (227 test cases, 225 passed, 2 skipped) | Exhaustive unit & integration tests covering DirectX, NVENC, WebRTC, FEC, cross-platform decoders. |
+| **`cargo test --workspace`** | Rust Workspace (45 test cases, 100% passed) | Comprehensive verification of pairing cryptography, IPC binary frames, config, session, and signaling. |
 | **`apps/client` & `apps/host`** | C++ Diagnostic CLI tools | Standalone smoke test executables for CI pipelines and headless validation (`--self-test`). |
 
 ---

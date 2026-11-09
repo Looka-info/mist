@@ -19,17 +19,58 @@ target_link_libraries(mist_decode PUBLIC
     mist_encode
     mist_input
     mist_render
-    mist_platform_windows
     mist_telemetry
     mist_warnings
 )
 
 if (WIN32)
+    target_link_libraries(mist_decode PUBLIC
+        mist_platform_windows
+    )
     target_link_libraries(mist_decode PRIVATE
         d3d11
         dxgi
         mfplat
         mfuuid
         ole32
+    )
+endif()
+
+if (APPLE)
+    find_library(VIDEOTOOLBOX_FRAMEWORK VideoToolbox REQUIRED)
+    find_library(COREMEDIA_FRAMEWORK CoreMedia REQUIRED)
+    find_library(COREVIDEO_FRAMEWORK CoreVideo REQUIRED)
+    find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+    target_link_libraries(mist_decode PRIVATE
+        ${VIDEOTOOLBOX_FRAMEWORK}
+        ${COREMEDIA_FRAMEWORK}
+        ${COREVIDEO_FRAMEWORK}
+        ${FOUNDATION_FRAMEWORK}
+    )
+endif()
+
+if (CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT ANDROID)
+    find_package(PkgConfig QUIET)
+    pkg_check_modules(LIBVA QUIET libva)
+    pkg_check_modules(LIBDRM QUIET libdrm)
+    if (LIBVA_FOUND)
+        target_include_directories(mist_decode PRIVATE ${LIBVA_INCLUDE_DIRS})
+        target_link_libraries(mist_decode PRIVATE ${LIBVA_LIBRARIES})
+    else()
+        target_link_libraries(mist_decode PRIVATE va va-drm)
+    endif()
+    if (LIBDRM_FOUND)
+        target_include_directories(mist_decode PRIVATE ${LIBDRM_INCLUDE_DIRS})
+        target_link_libraries(mist_decode PRIVATE ${LIBDRM_LIBRARIES})
+    else()
+        target_link_libraries(mist_decode PRIVATE drm)
+    endif()
+endif()
+
+if (ANDROID)
+    target_link_libraries(mist_decode PRIVATE
+        mediandk
+        android
+        log
     )
 endif()

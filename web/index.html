@@ -230,14 +230,15 @@
     </header>
 
     <main>
-        <canvas id="viewport" width="1920" height="1080"></canvas>
+        <video id="remote-video" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: contain; position: absolute; top: 0; left: 0;"></video>
+        <canvas id="viewport" width="1920" height="1080" style="position: absolute; top: 0; left: 0; display: none;"></canvas>
 
         <div id="hud-overlay" class="hidden">
             <div>FPS: <span id="hud-fps">0</span></div>
             <div>Latency: <span id="hud-latency">0.0</span> ms</div>
             <div>RTT: <span id="hud-rtt">0.0</span> ms</div>
             <div>Loss: <span id="hud-loss">0.0%</span></div>
-            <div>Codec: <span id="hud-codec">None</span> (WebCodecs)</div>
+            <div>Codec: <span id="hud-codec">None</span></div>
         </div>
 
         <div id="connection-modal">
@@ -247,15 +248,23 @@
                 <input id="cfg-signaling" type="text" value="ws://127.0.0.1:8080" />
             </div>
             <div class="input-group">
+                <label for="cfg-session-id">Session ID</label>
+                <input id="cfg-session-id" type="text" value="mist-session-1" />
+            </div>
+            <div class="input-group">
+                <label for="cfg-guest-id">Guest ID</label>
+                <input id="cfg-guest-id" type="text" value="web-guest-1" />
+            </div>
+            <div class="input-group">
                 <label for="cfg-token">Authorization / Pairing Token</label>
                 <input id="cfg-token" type="text" value="mist-dev-token" />
             </div>
             <div class="input-group">
                 <label for="cfg-codec">Preferred Codec</label>
                 <select id="cfg-codec">
-                    <option value="av01.0.08M.10">AV1 Main (WebCodecs)</option>
-                    <option value="hvc1.1.6.L93.B0">HEVC Main (WebCodecs)</option>
-                    <option value="avc1.64002a" selected>H.264 High 4.2 (WebCodecs)</option>
+                    <option value="avc1.64002a" selected>H.264 High 4.2</option>
+                    <option value="hvc1.1.6.L93.B0">HEVC Main</option>
+                    <option value="av01.0.08M.10">AV1 Main</option>
                 </select>
             </div>
             <div class="input-group">

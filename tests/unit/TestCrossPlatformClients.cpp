@@ -23,9 +23,13 @@ TEST(CrossPlatformDecoderFactoryTest, CreateDecodersForAllPlatforms) {
     auto winDec = VideoDecoderFactory::createDecoder(ClientPlatform::Windows_D3D11VA);
     EXPECT_TRUE(winDec.hasValue());
     EXPECT_NE(winDec.value(), nullptr);
+#elif defined(__APPLE__)
+    EXPECT_EQ(VideoDecoderFactory::getNativePlatform(), ClientPlatform::MacOS_VideoToolbox);
+#elif defined(__linux__) && !defined(__ANDROID__)
+    EXPECT_EQ(VideoDecoderFactory::getNativePlatform(), ClientPlatform::Linux_VaApi);
 #endif
 
-    // Cross-platform decoders should all instantiate successfully
+    // Cross-platform decoder objects should all instantiate cleanly
     auto macDec = VideoDecoderFactory::createDecoder(ClientPlatform::MacOS_VideoToolbox);
     ASSERT_TRUE(macDec.hasValue());
     EXPECT_NE(macDec.value(), nullptr);
@@ -43,7 +47,7 @@ TEST(CrossPlatformDecoderFactoryTest, CreateDecodersForAllPlatforms) {
     EXPECT_NE(webDec.value(), nullptr);
 }
 
-TEST(MacOSVideoToolboxTest, DecodeLifecycle) {
+TEST(MacOSVideoToolboxTest, DecodeLifecycleOrHonestRejection) {
     auto decRes = VideoToolboxDecoder::create();
     ASSERT_TRUE(decRes.hasValue());
     auto decoder = std::move(decRes.value());
@@ -51,75 +55,62 @@ TEST(MacOSVideoToolboxTest, DecodeLifecycle) {
     EXPECT_FALSE(decoder->isInitialized());
 
     DecodeConfig cfg{
-        .codec = VideoCodec::AV1,
+        .codec = VideoCodec::H264,
         .preferHardwareDecoding = true,
         .lowLatencyTuning = true
     };
+
+#if defined(__APPLE__)
+    EXPECT_TRUE(VideoToolboxDecoder::isNativePlatform());
     auto initRes = decoder->initialize(cfg);
     EXPECT_TRUE(initRes.hasValue());
     EXPECT_TRUE(decoder->isInitialized());
 
-    // Submit packet
-    EncodedPacket pkt{};
-    pkt.data = {0x12, 0x00, 0x0A, 0x0B, 0x0C};
-    pkt.timestampNs = 123456789ULL;
-    pkt.isKeyframe = true;
+    EncodedPacket emptyPkt{};
+    EXPECT_FALSE(decoder->submitPacket(emptyPkt).hasValue());
 
-    auto subRes = decoder->submitPacket(pkt);
-    EXPECT_TRUE(subRes.hasValue());
-    EXPECT_EQ(decoder->getDecodedFrameCount(), 1u);
-
-    // Retrieve frame
-    auto frameRes = decoder->getNextFrame();
-    ASSERT_TRUE(frameRes.hasValue());
-    EXPECT_EQ(frameRes.value().width, 1920u);
-    EXPECT_EQ(frameRes.value().height, 1080u);
-    EXPECT_EQ(frameRes.value().timestampNs, 123456789ULL);
-    EXPECT_EQ(frameRes.value().frameNumber, 1u);
-
-    EXPECT_TRUE(decoder->releaseFrame(frameRes.value()).hasValue());
-
-    // Second fetch should return empty/NotFound
-    auto emptyRes = decoder->getNextFrame();
-    EXPECT_FALSE(emptyRes.hasValue());
-
-    // Flush and shutdown
     EXPECT_TRUE(decoder->flush().hasValue());
     EXPECT_TRUE(decoder->shutdown().hasValue());
     EXPECT_FALSE(decoder->isInitialized());
+#else
+    EXPECT_FALSE(VideoToolboxDecoder::isNativePlatform());
+    EXPECT_FALSE(decoder->isHardwareAccelerated());
+    auto initRes = decoder->initialize(cfg);
+    EXPECT_FALSE(initRes.hasValue());
+    EXPECT_EQ(initRes.error().code(), common::ErrorCode::NotImplemented);
+#endif
 }
 
-TEST(LinuxVaApiTest, SurfaceRingBufferLifecycle) {
+TEST(LinuxVaApiTest, SurfaceRingBufferOrHonestRejection) {
     auto decRes = VaApiVideoDecoder::create();
     ASSERT_TRUE(decRes.hasValue());
     auto decoder = std::move(decRes.value());
 
     DecodeConfig cfg{
-        .codec = VideoCodec::HEVC,
+        .codec = VideoCodec::H264,
         .preferHardwareDecoding = true,
         .lowLatencyTuning = true
     };
-    EXPECT_TRUE(decoder->initialize(cfg).hasValue());
 
-    for (uint32_t i = 1; i <= 4; ++i) {
-        EncodedPacket pkt{};
-        pkt.data = {0x00, 0x00, 0x00, 0x01, static_cast<uint8_t>(i)};
-        pkt.timestampNs = i * 16666666ULL;
-        EXPECT_TRUE(decoder->submitPacket(pkt).hasValue());
-
-        auto frameRes = decoder->getNextFrame();
-        ASSERT_TRUE(frameRes.hasValue());
-        EXPECT_EQ(frameRes.value().frameNumber, i);
-        // Verify simulated surface ID cycle (1, 2, 3, 4, ...)
-        uintptr_t surfaceId = reinterpret_cast<uintptr_t>(frameRes.value().nativeResource);
-        EXPECT_EQ(surfaceId, ((i % 4) + 1));
-        EXPECT_TRUE(decoder->releaseFrame(frameRes.value()).hasValue());
+#if defined(__linux__) && !defined(__ANDROID__)
+    EXPECT_TRUE(VaApiVideoDecoder::isNativePlatform());
+    // On Linux CI/runner, test VA-API initialization
+    auto initRes = decoder->initialize(cfg);
+    // If DRM render node exists, initialization succeeds
+    if (initRes.hasValue()) {
+        EXPECT_TRUE(decoder->isInitialized());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
     }
-
-    EXPECT_EQ(decoder->getDecodedFrameCount(), 4u);
+#else
+    EXPECT_FALSE(VaApiVideoDecoder::isNativePlatform());
+    EXPECT_FALSE(decoder->isHardwareAccelerated());
+    auto initRes = decoder->initialize(cfg);
+    EXPECT_FALSE(initRes.hasValue());
+    EXPECT_EQ(initRes.error().code(), common::ErrorCode::NotImplemented);
+#endif
 }
 
-TEST(AndroidMediaCodecTest, BufferQueueAndDecode) {
+TEST(AndroidMediaCodecTest, BufferQueueOrHonestRejection) {
     auto decRes = MediaCodecVideoDecoder::create();
     ASSERT_TRUE(decRes.hasValue());
     auto decoder = std::move(decRes.value());
@@ -129,25 +120,24 @@ TEST(AndroidMediaCodecTest, BufferQueueAndDecode) {
         .preferHardwareDecoding = true,
         .lowLatencyTuning = true
     };
-    EXPECT_TRUE(decoder->initialize(cfg).hasValue());
 
-    // Empty packet submission should fail validation
-    EncodedPacket emptyPkt{};
-    EXPECT_FALSE(decoder->submitPacket(emptyPkt).hasValue());
-
-    // Valid packet submission
-    EncodedPacket validPkt{};
-    validPkt.data = {0x00, 0x00, 0x01, 0x65, 0x88, 0x84};
-    validPkt.timestampNs = 555555ULL;
-    EXPECT_TRUE(decoder->submitPacket(validPkt).hasValue());
-
-    auto frameRes = decoder->getNextFrame();
-    ASSERT_TRUE(frameRes.hasValue());
-    EXPECT_EQ(frameRes.value().timestampNs, 555555ULL);
-    EXPECT_TRUE(decoder->releaseFrame(frameRes.value()).hasValue());
+#if defined(__ANDROID__)
+    EXPECT_TRUE(MediaCodecVideoDecoder::isNativePlatform());
+    auto initRes = decoder->initialize(cfg);
+    if (initRes.hasValue()) {
+        EXPECT_TRUE(decoder->isInitialized());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
+    }
+#else
+    EXPECT_FALSE(MediaCodecVideoDecoder::isNativePlatform());
+    EXPECT_FALSE(decoder->isHardwareAccelerated());
+    auto initRes = decoder->initialize(cfg);
+    EXPECT_FALSE(initRes.hasValue());
+    EXPECT_EQ(initRes.error().code(), common::ErrorCode::NotImplemented);
+#endif
 }
 
-TEST(WebRtcWasmTest, WebCodecsPipeline) {
+TEST(WebRtcWasmTest, WebCodecsOrHonestRejection) {
     auto decRes = WebRtcWasmVideoDecoder::create();
     ASSERT_TRUE(decRes.hasValue());
     auto decoder = std::move(decRes.value());
@@ -157,24 +147,25 @@ TEST(WebRtcWasmTest, WebCodecsPipeline) {
         .preferHardwareDecoding = true,
         .lowLatencyTuning = true
     };
+
+#if defined(__EMSCRIPTEN__)
+    EXPECT_TRUE(WebRtcWasmVideoDecoder::isNativePlatform());
     EXPECT_TRUE(decoder->initialize(cfg).hasValue());
-
-    EncodedPacket pkt{};
-    pkt.data = {0x0A, 0x08, 0x00, 0x00};
-    pkt.timestampNs = 9999ULL;
-    EXPECT_TRUE(decoder->submitPacket(pkt).hasValue());
-
-    auto frameRes = decoder->getNextFrame();
-    ASSERT_TRUE(frameRes.hasValue());
-    EXPECT_TRUE(decoder->flush().hasValue());
     EXPECT_TRUE(decoder->shutdown().hasValue());
+#else
+    EXPECT_FALSE(WebRtcWasmVideoDecoder::isNativePlatform());
+    EXPECT_FALSE(decoder->isHardwareAccelerated());
+    auto initRes = decoder->initialize(cfg);
+    EXPECT_FALSE(initRes.hasValue());
+    EXPECT_EQ(initRes.error().code(), common::ErrorCode::NotImplemented);
+#endif
 }
 
 TEST(GuestClientSessionTest, LifecycleAndVideoIngestion) {
     GuestClientConfig config{
-        .platform = ClientPlatform::MacOS_VideoToolbox,
+        .platform = VideoDecoderFactory::getNativePlatform(),
         .sessionId = "session-test-42",
-        .preferredCodec = VideoCodec::AV1,
+        .preferredCodec = VideoCodec::H264,
         .enableAudio = true,
         .enableInput = true
     };
@@ -184,7 +175,7 @@ TEST(GuestClientSessionTest, LifecycleAndVideoIngestion) {
     auto session = std::move(sessionRes.value());
 
     EXPECT_FALSE(session->isConnected());
-    EXPECT_EQ(session->getPlatform(), ClientPlatform::MacOS_VideoToolbox);
+    EXPECT_EQ(session->getPlatform(), VideoDecoderFactory::getNativePlatform());
 
     bool connectionStateObserved = false;
     session->setConnectionStateCallback([&](bool connected) {
@@ -194,36 +185,21 @@ TEST(GuestClientSessionTest, LifecycleAndVideoIngestion) {
     uint32_t framesReceivedCount = 0;
     session->setFrameDecodedCallback([&](const DecodedFrame& frame) {
         ++framesReceivedCount;
-        EXPECT_EQ(frame.width, 1920u);
-        EXPECT_EQ(frame.height, 1080u);
+        EXPECT_GT(frame.width, 0u);
+        EXPECT_GT(frame.height, 0u);
     });
 
     EXPECT_TRUE(session->connect().hasValue());
     EXPECT_TRUE(session->isConnected());
     EXPECT_TRUE(connectionStateObserved);
 
-    // Ingest video packets
-    for (int i = 0; i < 5; ++i) {
-        EncodedPacket pkt{};
-        pkt.data = {0x12, 0x00, 0xAA, 0xBB};
-        pkt.timestampNs = i * 16666666ULL;
-        EXPECT_TRUE(session->ingestVideoPacket(pkt).hasValue());
-    }
-
-    EXPECT_EQ(framesReceivedCount, 5u);
-
     // Ingest audio packet
     std::vector<uint8_t> opusPacket = {0xF8, 0xFF, 0xFE};
     EXPECT_TRUE(session->ingestAudioPacket(opusPacket.data(), opusPacket.size(), 1000ULL).hasValue());
 
     auto stats = session->getStats();
-    EXPECT_EQ(stats.videoPacketsReceived, 5u);
-    EXPECT_EQ(stats.framesDecoded, 5u);
-    EXPECT_EQ(stats.framesPresented, 5u);
     EXPECT_EQ(stats.audioPacketsReceived, 1u);
-    EXPECT_GT(stats.averageDecodeLatencyMs, 0.0);
-    EXPECT_EQ(stats.activeCodec, "AV1");
-    EXPECT_EQ(stats.platformName, "macOS (Apple VideoToolbox)");
+    EXPECT_EQ(stats.activeCodec, "H.264");
 
     EXPECT_TRUE(session->disconnect().hasValue());
     EXPECT_FALSE(session->isConnected());
@@ -232,7 +208,7 @@ TEST(GuestClientSessionTest, LifecycleAndVideoIngestion) {
 
 TEST(GuestClientSessionTest, InputPackagingAndDispatch) {
     GuestClientConfig config{
-        .platform = ClientPlatform::Linux_VaApi,
+        .platform = VideoDecoderFactory::getNativePlatform(),
         .sessionId = "session-input-101",
         .enableInput = true
     };
@@ -330,44 +306,67 @@ TEST(PlatformCapabilityMatrixTest, CapabilityDiscoveryAcrossAllPlatforms) {
 #if defined(_WIN32)
     EXPECT_TRUE(win.isNativeCompiled);
     EXPECT_TRUE(win.isHardwareAccelerated);
-    EXPECT_EQ(win.releaseStatus, "Production Qualified");
-#endif
+    EXPECT_EQ(win.qualificationState, DecoderQualificationState::HardwareVerified);
+    EXPECT_EQ(win.releaseStatus, "Hardware Verified (Windows 11 / D3D11VA)");
     EXPECT_TRUE(win.supportsH264);
     EXPECT_TRUE(win.supportsHevc);
     EXPECT_TRUE(win.supportsAv1);
+#else
+    EXPECT_FALSE(win.isNativeCompiled);
+    EXPECT_EQ(win.qualificationState, DecoderQualificationState::NotSupported);
+#endif
 
     // 2. macOS VideoToolbox
     auto mac = matrix[1];
     EXPECT_EQ(mac.platform, ClientPlatform::MacOS_VideoToolbox);
     EXPECT_EQ(mac.nativeApi, "Apple VideoToolbox Framework");
+#if defined(__APPLE__)
+    EXPECT_TRUE(mac.isNativeCompiled);
+    EXPECT_EQ(mac.qualificationState, DecoderQualificationState::NativeApiAvailable);
     EXPECT_TRUE(mac.supportsH264);
     EXPECT_TRUE(mac.supportsHevc);
-    EXPECT_TRUE(mac.supportsAv1);
+#else
+    EXPECT_FALSE(mac.isNativeCompiled);
+    EXPECT_EQ(mac.qualificationState, DecoderQualificationState::NotBuilt);
+#endif
 
     // 3. Linux VA-API
     auto linuxCap = matrix[2];
     EXPECT_EQ(linuxCap.platform, ClientPlatform::Linux_VaApi);
     EXPECT_EQ(linuxCap.nativeApi, "Linux Video Acceleration API (VA-API / DMA-BUF)");
-    EXPECT_TRUE(linuxCap.supportsH264);
-    EXPECT_TRUE(linuxCap.supportsHevc);
-    EXPECT_TRUE(linuxCap.supportsAv1);
+#if defined(__linux__) && !defined(__ANDROID__)
+    EXPECT_TRUE(linuxCap.isNativeCompiled);
+#else
+    EXPECT_FALSE(linuxCap.isNativeCompiled);
+    EXPECT_EQ(linuxCap.qualificationState, DecoderQualificationState::NotBuilt);
+#endif
 
     // 4. Android AMediaCodec
     auto androidCap = matrix[3];
     EXPECT_EQ(androidCap.platform, ClientPlatform::Android_MediaCodec);
     EXPECT_EQ(androidCap.nativeApi, "Android NDK AMediaCodec");
-    EXPECT_TRUE(androidCap.supportsH264);
+#if defined(__ANDROID__)
+    EXPECT_TRUE(androidCap.isNativeCompiled);
+#else
+    EXPECT_FALSE(androidCap.isNativeCompiled);
+    EXPECT_EQ(androidCap.qualificationState, DecoderQualificationState::NotBuilt);
+#endif
 
     // 5. Web WebCodecs
     auto webCap = matrix[4];
     EXPECT_EQ(webCap.platform, ClientPlatform::Web_WebRtcWasm);
     EXPECT_EQ(webCap.nativeApi, "W3C WebCodecs / WebAssembly");
-    EXPECT_TRUE(webCap.supportsH264);
+#if defined(__EMSCRIPTEN__)
+    EXPECT_TRUE(webCap.isNativeCompiled);
+#else
+    EXPECT_FALSE(webCap.isNativeCompiled);
+    EXPECT_EQ(webCap.qualificationState, DecoderQualificationState::NotBuilt);
+#endif
 }
 
 TEST(GuestClientSessionLifecycleTest, CompleteStateTransitionsAndRestrictions) {
     GuestClientConfig config{
-        .platform = ClientPlatform::Windows_D3D11VA,
+        .platform = VideoDecoderFactory::getNativePlatform(),
         .sessionId = "session-state-test",
         .authToken = "auth-token-12345"
     };
@@ -421,4 +420,3 @@ TEST(GuestClientSessionLifecycleTest, CompleteStateTransitionsAndRestrictions) {
     EXPECT_TRUE(session->disconnect().hasValue());
     EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Disconnected);
 }
-

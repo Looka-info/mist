@@ -1,3 +1,5 @@
 # Platform Isolation Layer
 
-add_subdirectory(windows)
+if (WIN32)
+    add_subdirectory(windows)
+endif()

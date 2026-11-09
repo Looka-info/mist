@@ -7,6 +7,7 @@
 #include <queue>
 #include <mutex>
 #include <vector>
+#include <cstdint>
 
 namespace mist::decode {
 
@@ -29,6 +30,31 @@ enum class ClientPlatform : uint8_t {
     return "Unknown";
 }
 
+enum class DecoderQualificationState : uint8_t {
+    NotSupported = 0,
+    NotBuilt,
+    Built,
+    NativeApiAvailable,
+    HardwareAvailable,
+    DecoderInitialized,
+    SmokeTestPassed,
+    HardwareVerified
+};
+
+[[nodiscard]] constexpr std::string_view qualificationStateToString(DecoderQualificationState s) noexcept {
+    switch (s) {
+        case DecoderQualificationState::NotSupported: return "NotSupported";
+        case DecoderQualificationState::NotBuilt: return "NotBuilt";
+        case DecoderQualificationState::Built: return "Built";
+        case DecoderQualificationState::NativeApiAvailable: return "NativeApiAvailable";
+        case DecoderQualificationState::HardwareAvailable: return "HardwareAvailable";
+        case DecoderQualificationState::DecoderInitialized: return "DecoderInitialized";
+        case DecoderQualificationState::SmokeTestPassed: return "SmokeTestPassed";
+        case DecoderQualificationState::HardwareVerified: return "HardwareVerified";
+    }
+    return "Unknown";
+}
+
 struct PlatformCapabilityInfo {
     ClientPlatform platform{ClientPlatform::Windows_D3D11VA};
     std::string nativeApi;
@@ -37,6 +63,12 @@ struct PlatformCapabilityInfo {
     bool supportsH264{false};
     bool supportsHevc{false};
     bool supportsAv1{false};
+    std::string supportedProfiles;
+    uint32_t maxWidth{0};
+    uint32_t maxHeight{0};
+    std::string activeBackend;
+    std::string initializationResult{"NotAttempted"};
+    DecoderQualificationState qualificationState{DecoderQualificationState::NotSupported};
     std::string releaseStatus{"Pending"};
 };
 
@@ -65,8 +97,8 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
-    [[maybe_unused]] void* vtSession_{nullptr};
-    [[maybe_unused]] void* formatDesc_{nullptr};
+    [[maybe_unused]] void* vtSession_{nullptr};      // VTDecompressionSessionRef on macOS
+    [[maybe_unused]] void* formatDesc_{nullptr};     // CMVideoFormatDescriptionRef on macOS
 };
 
 // Linux VA-API hardware decoder implementation
@@ -94,9 +126,12 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
-    [[maybe_unused]] void* vaDisplay_{nullptr};
-    [[maybe_unused]] uint32_t vaContext_{0};
-    uint32_t vaSurfaces_[4]{0, 0, 0, 0};
+    [[maybe_unused]] int drmFd_{-1};
+    [[maybe_unused]] void* vaDisplay_{nullptr};      // VADisplay on Linux
+    [[maybe_unused]] uint32_t vaConfig_{0};          // VAConfigID
+    [[maybe_unused]] uint32_t vaContext_{0};         // VAContextID
+    [[maybe_unused]] uint32_t vaSurfaces_[8]{};      // VASurfaceID array
+    [[maybe_unused]] uint32_t surfaceCount_{0};
 };
 
 // Android NDK AMediaCodec hardware decoder implementation
@@ -124,8 +159,9 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
-    [[maybe_unused]] void* mediaCodec_{nullptr};
-    [[maybe_unused]] void* nativeWindow_{nullptr};
+    [[maybe_unused]] void* mediaCodec_{nullptr};     // AMediaCodec* on Android
+    [[maybe_unused]] void* mediaFormat_{nullptr};    // AMediaFormat* on Android
+    [[maybe_unused]] void* nativeWindow_{nullptr};   // ANativeWindow* on Android
 };
 
 // Web WebCodecs / WebAssembly client decoder implementation

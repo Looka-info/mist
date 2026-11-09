@@ -365,12 +365,15 @@ GuestClientStats GuestClientSession::getStats() const {
     auto now = std::chrono::steady_clock::now();
     double elapsedSec = std::chrono::duration<double>(now - lastFpsCalcTime_).count();
     if (elapsedSec >= 1.0) {
-        uint64_t diff = s.framesPresented - lastFrameCount_;
+        uint64_t diff = s.framesPresented >= lastFrameCount_ ? (s.framesPresented - lastFrameCount_) : 0;
         const_cast<GuestClientSession*>(this)->lastFrameCount_ = s.framesPresented;
         const_cast<GuestClientSession*>(this)->lastFpsCalcTime_ = now;
         s.currentFps = static_cast<double>(diff) / elapsedSec;
+    } else if (elapsedSec > 0.05 && s.framesPresented > lastFrameCount_) {
+        uint64_t diff = s.framesPresented - lastFrameCount_;
+        s.currentFps = static_cast<double>(diff) / elapsedSec;
     } else {
-        s.currentFps = s.framesPresented > 0 ? static_cast<double>(config_.targetFps) : 0.0;
+        s.currentFps = 0.0;
     }
 
     return s;

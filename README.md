@@ -1,7 +1,7 @@
 # Mist — High-Performance Native Game Streaming Platform
 
 **Rust-First Architecture · Slint 1.18.1 · Direct3D 11 · NVIDIA NVENC · Low-Latency WebRTC**  
-**Version:** `v0.3.0-rc1`  
+**Version:** `v0.3.0-rc2`  
 **License:** Proprietary (Third-party open-source licenses preserved)  
 
 Mist is a lightweight, ultra-low-latency native Windows game-streaming application engineered for interactive remote gaming. Built with a **Rust-first application architecture** using **Slint 1.18.1** (Material Design 3 Pixel Mint) alongside an optimized Direct3D 11/C++20 real-time media engine, Mist delivers Parsec-grade responsiveness without heavy web or Electron runtimes.
@@ -35,33 +35,33 @@ Mist connects gamers to their PCs over local network and WAN with sub-frame resp
 
 ---
 
-## 3. Platform Capability Matrix
+## 3. Platform Capability & Verification Matrix
 
-| Platform | Native Decode API | Compilation Status | Hardware Acceleration | Target Codecs | Release Status |
-|---|---|---|---|---|---|
-| **Windows** | Direct3D 11 Video Acceleration (D3D11VA) | Native Verified | GPU Hardware | H.264, HEVC, AV1 | **Production Qualified** |
-| **macOS** | Apple VideoToolbox Framework | Native / CI Matrix | VideoToolbox Engine | H.264, HEVC, AV1 | **CI Qualified** |
-| **Linux** | Video Acceleration API (VA-API / DMA-BUF) | Native / CI Matrix | Intel/AMD/NVIDIA VA-API | H.264, HEVC, AV1 | **CI Qualified** |
-| **Android** | Android NDK AMediaCodec | NDK Native / CI Matrix | MediaCodec Hardware | H.264, HEVC, AV1 | **NDK Verified** |
-| **Web** | W3C WebCodecs / WebAssembly | Native / Browser Validated | Browser GPU Engine | H.264, HEVC, AV1 | **WebCodecs Qualified** |
+| Platform | Native Decode API | Compilation Status | Hardware Acceleration | Target Codecs | Qualification State | Release Status |
+|---|---|---|---|---|---|---|
+| **Windows** | Direct3D 11 Video Acceleration (D3D11VA) | Native Verified | GPU Hardware (NVENC / D3D11) | H.264, HEVC, AV1 | `HardwareVerified` | **Production Hardware Verified** |
+| **macOS** | Apple VideoToolbox Framework | Native / CI Matrix | Device Dependent (Apple Silicon) | H.264, HEVC | `NativeApiAvailable` | **Native SDK Qualified** |
+| **Linux** | Video Acceleration API (VA-API / DMA-BUF) | Native / CI Matrix | Driver Dependent (Intel/AMD/NVIDIA) | H.264, HEVC, AV1 | `Built` / `HardwareAvailable` | **Driver Qualified** |
+| **Android** | Android NDK AMediaCodec | NDK Native / CI Matrix | MediaCodec Hardware | H.264, HEVC | `NativeApiAvailable` | **NDK Qualified** |
+| **Web** | W3C WebRTC & WebCodecs | Native / Browser Validated | Browser GPU Engine | H.264, HEVC, AV1 | `NativeApiAvailable` | **WebRTC / WebCodecs Qualified** |
 
 ---
 
 ## 4. Test & Verification Results
 
-Verification executed on the physical qualification workstation (AMD Ryzen 5 5600, NVIDIA GeForce GTX 1660 SUPER, 32 GB DDR4, Windows 11 Pro 64-bit):
+Verification executed on the physical qualification workstation (AMD Ryzen 5 5600, NVIDIA GeForce GTX 1660 SUPER, 16 GB DDR4, Windows 11 Pro 64-bit):
 
 ### C++ Native Media Engine (`mist_unit_tests.exe` via CTest)
 - **Discovered Tests:** 227 test cases
 - **Executed & Passed:** 225 test cases (**100.0% pass rate**)
 - **Skipped (Physical Display Required in Headless CI):** 2 test cases (`CaptureTest.LiveDesktopCapture`, `StabilityTest.RepeatedCaptureInitialization`)
-- **Execution Time:** 31.82 seconds
+- **Execution Time:** 28.05 seconds
 
 ### Rust Workspace (`cargo test --workspace`)
-- **Discovered & Executed Tests:** 32 test cases across 6 crates
-- **Pass Rate:** 32 passed, 0 failed (**100.0% pass rate**)
-- **Crates Verified:** `mist-config`, `mist-ipc`, `mist-pairing`, `mist-platform-windows`, `mist-signaling`, `mist-telemetry`
-- **Execution Time:** 0.36 seconds
+- **Discovered & Executed Tests:** 45 test cases across 6 crates
+- **Pass Rate:** 45 passed, 0 failed (**100.0% pass rate**)
+- **Crates Verified:** `mist-config`, `mist-domain`, `mist-ipc`, `mist-pairing`, `mist-platform-windows`, `mist-session`, `mist-signaling`, `mist-telemetry`
+- **Execution Time:** 0.38 seconds
 
 ---
 
