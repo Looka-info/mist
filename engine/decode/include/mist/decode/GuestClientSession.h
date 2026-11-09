@@ -103,6 +103,11 @@ public:
 
     [[nodiscard]] common::Result<void> triggerReconnect();
 
+    void onTransportConnecting();
+    void onTransportConnected();
+    void onTransportDisconnected();
+    void onTransportFailed(const std::string& reason);
+
     [[nodiscard]] common::Result<void> ingestVideoPacket(const encode::EncodedPacket& packet);
     [[nodiscard]] common::Result<void> ingestAudioPacket(const uint8_t* data, size_t size, uint64_t timestampNs);
 

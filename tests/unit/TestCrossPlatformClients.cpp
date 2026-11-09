@@ -557,6 +557,47 @@ TEST(GuestClientSessionLifecycleTest, CompleteStateTransitionsAndRestrictions) {
     EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Disconnected);
 }
 
+TEST(GuestClientSessionLifecycleTest, TransportStateTransitions) {
+    GuestClientConfig config{
+        .platform = VideoDecoderFactory::getNativePlatform(),
+        .sessionId = "session-transport-test"
+    };
+
+    auto sessionRes = GuestClientSession::create(config);
+    ASSERT_TRUE(sessionRes.hasValue());
+    auto session = std::move(sessionRes.value());
+
+    bool connectionCallbackObserved = false;
+    session->setConnectionStateCallback([&](bool connected) {
+        connectionCallbackObserved = connected;
+    });
+
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Disconnected);
+    EXPECT_FALSE(session->isConnected());
+
+    // 1. ICE connecting
+    session->onTransportConnecting();
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::ConnectingIce);
+    EXPECT_FALSE(session->isConnected());
+
+    // 2. Transport connected
+    session->onTransportConnected();
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Connected);
+    EXPECT_TRUE(session->isConnected());
+    EXPECT_TRUE(connectionCallbackObserved);
+
+    // 3. Transport disconnected -> Reconnecting
+    session->onTransportDisconnected();
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Reconnecting);
+    EXPECT_FALSE(session->isConnected());
+    EXPECT_FALSE(connectionCallbackObserved);
+
+    // 4. Transport failure -> Failed
+    session->onTransportFailed("DTLS alert handshake failed");
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Failed);
+    EXPECT_FALSE(session->isConnected());
+}
+
 #include <fstream>
 
 static std::vector<uint8_t> loadFixtureFile(const std::string& relativePath) {

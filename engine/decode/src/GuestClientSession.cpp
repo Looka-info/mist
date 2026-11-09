@@ -101,6 +101,38 @@ common::Result<void> GuestClientSession::triggerReconnect() {
     return connect();
 }
 
+void GuestClientSession::onTransportConnecting() {
+    transitionState(SessionLifecycleState::ConnectingIce);
+}
+
+void GuestClientSession::onTransportConnected() {
+    isConnected_.store(true);
+    transitionState(SessionLifecycleState::Connected);
+    std::lock_guard<std::mutex> lock(callbackMutex_);
+    if (connectionCallback_) {
+        connectionCallback_(true);
+    }
+}
+
+void GuestClientSession::onTransportDisconnected() {
+    isConnected_.store(false);
+    transitionState(SessionLifecycleState::Reconnecting);
+    std::lock_guard<std::mutex> lock(callbackMutex_);
+    if (connectionCallback_) {
+        connectionCallback_(false);
+    }
+}
+
+void GuestClientSession::onTransportFailed(const std::string& reason) {
+    isConnected_.store(false);
+    transitionState(SessionLifecycleState::Failed);
+    MIST_LOG_ERROR(common::SubsystemId::Session, std::string("Guest transport failed: ") + reason);
+    std::lock_guard<std::mutex> lock(callbackMutex_);
+    if (connectionCallback_) {
+        connectionCallback_(false);
+    }
+}
+
 common::Result<void> GuestClientSession::connect() {
     if (isConnected_.load()) {
         return common::Result<void>::success();
@@ -150,6 +182,13 @@ common::Result<void> GuestClientSession::disconnect() {
     isRelativeMouseEnabled_.store(false);
     transitionState(SessionLifecycleState::Disconnected);
 
+    {
+        std::lock_guard<std::mutex> qLock(queueMutex_);
+        while (!packetQueue_.empty()) {
+            packetQueue_.pop();
+        }
+    }
+
     if (decoder_) {
         (void)decoder_->flush();
         (void)decoder_->shutdown();
@@ -174,10 +213,6 @@ common::Result<void> GuestClientSession::ingestVideoPacket(const encode::Encoded
     if (!decoder_) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::InvalidState,
                              "No video decoder available");
-    }
-
-    if (lifecycleState_.load() == SessionLifecycleState::Connected) {
-        transitionState(SessionLifecycleState::Streaming);
     }
 
     {
@@ -216,6 +251,10 @@ common::Result<void> GuestClientSession::ingestVideoPacket(const encode::Encoded
         std::lock_guard<std::mutex> lock(statsMutex_);
         ++stats_.framesDropped;
         return subRes.error();
+    }
+
+    if (lifecycleState_.load() == SessionLifecycleState::Connected) {
+        transitionState(SessionLifecycleState::Streaming);
     }
 
     auto getRes = decoder_->getNextFrame();
