@@ -47,6 +47,7 @@ $RECYCLE.BIN/
 # Test artifacts
 artifacts/*.h264
 artifacts/*.mp4
+artifacts/*.json
 imgui.ini
 
 # Distribution packaging & local runtime stores
