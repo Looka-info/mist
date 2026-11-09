@@ -94,6 +94,12 @@ struct GamepadState {
     bool isConnected{true};
 };
 
+struct GamepadVibration {
+    uint32_t slotIndex{0};
+    uint16_t leftMotorSpeed{0};   // 0 - 65535
+    uint16_t rightMotorSpeed{0};  // 0 - 65535
+};
+
 enum class PermissionAction : uint8_t {
     Request = 0,
     Granted = 1,
