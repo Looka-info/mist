@@ -15,7 +15,7 @@
 | 1 | **NAT Traversal Reliability** | Critical | **Unit Tested** | `0985593` |
 | 2 | **TURN Relay Fallback** | Critical | **Unit Tested** | `1b6b2bd` |
 | 3 | **Host-Side Authentication** | Critical | **Unit Tested** | `87697fc` |
-| 4 | **Host Approval Flow** | High | **Unit Tested** | Pending |
+| 4 | **Host Approval Flow** | High | **Unit Tested** | `2c09677` |
 | 5 | **Per-Guest Permissions** | High | Not Started | — |
 | 6 | **Encryption Verification & Peer Identity** | High | Not Started | — |
 | 7 | **Encode-Once, Send-to-Many** | High | Not Started | — |
@@ -102,7 +102,7 @@
 - **Benchmark Evidence:** Ban checks and connected guest inspection operate in O(1) hash lookups with < 10μs evaluation time.
 - **Hardware Requirements:** None.
 - **Known Limitations:** Banned devices are persisted to `%APPDATA%/Mist/banned_devices.json` and evaluated on host.
-- **Commit Hash:** Pending
+- **Commit Hash:** `2c09677`
 
 ### 5. Per-Guest Permissions
 - **Status:** Not Started
