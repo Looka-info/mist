@@ -7,6 +7,7 @@
 #include "mist/capture/CaptureEncodePipeline.h"
 #include "mist/encode/NvencVideoEncoder.h"
 #include "mist/transport/WebRtcTransport.h"
+#include "mist/transport/MultiGuestFanout.h"
 #include "mist/services/WebSocketSignalingClient.h"
 #include "mist/audio/WasapiAudioCapture.h"
 #include "mist/audio/OpusAudioEncoder.h"
@@ -608,9 +609,22 @@ int HostApplication::executeStreamTest() {
         return 1;
     }
 
-    rtcTransport.setKeyframeRequestCallback([&pipeline]() {
+    auto fanout = std::make_shared<transport::MultiGuestFanout>();
+    (void)fanout->registerGuestSender(options_.sessionId.empty() ? "guest-stream-test" : options_.sessionId,
+        [&rtcTransport](const encode::EncodedPacket& packet) {
+            return rtcTransport.sendVideoPacket(packet);
+        },
+        [&rtcTransport](std::span<const uint8_t> opusPayload, uint32_t sampleCount) {
+            return rtcTransport.sendAudioFrame(opusPayload, sampleCount);
+        });
+
+    fanout->setKeyframeRequestCallback([&pipeline]() {
         MIST_LOG_INFO(common::SubsystemId::HostApp, "RTCP PLI keyframe request received -> forcing IDR frame");
         pipeline.requestKeyframe();
+    });
+
+    rtcTransport.setKeyframeRequestCallback([fanout, sessId = options_.sessionId]() {
+        fanout->requestKeyframe(sessId.empty() ? "guest-stream-test" : sessId);
     });
 
     auto qos = rtcTransport.getQosController();
@@ -622,8 +636,8 @@ int HostApplication::executeStreamTest() {
         });
     }
 
-    pipeline.setEncodedPacketCallback([&rtcTransport](const encode::EncodedPacket& packet) {
-        (void)rtcTransport.sendVideoPacket(packet);
+    pipeline.setEncodedPacketCallback([fanout](const encode::EncodedPacket& packet) {
+        (void)fanout->broadcastVideoFrame(packet);
     });
 
     // Audio capture and encoding loop if requested
@@ -671,7 +685,7 @@ int HostApplication::executeStreamTest() {
                                 reinterpret_cast<const float*>(pkt.data.data()), pkt.data.size() / sizeof(float)));
                             if (encRes) {
                                 auto& opusPkt = encRes.value();
-                                (void)rtcTransport.sendAudioFrame(opusPkt, pkt.frames);
+                                (void)fanout->broadcastAudioFrame(opusPkt, pkt.frames);
                                 audioPacketsSent.fetch_add(1, std::memory_order_relaxed);
                                 audioBytesSent.fetch_add(opusPkt.size(), std::memory_order_relaxed);
                                 counterPackets->increment(1);
@@ -902,8 +916,21 @@ int HostApplication::executeStreamLive() {
     }
 #endif
 
-    rtcTransport.setKeyframeRequestCallback([&pipeline]() {
+    auto fanout = std::make_shared<transport::MultiGuestFanout>();
+    (void)fanout->registerGuestSender(options_.sessionId.empty() ? "guest-primary" : options_.sessionId,
+        [&rtcTransport](const encode::EncodedPacket& packet) {
+            return rtcTransport.sendVideoPacket(packet);
+        },
+        [&rtcTransport](std::span<const uint8_t> opusPayload, uint32_t sampleCount) {
+            return rtcTransport.sendAudioFrame(opusPayload, sampleCount);
+        });
+
+    fanout->setKeyframeRequestCallback([&pipeline]() {
         pipeline.requestKeyframe();
+    });
+
+    rtcTransport.setKeyframeRequestCallback([fanout, sessId = options_.sessionId]() {
+        fanout->requestKeyframe(sessId.empty() ? "guest-primary" : sessId);
     });
 
     auto liveQos = rtcTransport.getQosController();
@@ -915,8 +942,8 @@ int HostApplication::executeStreamLive() {
         });
     }
 
-    pipeline.setEncodedPacketCallback([&rtcTransport](const encode::EncodedPacket& packet) {
-        (void)rtcTransport.sendVideoPacket(packet);
+    pipeline.setEncodedPacketCallback([fanout](const encode::EncodedPacket& packet) {
+        (void)fanout->broadcastVideoFrame(packet);
     });
 
     // Audio capture and encoding loop if requested
@@ -964,7 +991,7 @@ int HostApplication::executeStreamLive() {
                                 reinterpret_cast<const float*>(pkt.data.data()), pkt.data.size() / sizeof(float)));
                             if (encRes) {
                                 auto& opusPkt = encRes.value();
-                                (void)rtcTransport.sendAudioFrame(opusPkt, pkt.frames);
+                                (void)fanout->broadcastAudioFrame(opusPkt, pkt.frames);
                                 audioPacketsSent.fetch_add(1, std::memory_order_relaxed);
                                 audioBytesSent.fetch_add(opusPkt.size(), std::memory_order_relaxed);
                                 counterPackets->increment(1);

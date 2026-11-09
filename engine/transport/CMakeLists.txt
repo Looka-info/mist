@@ -73,6 +73,7 @@ add_library(mist_transport STATIC
     src/DataChannelManager.cpp
     src/TransportStatistics.cpp
     src/WebRtcTransport.cpp
+    src/MultiGuestFanout.cpp
     src/NatTraversal.cpp
     src/TurnRelayManager.cpp
     src/qos/NetworkQualityEstimator.cpp
