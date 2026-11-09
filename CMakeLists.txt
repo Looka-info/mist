@@ -38,8 +38,14 @@ if(MSVC)
         /EHsc
         /utf-8
         /volatile:iso
-        /wd4201
-        /wd4100
+        /wd4201 # nameless struct/union
+        /wd4100 # unreferenced formal parameter
+        /wd4244 # conversion from type1 to type2 (possible loss of data)
+        /wd4267 # conversion from size_t to type (possible loss of data)
+        /wd4389 # signed/unsigned mismatch
+        /wd4127 # conditional expression is constant
+        /wd4702 # unreachable code
+        /wd4458 # declaration hides class member
     )
     if(MIST_TREAT_WARNINGS_AS_ERRORS)
         target_compile_options(mist_warnings INTERFACE /WX)

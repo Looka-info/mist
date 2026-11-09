@@ -42,6 +42,9 @@ jobs:
       - name: Run Rust Workspace Tests
         run: cargo test --workspace --verbose
 
+      - name: Build Slint Desktop Executable (Release)
+        run: cargo build --package mist-desktop --release
+
       - name: Configure CMake Media Engine (Release)
         run: |
           cmake -B build -S . `
@@ -51,7 +54,19 @@ jobs:
             -DMIST_TREAT_WARNINGS_AS_ERRORS=ON
 
       - name: Build C++ Media Engine
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel -- /v:m /fileLogger /flp:logfile=build-msvc.log;verbosity=normal
+
+      - name: Dump Build Diagnostics on Failure
+        if: failure()
+        run: |
+          if (Test-Path "build-msvc.log") {
+            Write-Host "=== MSBuild Log ===" -ForegroundColor Red
+            Get-Content "build-msvc.log" -Tail 200
+          }
+          Get-ChildItem -Path build -Filter "*.log" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "=== Sub-log: $($_.FullName) ===" -ForegroundColor Red
+            Get-Content $_.FullName -Tail 50
+          }
 
       - name: Run CTest Regression Suite
         run: ctest --test-dir build -C Release --output-on-failure
