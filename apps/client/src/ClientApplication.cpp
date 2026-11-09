@@ -33,7 +33,7 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
         if (arg == "--help" || arg == "-h") {
-            std::cout << "Mist Client v0.3.0-rc1\n"
+            std::cout << "Mist Client v0.3.0-rc3\n"
                       << "Usage: mist_client [options]\n\n"
                       << "General Options:\n"
                       << "  -h, --help                Show help information\n"
@@ -68,7 +68,7 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
                       << "  --vsync                   Enable vertical sync (default: false)\n";
             return std::optional<int>(0);
         } else if (arg == "--version" || arg == "-v") {
-            std::cout << "mist_client version 0.3.0-rc1\n";
+            std::cout << "mist_client version 0.3.0-rc3\n";
             return std::optional<int>(0);
         } else if (arg == "--self-test") {
             options_.mode = ClientCommandMode::SelfTest;
@@ -855,6 +855,13 @@ int ClientApplication::executeReceiveStream() {
         inputTicks++;
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
+
+#if defined(_WIN32)
+    stopTelemetry.store(true, std::memory_order_relaxed);
+    if (telemetryThread.joinable()) {
+        telemetryThread.join();
+    }
+#endif
 
     if (options_.enableInput) {
         clientInput->sendResetState();

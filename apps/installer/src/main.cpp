@@ -155,7 +155,7 @@ void WriteDefaultConfig(const std::wstring& configPath) {
 
     out << "[general]\n"
         << "app_name = Mist Native Streaming\n"
-        << "version = 0.3.0-rc1\n"
+        << "version = 0.3.0-rc3\n"
         << "log_level = info\n\n"
         << "[video]\n"
         << "width = 1920\n"
@@ -180,7 +180,7 @@ void RegisterUninstall(const std::wstring& installDir) {
     const wchar_t* subKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Mist";
     if (RegCreateKeyExW(HKEY_CURRENT_USER, subKey, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_WRITE, nullptr, &hKey, nullptr) == ERROR_SUCCESS) {
         const wchar_t* displayName = L"Mist Native Game Streaming Studio";
-        const wchar_t* displayVersion = L"0.3.0-rc1";
+        const wchar_t* displayVersion = L"0.3.0-rc3";
         const wchar_t* publisher = L"Mist Systems Architecture";
         std::wstring displayIcon = installDir + L"\\mist_desktop.exe,0";
         std::wstring uninstallStr = L"\"" + installDir + L"\\uninstall.exe\" --uninstall";
@@ -491,7 +491,7 @@ LRESULT CALLBACK InstallerWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
 
             SelectObject(hdc, hSubFont);
             SetTextColor(hdc, TEXT_MUTED);
-            TextOutW(hdc, 96, 48, L"Play beyond your desk.  *  Version 0.3.0-rc1", 43);
+            TextOutW(hdc, 96, 48, L"Play beyond your desk.  *  Version 0.3.0-rc3", 43);
 
             SelectObject(hdc, oldFont);
             DeleteObject(hTitleFont);
