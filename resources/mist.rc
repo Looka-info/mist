@@ -4,8 +4,8 @@
 IDI_MIST_ICON ICON "mist.ico"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     0,2,0,1
-PRODUCTVERSION  0,2,0,1
+FILEVERSION     0,3,0,1
+PRODUCTVERSION  0,3,0,1
 FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
 FILEFLAGS       0
 FILEOS          VOS_NT_WINDOWS32
@@ -18,11 +18,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Mist Project"
             VALUE "FileDescription",  "Mist Native Low-Latency Game Streaming Studio"
-            VALUE "FileVersion",      "0.2.0-rc1"
+            VALUE "FileVersion",      "0.3.0-rc1"
             VALUE "InternalName",     "mist_desktop"
             VALUE "OriginalFilename", "mist_desktop.exe"
             VALUE "ProductName",      "Mist Game Streaming"
-            VALUE "ProductVersion",   "0.2.0-rc1"
+            VALUE "ProductVersion",   "0.3.0-rc1"
             VALUE "LegalCopyright",   "Copyright (C) 2026 Mist Project Contributors"
         END
     END

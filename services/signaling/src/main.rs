@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             bind_addr = format!("127.0.0.1:{}", args[i + 1]);
             i += 2;
         } else if args[i] == "--help" || args[i] == "-h" {
-            println!("Mist Hardened Signaling Service v0.2.0");
+            println!("Mist Hardened Signaling Service v0.3.0");
             println!("Usage: mist-signaling [--bind <IP:PORT>] [--port <PORT>]");
             return Ok(());
         } else {

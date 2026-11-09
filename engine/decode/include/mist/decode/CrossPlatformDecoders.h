@@ -6,6 +6,7 @@
 #include <memory>
 #include <queue>
 #include <mutex>
+#include <vector>
 
 namespace mist::decode {
 
@@ -28,6 +29,17 @@ enum class ClientPlatform : uint8_t {
     return "Unknown";
 }
 
+struct PlatformCapabilityInfo {
+    ClientPlatform platform{ClientPlatform::Windows_D3D11VA};
+    std::string nativeApi;
+    bool isNativeCompiled{false};
+    bool isHardwareAccelerated{false};
+    bool supportsH264{false};
+    bool supportsHevc{false};
+    bool supportsAv1{false};
+    std::string releaseStatus{"Pending"};
+};
+
 // macOS Apple VideoToolbox hardware decoder implementation
 class VideoToolboxDecoder : public IVideoDecoder {
 public:
@@ -43,6 +55,9 @@ public:
     [[nodiscard]] common::Result<void> shutdown() override;
     [[nodiscard]] bool isInitialized() const noexcept { return isInitialized_; }
     [[nodiscard]] uint32_t getDecodedFrameCount() const noexcept { return decodedFrameCount_; }
+    [[nodiscard]] bool isHardwareAccelerated() const noexcept;
+    [[nodiscard]] static bool isNativePlatform() noexcept;
+    [[nodiscard]] static bool isCodecSupported(encode::VideoCodec codec) noexcept;
 
 private:
     mutable std::mutex mutex_;
@@ -69,6 +84,9 @@ public:
     [[nodiscard]] common::Result<void> shutdown() override;
     [[nodiscard]] bool isInitialized() const noexcept { return isInitialized_; }
     [[nodiscard]] uint32_t getDecodedFrameCount() const noexcept { return decodedFrameCount_; }
+    [[nodiscard]] bool isHardwareAccelerated() const noexcept;
+    [[nodiscard]] static bool isNativePlatform() noexcept;
+    [[nodiscard]] static bool isCodecSupported(encode::VideoCodec codec) noexcept;
 
 private:
     mutable std::mutex mutex_;
@@ -96,6 +114,9 @@ public:
     [[nodiscard]] common::Result<void> shutdown() override;
     [[nodiscard]] bool isInitialized() const noexcept { return isInitialized_; }
     [[nodiscard]] uint32_t getDecodedFrameCount() const noexcept { return decodedFrameCount_; }
+    [[nodiscard]] bool isHardwareAccelerated() const noexcept;
+    [[nodiscard]] static bool isNativePlatform() noexcept;
+    [[nodiscard]] static bool isCodecSupported(encode::VideoCodec codec) noexcept;
 
 private:
     mutable std::mutex mutex_;
@@ -122,6 +143,9 @@ public:
     [[nodiscard]] common::Result<void> shutdown() override;
     [[nodiscard]] bool isInitialized() const noexcept { return isInitialized_; }
     [[nodiscard]] uint32_t getDecodedFrameCount() const noexcept { return decodedFrameCount_; }
+    [[nodiscard]] bool isHardwareAccelerated() const noexcept;
+    [[nodiscard]] static bool isNativePlatform() noexcept;
+    [[nodiscard]] static bool isCodecSupported(encode::VideoCodec codec) noexcept;
 
 private:
     mutable std::mutex mutex_;
@@ -151,6 +175,9 @@ public:
         return ClientPlatform::Windows_D3D11VA;
 #endif
     }
+
+    [[nodiscard]] static std::vector<PlatformCapabilityInfo> getCapabilityMatrix();
+    [[nodiscard]] static PlatformCapabilityInfo getPlatformCapability(ClientPlatform platform);
 };
 
 } // namespace mist::decode

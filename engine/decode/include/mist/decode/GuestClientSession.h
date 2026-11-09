@@ -7,6 +7,7 @@
 #include "mist/input/InputProtocol.h"
 #include "mist/common/Result.h"
 #include <string>
+#include <string_view>
 #include <memory>
 #include <functional>
 #include <atomic>
@@ -15,6 +16,33 @@
 #include <chrono>
 
 namespace mist::decode {
+
+enum class SessionLifecycleState : uint8_t {
+    Disconnected = 0,
+    Pairing,
+    Authenticating,
+    Signaling,
+    ConnectingIce,
+    Connected,
+    Streaming,
+    Reconnecting,
+    Failed
+};
+
+[[nodiscard]] constexpr std::string_view sessionLifecycleStateToString(SessionLifecycleState s) noexcept {
+    switch (s) {
+        case SessionLifecycleState::Disconnected: return "Disconnected";
+        case SessionLifecycleState::Pairing: return "Pairing";
+        case SessionLifecycleState::Authenticating: return "Authenticating";
+        case SessionLifecycleState::Signaling: return "Signaling";
+        case SessionLifecycleState::ConnectingIce: return "ConnectingIce";
+        case SessionLifecycleState::Connected: return "Connected";
+        case SessionLifecycleState::Streaming: return "Streaming";
+        case SessionLifecycleState::Reconnecting: return "Reconnecting";
+        case SessionLifecycleState::Failed: return "Failed";
+    }
+    return "Unknown";
+}
 
 struct GuestClientConfig {
     ClientPlatform platform{ClientPlatform::Windows_D3D11VA};
@@ -44,10 +72,12 @@ struct GuestClientStats {
     double currentFps{0.0};
     std::string activeCodec{"H.264"};
     std::string platformName{"Windows (D3D11VA)"};
+    SessionLifecycleState lifecycleState{SessionLifecycleState::Disconnected};
 };
 
 using FrameDecodedCallback = std::function<void(const DecodedFrame&)>;
 using ConnectionStateCallback = std::function<void(bool isConnected)>;
+using LifecycleStateCallback = std::function<void(SessionLifecycleState oldState, SessionLifecycleState newState)>;
 using InputPacketOutboundCallback = std::function<void(const std::vector<uint8_t>& packetBytes)>;
 
 class GuestClientSession {
@@ -62,6 +92,16 @@ public:
     [[nodiscard]] common::Result<void> connect();
     [[nodiscard]] common::Result<void> disconnect();
     [[nodiscard]] bool isConnected() const noexcept { return isConnected_.load(); }
+    [[nodiscard]] SessionLifecycleState getLifecycleState() const noexcept { return lifecycleState_.load(); }
+
+    [[nodiscard]] common::Result<void> submitPairingCode(const std::string& code);
+    [[nodiscard]] common::Result<void> authenticate(const std::string& authToken);
+    [[nodiscard]] common::Result<void> negotiatePermissions(uint8_t requestedFeatures);
+
+    [[nodiscard]] common::Result<void> setRelativeMouse(bool enabled);
+    [[nodiscard]] bool isRelativeMouseEnabled() const noexcept { return isRelativeMouseEnabled_.load(); }
+
+    [[nodiscard]] common::Result<void> triggerReconnect();
 
     [[nodiscard]] common::Result<void> ingestVideoPacket(const encode::EncodedPacket& packet);
     [[nodiscard]] common::Result<void> ingestAudioPacket(const uint8_t* data, size_t size, uint64_t timestampNs);
@@ -75,6 +115,7 @@ public:
 
     void setFrameDecodedCallback(FrameDecodedCallback callback);
     void setConnectionStateCallback(ConnectionStateCallback callback);
+    void setLifecycleCallback(LifecycleStateCallback callback);
     void setInputOutboundCallback(InputPacketOutboundCallback callback);
 
     [[nodiscard]] GuestClientStats getStats() const;
@@ -82,11 +123,18 @@ public:
     [[nodiscard]] IVideoDecoder* getDecoder() const noexcept { return decoder_.get(); }
     [[nodiscard]] ClientPlatform getPlatform() const noexcept { return config_.platform; }
 
+    [[nodiscard]] static std::vector<std::string> getPlatformRestrictions(ClientPlatform platform);
+
 private:
+    void transitionState(SessionLifecycleState newState);
+
     GuestClientConfig config_;
     std::unique_ptr<IVideoDecoder> decoder_;
     std::atomic<bool> isConnected_{false};
+    std::atomic<bool> isRelativeMouseEnabled_{false};
+    std::atomic<SessionLifecycleState> lifecycleState_{SessionLifecycleState::Disconnected};
     std::atomic<uint32_t> inputSequence_{0};
+    uint8_t grantedPermissions_{0x07};
 
     mutable std::mutex statsMutex_;
     GuestClientStats stats_{};
@@ -94,6 +142,7 @@ private:
     mutable std::mutex callbackMutex_;
     FrameDecodedCallback frameCallback_;
     ConnectionStateCallback connectionCallback_;
+    LifecycleStateCallback lifecycleCallback_;
     InputPacketOutboundCallback inputCallback_;
 
     std::chrono::steady_clock::time_point lastFpsCalcTime_{};

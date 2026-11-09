@@ -6,7 +6,7 @@ mod controller;
 
 fn main() {
     mist_core::init_logging(false);
-    tracing::info!("Starting Mist Desktop Application v0.2.0 (Rust + Slint)");
+    tracing::info!("Starting Mist Desktop Application v0.3.0 (Rust + Slint)");
 
     if let Err(e) = app::run_app() {
         tracing::error!("Mist Desktop encountered fatal error: {}", e);

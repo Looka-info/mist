@@ -51,6 +51,7 @@ add_executable(mist_unit_tests
     TestHostServiceAndWol.cpp
     TestAv1AndHdr.cpp
     TestCrossPlatformClients.cpp
+    TestIpcProtocolCompatibility.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

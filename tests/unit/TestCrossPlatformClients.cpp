@@ -318,3 +318,107 @@ TEST(GuestClientSessionTest, InputPackagingAndDispatch) {
     // Sending input while disconnected must fail
     EXPECT_FALSE(session->sendMouseMove(1, 1).hasValue());
 }
+
+TEST(PlatformCapabilityMatrixTest, CapabilityDiscoveryAcrossAllPlatforms) {
+    auto matrix = VideoDecoderFactory::getCapabilityMatrix();
+    ASSERT_EQ(matrix.size(), 5u);
+
+    // 1. Windows D3D11VA
+    auto win = matrix[0];
+    EXPECT_EQ(win.platform, ClientPlatform::Windows_D3D11VA);
+    EXPECT_EQ(win.nativeApi, "Direct3D 11 Video Acceleration (D3D11VA)");
+#if defined(_WIN32)
+    EXPECT_TRUE(win.isNativeCompiled);
+    EXPECT_TRUE(win.isHardwareAccelerated);
+    EXPECT_EQ(win.releaseStatus, "Production Qualified");
+#endif
+    EXPECT_TRUE(win.supportsH264);
+    EXPECT_TRUE(win.supportsHevc);
+    EXPECT_TRUE(win.supportsAv1);
+
+    // 2. macOS VideoToolbox
+    auto mac = matrix[1];
+    EXPECT_EQ(mac.platform, ClientPlatform::MacOS_VideoToolbox);
+    EXPECT_EQ(mac.nativeApi, "Apple VideoToolbox Framework");
+    EXPECT_TRUE(mac.supportsH264);
+    EXPECT_TRUE(mac.supportsHevc);
+    EXPECT_TRUE(mac.supportsAv1);
+
+    // 3. Linux VA-API
+    auto linuxCap = matrix[2];
+    EXPECT_EQ(linuxCap.platform, ClientPlatform::Linux_VaApi);
+    EXPECT_EQ(linuxCap.nativeApi, "Linux Video Acceleration API (VA-API / DMA-BUF)");
+    EXPECT_TRUE(linuxCap.supportsH264);
+    EXPECT_TRUE(linuxCap.supportsHevc);
+    EXPECT_TRUE(linuxCap.supportsAv1);
+
+    // 4. Android AMediaCodec
+    auto androidCap = matrix[3];
+    EXPECT_EQ(androidCap.platform, ClientPlatform::Android_MediaCodec);
+    EXPECT_EQ(androidCap.nativeApi, "Android NDK AMediaCodec");
+    EXPECT_TRUE(androidCap.supportsH264);
+
+    // 5. Web WebCodecs
+    auto webCap = matrix[4];
+    EXPECT_EQ(webCap.platform, ClientPlatform::Web_WebRtcWasm);
+    EXPECT_EQ(webCap.nativeApi, "W3C WebCodecs / WebAssembly");
+    EXPECT_TRUE(webCap.supportsH264);
+}
+
+TEST(GuestClientSessionLifecycleTest, CompleteStateTransitionsAndRestrictions) {
+    GuestClientConfig config{
+        .platform = ClientPlatform::Windows_D3D11VA,
+        .sessionId = "session-state-test",
+        .authToken = "auth-token-12345"
+    };
+
+    auto sessionRes = GuestClientSession::create(config);
+    ASSERT_TRUE(sessionRes.hasValue());
+    auto session = std::move(sessionRes.value());
+
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Disconnected);
+    EXPECT_FALSE(session->isRelativeMouseEnabled());
+
+    // Pairing submission
+    EXPECT_FALSE(session->submitPairingCode("12").hasValue()); // Too short
+    EXPECT_TRUE(session->submitPairingCode("ABC123").hasValue());
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Authenticating);
+
+    // Authentication
+    EXPECT_FALSE(session->authenticate("").hasValue());
+    EXPECT_TRUE(session->authenticate("valid-secret-token").hasValue());
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Signaling);
+
+    // Connect
+    EXPECT_TRUE(session->connect().hasValue());
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Connected);
+
+    // Relative mouse toggle
+    EXPECT_TRUE(session->setRelativeMouse(true).hasValue());
+    EXPECT_TRUE(session->isRelativeMouseEnabled());
+    EXPECT_TRUE(session->setRelativeMouse(false).hasValue());
+    EXPECT_FALSE(session->isRelativeMouseEnabled());
+
+    // Ingest packet moves to Streaming
+    EncodedPacket pkt{};
+    pkt.data = {0x00, 0x00, 0x01, 0x67};
+    pkt.timestampNs = 1000;
+    (void)session->ingestVideoPacket(pkt);
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Streaming);
+
+    // Reconnection
+    EXPECT_TRUE(session->triggerReconnect().hasValue());
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Connected);
+
+    // Platform restrictions
+    auto macRestrictions = GuestClientSession::getPlatformRestrictions(ClientPlatform::MacOS_VideoToolbox);
+    EXPECT_FALSE(macRestrictions.empty());
+    auto linuxRestrictions = GuestClientSession::getPlatformRestrictions(ClientPlatform::Linux_VaApi);
+    EXPECT_FALSE(linuxRestrictions.empty());
+    auto webRestrictions = GuestClientSession::getPlatformRestrictions(ClientPlatform::Web_WebRtcWasm);
+    EXPECT_FALSE(webRestrictions.empty());
+
+    EXPECT_TRUE(session->disconnect().hasValue());
+    EXPECT_EQ(session->getLifecycleState(), SessionLifecycleState::Disconnected);
+}
+

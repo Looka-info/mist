@@ -1,6 +1,6 @@
 [package]
 name = "mist-signaling"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "High-performance native WebRTC signaling service for Mist"
 

@@ -43,7 +43,7 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
         if (arg == "--help" || arg == "-h") {
-            std::cout << "Mist Host v0.2.0-rc1\n"
+            std::cout << "Mist Host v0.3.0-rc1\n"
                       << "Usage: mist_host [options]\n\n"
                       << "General Options:\n"
                       << "  -h, --help                          Show help information\n"
@@ -84,7 +84,7 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
                       << "  --allow-remote-input                Grant remote control permissions to client\n";
             return std::optional<int>(0);
         } else if (arg == "--version" || arg == "-v") {
-            std::cout << "mist_host version 0.2.0-rc1\n";
+            std::cout << "mist_host version 0.3.0-rc1\n";
             return std::optional<int>(0);
         } else if (arg == "--self-test") {
             options_.mode = HostCommandMode::SelfTest;

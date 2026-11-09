@@ -397,7 +397,7 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
     for (int i = 1; i < argc; ++i) {
         std::string_view arg = argv[i];
         if (arg == "--help" || arg == "-h") {
-            std::cout << "Mist Desktop Game Streaming Studio v0.2.0-rc1\n"
+            std::cout << "Mist Desktop Game Streaming Studio v0.3.0-rc1\n"
                       << "Usage: mist_desktop.exe [options]\n\n"
                       << "Options:\n"
                       << "  --help, -h            Show this help text and exit\n"
@@ -414,7 +414,7 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
                       << "  --self-test           Run automated desktop self-test suite\n";
             return std::optional<int>(0);
         } else if (arg == "--version" || arg == "-v") {
-            std::cout << "mist_desktop version 0.2.0-rc1\n";
+            std::cout << "mist_desktop version 0.3.0-rc1\n";
             return std::optional<int>(0);
         } else if (arg == "--home") {
             targetScreen_ = DesktopScreen::Home;
@@ -458,7 +458,7 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
     auto valRes = config_.validate();
     if (!valRes) return valRes.error();
 
-    MIST_LOG_INFO(common::SubsystemId::DesktopApp, "Initializing Mist Desktop Application v0.2.0-rc1...");
+    MIST_LOG_INFO(common::SubsystemId::DesktopApp, "Initializing Mist Desktop Application v0.3.0-rc1...");
     (void)platform::windows::initializeProcessDpiAwareness();
 
     isInitialized_.store(true);
@@ -2252,7 +2252,7 @@ void DesktopApplication::renderGuiNavRail() {
     if (availY > 60.0f && !isCollapsed) {
         ImGui::SetCursorPosY(ImGui::GetCursorPosY() + availY - 60.0f);
         if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextColored(c.mute, "v0.2.0-rc1");
+        ImGui::TextColored(c.mute, "v0.3.0-rc1");
         ImGui::TextColored(c.mute, "Windows 11 * GTX 1660 SUPER");
         if (fontSmall_) ImGui::PopFont();
     }

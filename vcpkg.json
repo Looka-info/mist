@@ -1,6 +1,6 @@
 {
   "name": "mist",
-  "version-string": "0.2.0-rc1",
+  "version-string": "0.3.0-rc1",
   "description": "High-performance native Windows game-streaming platform",
   "homepage": "https://github.com/mist/mist",
   "license": "Proprietary",

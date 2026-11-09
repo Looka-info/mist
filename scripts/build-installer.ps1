@@ -9,7 +9,7 @@
 
 param(
     [string]$DistDir = "dist\mist-windows-x64",
-    [string]$ZipOutput = "dist\mist-v0.2.0-rc1-windows-x64.zip",
+    [string]$ZipOutput = "dist\mist-v0.3.0-rc1-windows-x64.zip",
     [switch]$TestInstallUninstall = $true
 )
 
@@ -66,15 +66,15 @@ if (Test-Path "resources") {
 
 if (Test-Path $installerBinary) {
     Copy-Item -Path $installerBinary -Destination "$DistDir\MistSetup.exe" -Force
-    Copy-Item -Path $installerBinary -Destination "dist\MistSetup-v0.2.0-rc1.exe" -Force
-    Write-Host "  -> Staged standalone installer: MistSetup-v0.2.0-rc1.exe" -ForegroundColor Green
+    Copy-Item -Path $installerBinary -Destination "dist\MistSetup-v0.3.0-rc1.exe" -Force
+    Write-Host "  -> Staged standalone installer: MistSetup-v0.3.0-rc1.exe" -ForegroundColor Green
 }
 
 # 3. Create default configuration
 $defaultConfig = @"
 [general]
 app_name = Mist Native Streaming
-version = 0.2.0-rc1
+version = 0.3.0-rc1
 log_level = info
 
 [video]
@@ -106,7 +106,7 @@ $installLines = @(
     '    [switch]$Silent = $false',
     ')',
     '$ErrorActionPreference = "Stop"',
-    'if (-not $Silent) { Write-Host "Installing Mist Native Game Streaming Platform v0.2.0-rc1..." -ForegroundColor Cyan }',
+    'if (-not $Silent) { Write-Host "Installing Mist Native Game Streaming Platform v0.3.0-rc1..." -ForegroundColor Cyan }',
     'if (-not (Test-Path $InstallPath)) { New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null }',
     '$scriptRoot = $PSScriptRoot',
     'Copy-Item -Path "$scriptRoot\bin\*" -Destination $InstallPath -Recurse -Force',
@@ -125,11 +125,11 @@ $installLines = @(
     '$regKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Mist"',
     'if (-not (Test-Path $regKey)) { New-Item -Path $regKey -Force | Out-Null }',
     'Set-ItemProperty -Path $regKey -Name "DisplayName" -Value "Mist Native Game Streaming Platform"',
-    'Set-ItemProperty -Path $regKey -Name "DisplayVersion" -Value "0.2.0-rc1"',
+    'Set-ItemProperty -Path $regKey -Name "DisplayVersion" -Value "0.3.0-rc1"',
     'Set-ItemProperty -Path $regKey -Name "Publisher" -Value "Mist Systems Architecture"',
     'Set-ItemProperty -Path $regKey -Name "InstallLocation" -Value $InstallPath',
     'Set-ItemProperty -Path $regKey -Name "UninstallString" -Value "powershell.exe -ExecutionPolicy Bypass -File `"$InstallPath\uninstall.ps1`""',
-    'if (-not $Silent) { Write-Host "Mist v0.2.0-rc1 successfully installed to: $InstallPath" -ForegroundColor Green }'
+    'if (-not $Silent) { Write-Host "Mist v0.3.0-rc1 successfully installed to: $InstallPath" -ForegroundColor Green }'
 )
 $installScript = $installLines -join "`r`n"
 Set-Content -Path "$DistDir\install.ps1" -Value $installScript -Encoding UTF8
@@ -138,7 +138,7 @@ Set-Content -Path "$DistDir\install.ps1" -Value $installScript -Encoding UTF8
 $uninstallLines = @(
     'param([switch]$Silent = $false)',
     '$InstallPath = $PSScriptRoot',
-    'if (-not $Silent) { Write-Host "Uninstalling Mist Native Game Streaming Platform v0.2.0-rc1..." -ForegroundColor Cyan }',
+    'if (-not $Silent) { Write-Host "Uninstalling Mist Native Game Streaming Platform v0.3.0-rc1..." -ForegroundColor Cyan }',
     '$startMenuDir = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Mist"',
     'if (Test-Path $startMenuDir) { Remove-Item -Path $startMenuDir -Recurse -Force -ErrorAction SilentlyContinue }',
     '$regKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Mist"',
@@ -147,7 +147,7 @@ $uninstallLines = @(
     '    $files = Get-ChildItem -Path $InstallPath -Recurse | Where-Object { $_.FullName -ne "$PSScriptRoot\uninstall.ps1" }',
     '    foreach ($f in $files) { Remove-Item -Path $f.FullName -Force -Recurse -ErrorAction SilentlyContinue }',
     '}',
-    'if (-not $Silent) { Write-Host "Mist v0.2.0-rc1 uninstallation complete." -ForegroundColor Green }'
+    'if (-not $Silent) { Write-Host "Mist v0.3.0-rc1 uninstallation complete." -ForegroundColor Green }'
 )
 $uninstallScript = $uninstallLines -join "`r`n"
 Set-Content -Path "$DistDir\uninstall.ps1" -Value $uninstallScript -Encoding UTF8
@@ -155,10 +155,10 @@ Set-Content -Path "$DistDir\uninstall.ps1" -Value $uninstallScript -Encoding UTF
 # 6. Execute Code Signing and Release Manifest generation
 Write-Host "Executing release code signing..." -ForegroundColor Yellow
 & powershell -ExecutionPolicy Bypass -File "scripts\sign-release.ps1" -DistPath "$DistDir" -ManifestOutput "$DistDir\release-manifest.json"
-if (Test-Path "dist\MistSetup-v0.2.0-rc1.exe") {
+if (Test-Path "dist\MistSetup-v0.3.0-rc1.exe") {
     $certs = Get-ChildItem -Path Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue
     if ($certs -and $certs.Count -gt 0) {
-        Set-AuthenticodeSignature -FilePath "dist\MistSetup-v0.2.0-rc1.exe" -Certificate $certs[0] -TimestampServer "http://timestamp.digicert.com" -ErrorAction SilentlyContinue | Out-Null
+        Set-AuthenticodeSignature -FilePath "dist\MistSetup-v0.3.0-rc1.exe" -Certificate $certs[0] -TimestampServer "http://timestamp.digicert.com" -ErrorAction SilentlyContinue | Out-Null
     }
 }
 
@@ -196,12 +196,12 @@ if ($TestInstallUninstall) {
     Write-Host "  -> Uninstall verification: PASSED" -ForegroundColor Green
 
     # Test Native Windows Setup Executable Lifecycle
-    if (Test-Path "dist\MistSetup-v0.2.0-rc1.exe") {
+    if (Test-Path "dist\MistSetup-v0.3.0-rc1.exe") {
         Write-Host "`nTesting native MistSetup.exe silent installation..." -ForegroundColor Yellow
         $nativeTestDir = "$env:TEMP\MistNativeSetupTest"
         if (Test-Path $nativeTestDir) { Remove-Item -Path $nativeTestDir -Recurse -Force }
 
-        Start-Process -FilePath "dist\MistSetup-v0.2.0-rc1.exe" -ArgumentList "/S /D=$nativeTestDir" -Wait
+        Start-Process -FilePath "dist\MistSetup-v0.3.0-rc1.exe" -ArgumentList "/S /D=$nativeTestDir" -Wait
         if (-not (Test-Path "$nativeTestDir\mist_desktop.exe")) {
             Write-Error "Native installer test failed: mist_desktop.exe not found in $nativeTestDir"
             exit 1
