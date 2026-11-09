@@ -40,6 +40,7 @@ add_executable(mist_unit_tests
     TestHostBandwidthBudget.cpp
     TestHevcCodec.cpp
     TestEncoderFallbacks.cpp
+    TestLowLatencyTuning.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE

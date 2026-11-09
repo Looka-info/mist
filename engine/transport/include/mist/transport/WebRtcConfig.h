@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mist/transport/LowLatencyTuning.h"
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -42,6 +43,9 @@ struct WebRtcTransportConfig {
 
     // Peer identity & security verification
     std::string expectedRemoteFingerprint;
+
+    // WebRTC low-latency tuning & pacing
+    LowLatencyProfile lowLatency{};
 };
 
 enum class WebRtcState {
