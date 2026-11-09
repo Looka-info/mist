@@ -577,4 +577,4 @@
 - **Benchmark Evidence:** 227 C++ tests (225 passed, 2 skipped display capture, 0 failed in 28.05s); 45 Rust workspace tests passing 100% in 0.38s; NVENC 13.1 hardware test frames encoded at 60 FPS; D3D11VA hardware decoder initialized and passed; installer built and verified with automated install/uninstall pass.
 - **Hardware Requirements:** Windows 10/11 x64 with DirectX 11 GPU (Host & Client); Apple Silicon / Intel Mac (macOS Client); VA-API supported GPU on Linux; Android device with AMediaCodec; Chromium/WebKit/Gecko browser for Web.
 - **Known Limitations:** Hardware-accelerated AV1 encoding requires Ada Lovelace (RTX 40-series) or newer GPU architecture; earlier architectures fall back to HEVC/H.264 or CPU AV1.
-- **Commit Hash:** Staged for Milestone 27 commit
+- **Commit Hash:** `c22e17f`
