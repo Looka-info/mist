@@ -64,6 +64,11 @@ jobs:
       - name: Build C++ Media Engine
         run: cmake --build build --config Release --parallel
 
+      - name: Start Windows Audio Service
+        run: |
+          Set-Service -Name Audiosrv -StartupType Automatic -ErrorAction SilentlyContinue
+          Start-Service -Name Audiosrv -ErrorAction SilentlyContinue
+
       - name: Run CTest Regression Suite
         run: ctest --test-dir build -C Release --output-on-failure
 

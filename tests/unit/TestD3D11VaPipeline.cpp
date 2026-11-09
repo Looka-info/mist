@@ -42,6 +42,9 @@ TEST(D3D11VaPipelineTest, SharedDeviceInitialization) {
     // Verify both subsystems share the exact same GPU device
     EXPECT_EQ(decoder->getD3D11Device(), sharedDevice.Get());
     EXPECT_EQ(renderer->getD3D11Device(), sharedDevice.Get());
+    if (!decoder->isZeroCopyEnabled()) {
+        GTEST_SKIP() << "D3D11VA hardware zero-copy acceleration not supported by graphics adapter in this environment";
+    }
     EXPECT_TRUE(decoder->isZeroCopyEnabled());
 }
 

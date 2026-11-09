@@ -27,6 +27,7 @@ std::string wideToUtf8(const std::wstring& wide) {
 
 AudioDeviceInfo parseDevice(IMMDevice* device, bool isDefault) {
     AudioDeviceInfo info;
+    if (!device) return info;
     info.isDefault = isDefault;
 
     LPWSTR strId = nullptr;
@@ -36,7 +37,7 @@ AudioDeviceInfo parseDevice(IMMDevice* device, bool isDefault) {
     }
 
     ComPtr<IPropertyStore> props;
-    if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &props))) {
+    if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &props)) && props) {
         PROPVARIANT var;
         PropVariantInit(&var);
         if (SUCCEEDED(props->GetValue(PKEY_Device_FriendlyName, &var))) {
@@ -52,14 +53,14 @@ AudioDeviceInfo parseDevice(IMMDevice* device, bool isDefault) {
     }
 
     ComPtr<IAudioClient> audioClient;
-    if (SUCCEEDED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &audioClient))) {
+    if (SUCCEEDED(device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &audioClient)) && audioClient) {
         WAVEFORMATEX* mixFormat = nullptr;
         if (SUCCEEDED(audioClient->GetMixFormat(&mixFormat)) && mixFormat) {
             info.sampleRate = mixFormat->nSamplesPerSec;
             info.channels = mixFormat->nChannels;
             info.bitsPerSample = mixFormat->wBitsPerSample;
 
-            if (mixFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE) {
+            if (mixFormat->wFormatTag == WAVE_FORMAT_EXTENSIBLE && mixFormat->cbSize >= 22) {
                 auto* ext = reinterpret_cast<WAVEFORMATEXTENSIBLE*>(mixFormat);
                 if (ext->SubFormat == GUID_IEEE_FLOAT) {
                     info.format = AudioSampleFormat::Float32;
@@ -83,7 +84,7 @@ AudioDeviceInfo parseDevice(IMMDevice* device, bool isDefault) {
 
 common::Result<std::vector<AudioDeviceInfo>> AudioDeviceEnumerator::enumerateRenderDevices() {
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    bool coInitialized = SUCCEEDED(hr);
+    bool coInitialized = (hr == S_OK || hr == S_FALSE);
 
     ComPtr<IMMDeviceEnumerator> enumerator;
     hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), &enumerator);
@@ -134,7 +135,7 @@ common::Result<std::vector<AudioDeviceInfo>> AudioDeviceEnumerator::enumerateRen
 
 common::Result<AudioDeviceInfo> AudioDeviceEnumerator::getDefaultRenderDevice() {
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    bool coInitialized = SUCCEEDED(hr);
+    bool coInitialized = (hr == S_OK || hr == S_FALSE);
 
     ComPtr<IMMDeviceEnumerator> enumerator;
     hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), &enumerator);
