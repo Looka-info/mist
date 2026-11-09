@@ -1244,14 +1244,25 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
         }
     }
 
-    // Load Material Symbols Rounded dedicated fonts
+    // Load Material Symbols Rounded dedicated fonts (only required symbol ranges)
     if (!fontMatIcons.empty()) {
-        static const ImWchar icon_ranges[] = { 0xe000, 0xf300, 0 };
+        static const ImWchar icon_ranges[] = {
+            0xe000, 0xe050,  // error, warning, play_arrow, stop
+            0xe150, 0xe1d0,  // link, network_check, speed
+            0xe300, 0xe340,  // cast, videogame_asset, devices, phonelink, keyboard, mouse, desktop
+            0xe400, 0xe435,  // palette, tune
+            0xe510, 0xe5e0,  // light_mode, sensors, menu, refresh, close
+            0xe630, 0xe645,  // wifi
+            0xe830, 0xe8e0,  // circle, check_circle, router, home, search, settings
+            0xea00, 0xea30,  // bolt, sports_esports
+            0xeb40, 0xeb45,  // casino
+            0
+        };
         ImFontConfig iconCfg;
         iconCfg.PixelSnapH = true;
         iconCfg.GlyphOffset.y = 1.0f;
-        fontIcons_ = io.Fonts->AddFontFromFileTTF(fontMatIcons.c_str(), 22.0f, &iconCfg, icon_ranges);
-        fontIconsLarge_ = io.Fonts->AddFontFromFileTTF(fontMatIcons.c_str(), 36.0f, &iconCfg, icon_ranges);
+        fontIcons_ = io.Fonts->AddFontFromFileTTF(fontMatIcons.c_str(), 24.0f, &iconCfg, icon_ranges);
+        fontIconsLarge_ = io.Fonts->AddFontFromFileTTF(fontMatIcons.c_str(), 40.0f, &iconCfg, icon_ranges);
     }
 
     if (!fontRegular_) {
@@ -1263,6 +1274,18 @@ common::Result<void> DesktopApplication::initializeD3D11Gui() {
 
     ImGui_ImplWin32_Init(hwnd_);
     ImGui_ImplDX11_Init(d3d11Device_.Get(), d3d11Context_.Get());
+
+    // Pre-clear backbuffer so window never displays unrendered black buffer on launch
+    const auto& c = tokens::getActiveTheme(currentTheme_);
+    const float clearColor[4] = { c.bg.x, c.bg.y, c.bg.z, 1.00f };
+    if (rtv_ && d3d11Context_) {
+        ID3D11RenderTargetView* rtvPtr = rtv_.Get();
+        d3d11Context_->OMSetRenderTargets(1, &rtvPtr, nullptr);
+        d3d11Context_->ClearRenderTargetView(rtvPtr, clearColor);
+        if (swapChain_) {
+            (void)swapChain_->Present(0, 0);
+        }
+    }
 
     ShowWindow(hwnd_, SW_SHOWNORMAL);
     UpdateWindow(hwnd_);
@@ -1646,10 +1669,10 @@ void DesktopApplication::renderChip(const char* text, int statusType) const {
 bool DesktopApplication::renderPillButton(const char* label, bool primary, bool danger, const ImVec2& size, const char* iconName) {
     const auto& c = tokens::getActiveTheme(currentTheme_);
     ImVec2 actualSize = size;
-    if (actualSize.y <= 0) actualSize.y = 40.0f;
+    if (actualSize.y <= 0) actualSize.y = 44.0f;
 
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, tokens::MintShapes::Pill);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(24.0f, 8.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(24.0f, 10.0f));
 
     ImU32 iconCol = 0;
     if (primary) {
@@ -1676,11 +1699,13 @@ bool DesktopApplication::renderPillButton(const char* label, bool primary, bool 
     }
 
     ImVec2 pStart = ImGui::GetCursorScreenPos();
-    std::string fullLabel = (iconName ? "   " : "") + std::string(label);
+    std::string fullLabel = (iconName ? "     " : "") + std::string(label);
+    if (fontBold_) ImGui::PushFont(fontBold_);
     bool clicked = ImGui::Button(fullLabel.c_str(), actualSize);
+    if (fontBold_) ImGui::PopFont();
 
     if (iconName) {
-        renderVectorIcon(iconName, ImVec2(pStart.x + 20.0f, pStart.y + actualSize.y * 0.5f), 18.0f, iconCol);
+        renderVectorIcon(iconName, ImVec2(pStart.x + 22.0f, pStart.y + actualSize.y * 0.5f), 20.0f, iconCol);
     }
 
     ImGui::PopStyleColor(5);
@@ -2069,9 +2094,9 @@ void DesktopApplication::renderGuiNavRail() {
         }
 
         ImVec2 pStart = ImGui::GetCursorScreenPos();
-        std::string btnText = "      " + std::string(item.label);
+        std::string btnText = "        " + std::string(item.label);
         if (fontBold_) ImGui::PushFont(fontBold_);
-        if (ImGui::Button(btnText.c_str(), ImVec2(railWidth - 24.0f, 52.0f))) {
+        if (ImGui::Button(btnText.c_str(), ImVec2(railWidth - 24.0f, 56.0f))) {
             clearError();
             currentScreen_ = item.screen;
         }
@@ -2079,12 +2104,12 @@ void DesktopApplication::renderGuiNavRail() {
 
         // Render the navigation icon
         ImU32 iconColor = isSelected ? ImGui::ColorConvertFloat4ToU32(c.onCt) : ImGui::ColorConvertFloat4ToU32(c.mute);
-        renderVectorIcon(item.icon, ImVec2(pStart.x + 28.0f, pStart.y + 26.0f), 22.0f, iconColor);
+        renderVectorIcon(item.icon, ImVec2(pStart.x + 28.0f, pStart.y + 28.0f), 24.0f, iconColor);
 
         if (item.hasBadge) {
             ImDrawList* drawList = ImGui::GetWindowDrawList();
             float bx = pStart.x + railWidth - 56.0f;
-            float by = pStart.y + 26.0f;
+            float by = pStart.y + 28.0f;
             drawList->AddRectFilled(ImVec2(bx, by - 10.0f), ImVec2(bx + 20.0f, by + 10.0f), ImGui::ColorConvertFloat4ToU32(c.mint), 99.0f);
             drawList->AddText(ImVec2(bx + 6.0f, by - 7.0f), ImGui::ColorConvertFloat4ToU32(c.onMint), "1");
         }
@@ -2144,7 +2169,7 @@ void DesktopApplication::renderGuiHomeScreen() {
 
     for (int i = 0; i < 3; ++i) {
         if (i > 0) ImGui::SameLine(0, 14.0f);
-        BeginCardContainer(("SessionCard" + std::to_string(i)).c_str(), c, ImVec2(carCardW, 110.0f), 24.0f);
+        BeginCardContainer(("SessionCard" + std::to_string(i)).c_str(), c, ImVec2(carCardW, 126.0f), 24.0f);
         if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextColored(c.ink, "%s", sessions[i].name);
         if (fontBold_) ImGui::PopFont();
@@ -2191,18 +2216,18 @@ void DesktopApplication::renderGuiHomeScreen() {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 22.0f));
 
         std::string tileId = "Tile" + std::to_string(i);
-        ImGui::BeginChild(tileId.c_str(), ImVec2(tileW, 136.0f), true);
+        ImGui::BeginChild(tileId.c_str(), ImVec2(tileW, 152.0f), true);
 
-        // 48x48 rounded 16px mint icon box
+        // 52x52 rounded 16px mint icon box
         ImVec2 curPos = ImGui::GetCursorScreenPos();
         ImDrawList* drawList = ImGui::GetWindowDrawList();
-        drawList->AddRectFilled(curPos, ImVec2(curPos.x + 48.0f, curPos.y + 48.0f), ImGui::ColorConvertFloat4ToU32(c.mint), 16.0f);
+        drawList->AddRectFilled(curPos, ImVec2(curPos.x + 52.0f, curPos.y + 52.0f), ImGui::ColorConvertFloat4ToU32(c.mint), 16.0f);
 
         // Render the exact Material icon inside the mint box
-        renderVectorIcon(tiles[i].icon, ImVec2(curPos.x + 24.0f, curPos.y + 24.0f), 24.0f, ImGui::ColorConvertFloat4ToU32(c.onMint));
+        renderVectorIcon(tiles[i].icon, ImVec2(curPos.x + 26.0f, curPos.y + 26.0f), 26.0f, ImGui::ColorConvertFloat4ToU32(c.onMint));
 
-        ImGui::Dummy(ImVec2(48.0f, 48.0f));
-        ImGui::SameLine(0, 14.0f);
+        ImGui::Dummy(ImVec2(52.0f, 52.0f));
+        ImGui::SameLine(0, 16.0f);
         ImGui::BeginGroup();
         if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextColored(c.ink, "%s", tiles[i].title);
@@ -2273,7 +2298,7 @@ void DesktopApplication::renderGuiHomeScreen() {
         if (fontRegular_) ImGui::PopFont();
 
         float rw = ImGui::GetContentRegionAvail().x;
-        ImGui::SameLine(rw - 340.0f);
+        ImGui::SameLine(rw - 400.0f);
         renderChip(rows[i].chipText.c_str(), rows[i].status);
         ImGui::Spacing();
     }
@@ -2297,7 +2322,7 @@ void DesktopApplication::renderGuiHostScreen() {
     float colW = std::max(300.0f, (availW - 16.0f) / 2.0f);
 
     // Left: Stream Card
-    BeginCardContainer("HostStreamCard", c, ImVec2(colW, 310.0f), 28.0f);
+    BeginCardContainer("HostStreamCard", c, ImVec2(colW, 360.0f), 28.0f);
     if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.ink, "Stream");
     if (fontTitle_) ImGui::PopFont();
@@ -2352,7 +2377,7 @@ void DesktopApplication::renderGuiHostScreen() {
     ImGui::Spacing();
 
     if (!isHostingActive_) {
-        if (renderPillButton("Start streaming", true, false, ImVec2(180.0f, 40.0f), "play_arrow")) {
+        if (renderPillButton("Start streaming", true, false, ImVec2(200.0f, 44.0f), "play_arrow")) {
             std::string sId(hostSessionId_);
             std::string sigUrl(hostSignalingServer_);
             if (sId.empty()) {
@@ -2370,7 +2395,7 @@ void DesktopApplication::renderGuiHostScreen() {
             }
         }
     } else {
-        if (renderPillButton("Stop streaming", false, true, ImVec2(180.0f, 40.0f), "stop")) {
+        if (renderPillButton("Stop streaming", false, true, ImVec2(200.0f, 44.0f), "stop")) {
             terminateHostProcess();
             showToast("Streaming stopped");
         }
@@ -2380,7 +2405,7 @@ void DesktopApplication::renderGuiHostScreen() {
 
     // Right: Session Settings Card
     ImGui::SameLine(0, 16.0f);
-    BeginCardContainer("HostSessionCard", c, ImVec2(colW, 310.0f), 28.0f);
+    BeginCardContainer("HostSessionCard", c, ImVec2(colW, 360.0f), 28.0f);
     if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.ink, "Session");
     if (fontTitle_) ImGui::PopFont();
@@ -2418,7 +2443,7 @@ void DesktopApplication::renderGuiConnectScreen() {
     float colW = std::max(300.0f, (availW - 16.0f) / 2.0f);
 
     // Left: Connect Form Card
-    BeginCardContainer("ConnectFormCard", c, ImVec2(colW, 400.0f), 28.0f);
+    BeginCardContainer("ConnectFormCard", c, ImVec2(colW, 460.0f), 28.0f);
 
     renderM3TextField("##ConnSessionId", "Session ID", connectSessionId_, IM_ARRAYSIZE(connectSessionId_));
     ImGui::Spacing();
@@ -2433,7 +2458,7 @@ void DesktopApplication::renderGuiConnectScreen() {
     ImGui::Spacing();
     ImGui::Spacing();
 
-    if (renderPillButton(isConnecting_ ? "Connecting..." : "Connect", true, false, ImVec2(160.0f, 40.0f), isConnecting_ ? "refresh" : "play_arrow")) {
+    if (renderPillButton(isConnecting_ ? "Connecting..." : "Connect", true, false, ImVec2(180.0f, 44.0f), isConnecting_ ? "refresh" : "play_arrow")) {
         if (!isConnecting_) {
             std::string sId(connectSessionId_);
             std::string sigUrl(connectSignalingServer_);
@@ -2455,7 +2480,7 @@ void DesktopApplication::renderGuiConnectScreen() {
 
     if (isConnecting_) {
         ImGui::SameLine(0, 12.0f);
-        if (renderPillButton("Cancel", false, true, ImVec2(120.0f, 40.0f), "stop")) {
+        if (renderPillButton("Cancel", false, true, ImVec2(130.0f, 44.0f), "stop")) {
             terminateClientProcess();
             showToast("Connection cancelled");
         }
@@ -2465,7 +2490,7 @@ void DesktopApplication::renderGuiConnectScreen() {
 
     // Right: Connection Steps Card
     ImGui::SameLine(0, 16.0f);
-    BeginCardContainer("ConnectStepsCard", c, ImVec2(colW, 400.0f), 28.0f);
+    BeginCardContainer("ConnectStepsCard", c, ImVec2(colW, 460.0f), 28.0f);
     if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.ink, "Connection");
     if (fontTitle_) ImGui::PopFont();
@@ -2523,15 +2548,15 @@ void DesktopApplication::renderGuiDevicesScreen() {
     float colW = std::max(300.0f, (availW - 16.0f) / 2.0f);
 
     // Left: Pairing Code Card
-    BeginCardContainer("PairingCodeCard", c, ImVec2(colW, 260.0f), 28.0f);
+    BeginCardContainer("PairingCodeCard", c, ImVec2(colW, 320.0f), 28.0f);
     if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.ink, "Pairing code");
     if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
 
     // 6 Large Digits in Rounded Pill Containers
-    float spanW = std::min(52.0f, (colW - 80.0f) / 6.0f);
-    float spanH = 64.0f;
+    float spanW = std::min(58.0f, (colW - 80.0f) / 6.0f);
+    float spanH = 72.0f;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
     for (size_t i = 0; i < 6 && i < pairingCode_.size(); ++i) {
@@ -2554,7 +2579,7 @@ void DesktopApplication::renderGuiDevicesScreen() {
     if (fontSmall_) ImGui::PopFont();
 
     ImGui::Spacing();
-    if (renderPillButton("New code", true, false, ImVec2(120.0f, 36.0f))) {
+    if (renderPillButton("New code", true, false, ImVec2(130.0f, 42.0f))) {
         if (codeLockSeconds_ <= 0) {
             pairingCode_ = generateRandomPairingCode();
             wrongCodeFails_ = 0;
@@ -2563,7 +2588,7 @@ void DesktopApplication::renderGuiDevicesScreen() {
         }
     }
     ImGui::SameLine(0, 10.0f);
-    if (renderPillButton("Try a wrong code", false, false, ImVec2(150.0f, 36.0f))) {
+    if (renderPillButton("Try a wrong code", false, false, ImVec2(170.0f, 42.0f))) {
         if (codeLockSeconds_ <= 0) {
             wrongCodeFails_++;
             if (wrongCodeFails_ >= 5) {
@@ -2586,7 +2611,7 @@ void DesktopApplication::renderGuiDevicesScreen() {
 
     // Right: Waiting for Approval Card
     ImGui::SameLine(0, 16.0f);
-    BeginCardContainer("ApprovalCard", c, ImVec2(colW, 260.0f), 28.0f);
+    BeginCardContainer("ApprovalCard", c, ImVec2(colW, 320.0f), 28.0f);
     if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.ink, "Waiting for approval");
     if (fontTitle_) ImGui::PopFont();
@@ -2601,13 +2626,13 @@ void DesktopApplication::renderGuiDevicesScreen() {
         if (fontSmall_) ImGui::PopFont();
 
         ImGui::Spacing();
-        if (renderPillButton("Approve", true, false, ImVec2(100.0f, 36.0f))) {
+        if (renderPillButton("Approve", true, false, ImVec2(110.0f, 42.0f))) {
             trustedDevices_.push_back({"Aiden's Laptop", "Paired just now", false, false});
             isDeviceApprovalPending_ = false;
             showToast("Aiden's Laptop approved. Input is off.");
         }
         ImGui::SameLine(0, 10.0f);
-        if (renderPillButton("Deny", false, false, ImVec2(80.0f, 36.0f))) {
+        if (renderPillButton("Deny", false, false, ImVec2(90.0f, 42.0f))) {
             isDeviceApprovalPending_ = false;
             showToast("Request denied");
         }
@@ -2715,7 +2740,7 @@ void DesktopApplication::renderGuiNetworkScreen() {
     if (fontSmall_) ImGui::PopFont();
     ImGui::EndGroup();
 
-    ImGui::SameLine(cardW - 130.0f);
+    ImGui::SameLine(cardW - 200.0f);
     int qosStatusType = (liveNetworkStatus_.qosState.find("Optimal") != std::string::npos) ? 1 :
                         ((liveNetworkStatus_.qosState.find("Stable") != std::string::npos) ? 1 : 2);
     renderChip(liveNetworkStatus_.qosState.c_str(), qosStatusType);
@@ -2800,11 +2825,11 @@ void DesktopApplication::renderGuiNetworkScreen() {
     ImGui::Spacing();
 
     // 2. Real-Time Video & Network Throughput Graph Card
-    BeginCardContainer("NetworkChartCard", c, ImVec2(0, 360.0f), 28.0f);
+    BeginCardContainer("NetworkChartCard", c, ImVec2(0, 390.0f), 28.0f);
     if (fontTitle_) ImGui::PushFont(fontTitle_);
     ImGui::TextColored(c.ink, "Live Network Throughput & Latency");
     if (fontTitle_) ImGui::PopFont();
-    ImGui::SameLine(cardW - 130.0f);
+    ImGui::SameLine(cardW - 200.0f);
     int chartQosType = (networkQosState_.find("Optimal") != std::string::npos || networkQosState_.find("Stable") != std::string::npos) ? 1 :
                        ((networkQosState_.find("Recovering") != std::string::npos || networkQosState_.find("Increasing") != std::string::npos) ? 2 : 3);
     renderChip(networkQosState_.c_str(), chartQosType);
@@ -2906,7 +2931,7 @@ void DesktopApplication::renderGuiNetworkScreen() {
 
     ImGui::Spacing();
     ImGui::Spacing();
-    if (renderPillButton("Refresh Network Probe", false, false, ImVec2(220.0f, 36.0f), "refresh")) {
+    if (renderPillButton("Refresh Network Probe", false, false, ImVec2(240.0f, 44.0f), "refresh")) {
         probeLiveNetwork();
         showToast("Network telemetry probed");
     }
@@ -2967,8 +2992,8 @@ void DesktopApplication::renderGuiLoadingScreen() {
     float dw = (dispSize.x > 100.0f) ? dispSize.x : static_cast<float>(guiWidth_);
     float dh = (dispSize.y > 100.0f) ? dispSize.y : static_cast<float>(guiHeight_);
 
-    float cardW = std::min(460.0f, dw - 48.0f);
-    float cardH = 320.0f;
+    float cardW = std::min(480.0f, dw - 48.0f);
+    float cardH = 360.0f;
     float posX = (dw - cardW) * 0.5f;
     float posY = (dh - cardH) * 0.45f;
 
@@ -2989,7 +3014,7 @@ void DesktopApplication::renderGuiLoadingScreen() {
 
     if (ImGui::Begin("StartupLoadingModal", nullptr, flags)) {
         // Centered Sleek Mint Logo
-        float logoSize = 54.0f;
+        float logoSize = 60.0f;
         ImGui::SetCursorPosX((cardW - logoSize) * 0.5f);
         renderSleekMintLogo(logoSize);
         ImGui::Spacing();
@@ -3134,8 +3159,8 @@ void DesktopApplication::renderGuiSettingsDialog() {
     drawList->AddRectFilled(ImVec2(0, 0), io.DisplaySize, IM_COL32(5, 25, 19, 130));
 
     // Centered Dialog Modal
-    float dlgW = std::min(520.0f, io.DisplaySize.x - 32.0f);
-    float dlgH = 490.0f;
+    float dlgW = std::min(540.0f, io.DisplaySize.x - 32.0f);
+    float dlgH = 550.0f;
     float dlgX = (io.DisplaySize.x - dlgW) * 0.5f;
     float dlgY = (io.DisplaySize.y - dlgH) * 0.5f;
 
@@ -3226,7 +3251,7 @@ void DesktopApplication::renderGuiSettingsDialog() {
         // Done Button
         float btnX = dlgW - 140.0f;
         ImGui::SetCursorPosX(btnX);
-        if (renderPillButton("Done", true, false, ImVec2(100.0f, 38.0f))) {
+        if (renderPillButton("Done", true, false, ImVec2(110.0f, 42.0f))) {
             isSettingsOpen_ = false;
         }
 

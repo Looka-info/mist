@@ -120,17 +120,17 @@ struct MintShapes {
     static constexpr float Pill   = 99.0f; // .btn, .rail a, .search border-radius: 99px
 };
 
-// Typography Scale
+// Typography Scale (Comfortable large modern scale)
 struct MintTypography {
-    static constexpr float Display  = 32.0f; // h1 font: 500 32px
-    static constexpr float Headline = 22.0f; // .top .t font: 500 22px
-    static constexpr float Title    = 20.0f; // h2 font: 500 20px
-    static constexpr float Section  = 18.0f; // .sec font: 500 18px
-    static constexpr float BodyBold = 16.0f; // h3 font: 500 16px
-    static constexpr float Body     = 15.0f; // body font: 400 15px
-    static constexpr float Label    = 13.0f; // .chip, mute small font: 12-13px
-    static constexpr float Badge    = 12.0f; // .badge font: 12px
-    static constexpr float Code     = 34.0f; // .code span font: 26-40px
+    static constexpr float Display  = 40.0f; // Page titles (h1)
+    static constexpr float Headline = 28.0f; // Major metrics & key stats
+    static constexpr float Title    = 24.0f; // Card headings (h2)
+    static constexpr float Section  = 21.0f; // Section titles
+    static constexpr float BodyBold = 18.5f; // Button text, emphasized items
+    static constexpr float Body     = 17.5f; // Standard text, text fields
+    static constexpr float Label    = 15.0f; // Chips, descriptions, sublabels
+    static constexpr float Badge    = 13.5f; // Badges
+    static constexpr float Code     = 42.0f; // Pairing code display
 };
 
 // Spacing Grid
