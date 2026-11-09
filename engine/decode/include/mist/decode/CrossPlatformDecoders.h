@@ -8,6 +8,7 @@
 #include <mutex>
 #include <vector>
 #include <cstdint>
+#include <atomic>
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -92,11 +93,19 @@ public:
     [[nodiscard]] bool isHardwareAccelerated() const noexcept;
     [[nodiscard]] static bool isNativePlatform() noexcept;
     [[nodiscard]] static bool isCodecSupported(encode::VideoCodec codec) noexcept;
+    [[nodiscard]] bool isSessionActive() const noexcept {
+#if defined(__APPLE__)
+        return formatCreated_ && vtSession_ != nullptr;
+#else
+        return false;
+#endif
+    }
 
 private:
     mutable std::mutex mutex_;
     DecodeConfig config_{};
     bool isInitialized_{false};
+    std::atomic<bool> isShuttingDown_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
 #if defined(__APPLE__)

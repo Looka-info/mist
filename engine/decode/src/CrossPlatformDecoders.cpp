@@ -214,13 +214,20 @@ void VideoToolboxDecoder::decompressionOutputCallback(
     CVImageBufferRef imageBuffer,
     CMTime /*presentationTimeStamp*/,
     CMTime /*presentationDuration*/) {
-    if (status != noErr || !imageBuffer) {
+    if (!decompressionOutputRefCon || status != noErr || !imageBuffer) {
         return;
     }
     auto* self = static_cast<VideoToolboxDecoder*>(decompressionOutputRefCon);
+    if (self->isShuttingDown_.load(std::memory_order_acquire)) {
+        return;
+    }
     CVPixelBufferRetain(imageBuffer);
 
     std::lock_guard<std::mutex> lock(self->mutex_);
+    if (!self->isInitialized_ || self->isShuttingDown_.load(std::memory_order_acquire)) {
+        CVPixelBufferRelease(imageBuffer);
+        return;
+    }
     self->decodedFrameCount_++;
     DecodedFrame frame{};
     frame.width = static_cast<uint32_t>(CVPixelBufferGetWidth(imageBuffer));
@@ -284,7 +291,10 @@ common::Result<void> VideoToolboxDecoder::submitPacket(const encode::EncodedPack
                              "Empty encoded packet submitted to VideoToolbox");
     }
 
-    if (!formatCreated_) {
+    // Lazy session creation: VideoToolbox requires CMVideoFormatDescription,
+    // which is extracted dynamically from the first Annex-B SPS/PPS (H.264) or VPS/SPS/PPS (HEVC).
+    // In-flight resolution changes on keyframes are also detected and reconfigure the session.
+    if (!formatCreated_ || packet.isKeyframe) {
         bool paramsExtracted = false;
         if (config_.codec == encode::VideoCodec::H264) {
             paramsExtracted = extractH264Parameters(packet.data.data(), packet.data.size());
@@ -410,11 +420,19 @@ common::Result<void> VideoToolboxDecoder::releaseFrame(const DecodedFrame& frame
 }
 
 common::Result<void> VideoToolboxDecoder::flush() {
-    std::lock_guard<std::mutex> lock(mutex_);
 #if defined(__APPLE__)
-    if (vtSession_) {
-        VTDecompressionSessionWaitForAsynchronousFrames(vtSession_);
+    VTDecompressionSessionRef sessionToWait = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        sessionToWait = vtSession_;
     }
+    if (sessionToWait) {
+        // Must call outside mutex_ to prevent deadlock with asynchronous decompression callback
+        VTDecompressionSessionWaitForAsynchronousFrames(sessionToWait);
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+#else
+    std::lock_guard<std::mutex> lock(mutex_);
 #endif
     while (!frameQueue_.empty()) {
 #if defined(__APPLE__)
@@ -429,30 +447,47 @@ common::Result<void> VideoToolboxDecoder::flush() {
 }
 
 common::Result<void> VideoToolboxDecoder::shutdown() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    isInitialized_ = false;
 #if defined(__APPLE__)
-    if (vtSession_) {
-        VTDecompressionSessionWaitForAsynchronousFrames(vtSession_);
-        VTDecompressionSessionInvalidate(vtSession_);
-        CFRelease(vtSession_);
+    VTDecompressionSessionRef sessionToInvalidate = nullptr;
+    CMVideoFormatDescriptionRef formatToRelease = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!isInitialized_) {
+            return common::Result<void>::success();
+        }
+        isInitialized_ = false;
+        isShuttingDown_.store(true, std::memory_order_release);
+        sessionToInvalidate = vtSession_;
         vtSession_ = nullptr;
-    }
-    if (formatDesc_) {
-        CFRelease(formatDesc_);
+        formatToRelease = formatDesc_;
         formatDesc_ = nullptr;
+        formatCreated_ = false;
     }
-    formatCreated_ = false;
-#endif
+
+    if (sessionToInvalidate) {
+        // Wait and invalidate outside mutex_ so in-flight callbacks can finish without deadlocking
+        VTDecompressionSessionWaitForAsynchronousFrames(sessionToInvalidate);
+        VTDecompressionSessionInvalidate(sessionToInvalidate);
+        CFRelease(sessionToInvalidate);
+    }
+    if (formatToRelease) {
+        CFRelease(formatToRelease);
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
     while (!frameQueue_.empty()) {
-#if defined(__APPLE__)
         auto f = frameQueue_.front();
         if (f.nativeResource) {
             CVPixelBufferRelease(static_cast<CVPixelBufferRef>(f.nativeResource));
         }
-#endif
         frameQueue_.pop();
     }
+    isShuttingDown_.store(false, std::memory_order_release);
+#else
+    std::lock_guard<std::mutex> lock(mutex_);
+    isInitialized_ = false;
+    while (!frameQueue_.empty()) frameQueue_.pop();
+#endif
     return common::Result<void>::success();
 }
 

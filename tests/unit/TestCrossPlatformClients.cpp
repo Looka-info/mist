@@ -80,6 +80,38 @@ TEST(MacOSVideoToolboxTest, DecodeLifecycleOrHonestRejection) {
     }
 }
 
+
+TEST(MacOSVideoToolboxTest, DeadlockFreeShutdownAndLazyLifecycle) {
+    auto decRes = VideoToolboxDecoder::create();
+    ASSERT_TRUE(decRes.hasValue());
+    auto decoder = std::move(decRes.value());
+
+    EXPECT_FALSE(decoder->isInitialized());
+    EXPECT_FALSE(decoder->isSessionActive());
+
+    DecodeConfig cfg{
+        .codec = VideoCodec::H264,
+        .preferHardwareDecoding = true,
+        .lowLatencyTuning = true
+    };
+
+    if (VideoToolboxDecoder::isNativePlatform()) {
+        EXPECT_TRUE(decoder->initialize(cfg).hasValue());
+        EXPECT_TRUE(decoder->isInitialized());
+        // Lazy lifecycle: session is not active until SPS/PPS parameter sets arrive
+        EXPECT_FALSE(decoder->isSessionActive());
+
+        // Repeated flushes and shutdowns must not deadlock
+        EXPECT_TRUE(decoder->flush().hasValue());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
+        EXPECT_FALSE(decoder->isInitialized());
+    } else {
+        EXPECT_FALSE(decoder->initialize(cfg).hasValue());
+        EXPECT_FALSE(decoder->isSessionActive());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
+    }
+}
+
 TEST(LinuxVaApiTest, SurfaceRingBufferOrHonestRejection) {
     auto decRes = VaApiVideoDecoder::create();
     ASSERT_TRUE(decRes.hasValue());
