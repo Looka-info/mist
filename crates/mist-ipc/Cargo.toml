@@ -1,0 +1,11 @@
+[package]
+name = "mist-ipc"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+mist-core = { path = "../mist-core" }
+tracing.workspace = true
+windows-sys.workspace = true

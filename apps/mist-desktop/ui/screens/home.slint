@@ -1,0 +1,204 @@
+import { Theme } from "../theme.slint";
+import { PrimaryButton } from "../components/primary-button.slint";
+import { SecondaryButton } from "../components/secondary-button.slint";
+import { MetricCard } from "../components/metric-card.slint";
+import { StatusIndicator } from "../components/status-indicator.slint";
+
+export component HomeScreen {
+    in property <string> wifi-ssid: "Unavailable";
+    in property <int> wifi-signal: 0;
+    in property <string> gpu-name: "Direct3D 11 Display Adapter";
+    in property <bool> nvenc-ready: false;
+    in property <int> trusted-device-count: 0;
+    in property <bool> is-streaming: false;
+
+    callback share-clicked();
+    callback connect-clicked();
+
+    Flickable {
+        VerticalLayout {
+            padding: Theme.space-xl;
+            spacing: Theme.space-xl;
+            alignment: start;
+
+            // Welcome Section
+            Rectangle {
+                height: 140px;
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                HorizontalLayout {
+                    padding: Theme.space-xl;
+                    alignment: space-between;
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: Theme.space-xs;
+
+                        Text {
+                            text: "Welcome to Mist";
+                            color: Theme.text-primary;
+                            font-size: 24px;
+                            font-weight: 700;
+                        }
+
+                        Text {
+                            text: "Ultra-low latency peer-to-peer game streaming on your local Wi-Fi.";
+                            color: Theme.text-secondary;
+                            font-size: 14px;
+                        }
+
+                        HorizontalLayout {
+                            spacing: Theme.space-md;
+                            padding-top: Theme.space-xs;
+
+                            StatusIndicator {
+                                is-active: root.wifi-ssid != "Unavailable";
+                                active-text: "Wi-Fi: " + root.wifi-ssid;
+                                inactive-text: "Wi-Fi: Disconnected";
+                            }
+
+                            StatusIndicator {
+                                is-active: root.nvenc-ready;
+                                active-text: "NVENC: Ready";
+                                inactive-text: "NVENC: Software Fallback";
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+
+                        Rectangle {
+                            width: 56px;
+                            height: 56px;
+                            border-radius: 28px;
+                            background: Theme.surface-variant;
+
+                            Text {
+                                text: "🎮";
+                                font-size: 28px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Quick Actions Cards
+            HorizontalLayout {
+                spacing: Theme.space-lg;
+
+                // Share Card
+                Rectangle {
+                    height: 160px;
+                    background: Theme.surface;
+                    border-radius: Theme.radius-medium;
+                    border-width: 1px;
+                    border-color: Theme.surface-border;
+
+                    VerticalLayout {
+                        padding: Theme.space-lg;
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+
+                            Text {
+                                text: "📡 Wi-Fi Screen Share";
+                                color: Theme.text-primary;
+                                font-size: 16px;
+                                font-weight: 700;
+                            }
+
+                            Text {
+                                text: "Stream this PC's screen and games to another device using a 6-character code.";
+                                color: Theme.text-secondary;
+                                font-size: 13px;
+                                wrap: word-wrap;
+                            }
+                        }
+
+                        PrimaryButton {
+                            text: "Start Sharing";
+                            clicked => { root.share-clicked(); }
+                        }
+                    }
+                }
+
+                // Connect Card
+                Rectangle {
+                    height: 160px;
+                    background: Theme.surface;
+                    border-radius: Theme.radius-medium;
+                    border-width: 1px;
+                    border-color: Theme.surface-border;
+
+                    VerticalLayout {
+                        padding: Theme.space-lg;
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+
+                            Text {
+                                text: "🔗 Connect with Code";
+                                color: Theme.text-primary;
+                                font-size: 16px;
+                                font-weight: 700;
+                            }
+
+                            Text {
+                                text: "Connect to a remote host by entering its 6-character pairing code.";
+                                color: Theme.text-secondary;
+                                font-size: 13px;
+                                wrap: word-wrap;
+                            }
+                        }
+
+                        SecondaryButton {
+                            text: "Enter Code";
+                            clicked => { root.connect-clicked(); }
+                        }
+                    }
+                }
+            }
+
+            // Hardware & Platform Status
+            Text {
+                text: "System Readiness";
+                color: Theme.text-primary;
+                font-size: 16px;
+                font-weight: 700;
+            }
+
+            HorizontalLayout {
+                spacing: Theme.space-md;
+
+                MetricCard {
+                    title: "Graphics Hardware";
+                    value: root.nvenc-ready ? "NVIDIA NVENC" : "Hardware D3D11";
+                    subtitle: root.gpu-name;
+                    accent-color: root.nvenc-ready ? Theme.accent : Theme.text-secondary;
+                }
+
+                MetricCard {
+                    title: "Audio Capture & Playback";
+                    value: "WASAPI 48 kHz";
+                    subtitle: "Direct Loopback + Opus Audio";
+                    accent-color: Theme.accent;
+                }
+
+                MetricCard {
+                    title: "Paired Devices";
+                    value: root.trusted-device-count > 0 ? (root.trusted-device-count + " Devices") : "None";
+                    subtitle: "Secure authorization active";
+                    accent-color: root.trusted-device-count > 0 ? Theme.accent : Theme.text-disabled;
+                }
+            }
+        }
+    }
+}

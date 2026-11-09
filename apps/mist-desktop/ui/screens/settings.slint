@@ -1,0 +1,222 @@
+import { Theme } from "../theme.slint";
+import { PrimaryButton } from "../components/primary-button.slint";
+import { SecondaryButton } from "../components/secondary-button.slint";
+import { PermissionSwitch } from "../components/permission-switch.slint";
+import { TextField } from "../components/text-field.slint";
+
+export component SettingsScreen {
+    in-out property <bool> dark-theme: true;
+    in-out property <bool> high-contrast: false;
+    in-out property <int> fps: 60;
+    in-out property <int> bitrate-kbps: 12000;
+    in-out property <string> signaling-url: "ws://127.0.0.1:8080";
+    in-out property <string> stun-server: "stun:stun.l.google.com:19302";
+    in-out property <bool> audio-enabled: true;
+
+    callback save-clicked();
+    callback reset-clicked();
+
+    Flickable {
+        VerticalLayout {
+            padding: Theme.space-xl;
+            spacing: Theme.space-xl;
+            alignment: start;
+
+            // Screen Header
+            VerticalLayout {
+                spacing: Theme.space-xs;
+
+                Text {
+                    text: "Settings & Preferences";
+                    color: Theme.text-primary;
+                    font-size: 24px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: "Configure video streaming quality, audio endpoints, network servers, and interface appearance.";
+                    color: Theme.text-secondary;
+                    font-size: 14px;
+                }
+            }
+
+            // Appearance Section
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: "Appearance";
+                        color: Theme.text-primary;
+                        font-size: 16px;
+                        font-weight: 600;
+                    }
+
+                    PermissionSwitch {
+                        text: "Dark Theme (Material Design 3 Pixel Mint)";
+                        checked <=> root.dark-theme;
+                    }
+
+                    PermissionSwitch {
+                        text: "High Contrast Outlines";
+                        checked <=> root.high-contrast;
+                    }
+                }
+            }
+
+            // Video Encoding Section
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: "Video Streaming & Quality";
+                        color: Theme.text-primary;
+                        font-size: 16px;
+                        font-weight: 600;
+                    }
+
+                    HorizontalLayout {
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Target Frame Rate"; color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Controls rendering and encoder presentation cadence"; color: Theme.text-secondary; font-size: 12px; }
+                        }
+
+                        HorizontalLayout {
+                            spacing: Theme.space-sm;
+
+                            SecondaryButton {
+                                text: "30 FPS";
+                                min-width: 70px;
+                                clicked => { root.fps = 30; }
+                            }
+
+                            PrimaryButton {
+                                text: "60 FPS";
+                                min-width: 70px;
+                                clicked => { root.fps = 60; }
+                            }
+
+                            SecondaryButton {
+                                text: "120 FPS";
+                                min-width: 70px;
+                                clicked => { root.fps = 120; }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Streaming Bitrate: " + (root.bitrate-kbps / 1000) + " Mbps"; color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Strict bounded range between 2 Mbps and 25 Mbps"; color: Theme.text-secondary; font-size: 12px; }
+                        }
+
+                        HorizontalLayout {
+                            spacing: Theme.space-sm;
+
+                            SecondaryButton {
+                                text: "6 Mbps";
+                                min-width: 70px;
+                                clicked => { root.bitrate-kbps = 6000; }
+                            }
+
+                            PrimaryButton {
+                                text: "12 Mbps";
+                                min-width: 70px;
+                                clicked => { root.bitrate-kbps = 12000; }
+                            }
+
+                            SecondaryButton {
+                                text: "20 Mbps";
+                                min-width: 70px;
+                                clicked => { root.bitrate-kbps = 20000; }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Audio & Network Section
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: "Audio & Network Configuration";
+                        color: Theme.text-primary;
+                        font-size: 16px;
+                        font-weight: 600;
+                    }
+
+                    PermissionSwitch {
+                        text: "WASAPI Loopback Audio Streaming (48 kHz, Stereo)";
+                        checked <=> root.audio-enabled;
+                    }
+
+                    Text {
+                        text: "Signaling Server WebSocket URL";
+                        color: Theme.text-secondary;
+                        font-size: 13px;
+                    }
+
+                    TextField {
+                        text <=> root.signaling-url;
+                        placeholder: "ws://127.0.0.1:8080";
+                    }
+
+                    Text {
+                        text: "STUN Server Address";
+                        color: Theme.text-secondary;
+                        font-size: 13px;
+                    }
+
+                    TextField {
+                        text <=> root.stun-server;
+                        placeholder: "stun:stun.l.google.com:19302";
+                    }
+                }
+            }
+
+            // Actions
+            HorizontalLayout {
+                alignment: end;
+                spacing: Theme.space-md;
+
+                SecondaryButton {
+                    text: "Reset Defaults";
+                    clicked => { root.reset-clicked(); }
+                }
+
+                PrimaryButton {
+                    text: "Save Settings";
+                    min-width: 140px;
+                    clicked => { root.save-clicked(); }
+                }
+            }
+        }
+    }
+}

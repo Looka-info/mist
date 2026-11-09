@@ -1,0 +1,39 @@
+import { Theme } from "../theme.slint";
+
+export component SettingsRow {
+    in property <string> title: "Setting Name";
+    in property <string> description: "Explanation of what this setting configures";
+
+    height: 56px;
+
+    Rectangle {
+        background: #00000000;
+
+        HorizontalLayout {
+            padding-left: Theme.space-md;
+            padding-right: Theme.space-md;
+            alignment: space-between;
+
+            VerticalLayout {
+                alignment: center;
+                spacing: Theme.space-xs;
+
+                Text {
+                    text: root.title;
+                    color: Theme.text-primary;
+                    font-size: 14px;
+                    font-weight: 500;
+                }
+
+                Text {
+                    text: root.description;
+                    color: Theme.text-secondary;
+                    font-size: 12px;
+                }
+            }
+
+            // Right-side slot for custom controls
+            @children
+        }
+    }
+}

@@ -1,0 +1,75 @@
+import { Theme } from "../theme.slint";
+import { SecondaryButton } from "secondary-button.slint";
+
+export component DeviceCard {
+    in property <string> device-name: "Remote PC";
+    in property <string> device-id: "dev-01";
+    in property <string> last-connected: "Just now";
+    in property <bool> is-trusted: true;
+    in property <bool> has-audio: true;
+    in property <bool> has-input: true;
+    callback revoke-clicked();
+
+    height: 72px;
+
+    rect := Rectangle {
+        background: Theme.surface;
+        border-radius: Theme.radius-medium;
+        border-width: 1px;
+        border-color: Theme.surface-border;
+
+        HorizontalLayout {
+            padding-left: Theme.space-lg;
+            padding-right: Theme.space-lg;
+            alignment: space-between;
+
+            VerticalLayout {
+                alignment: center;
+                spacing: Theme.space-xs;
+
+                HorizontalLayout {
+                    spacing: Theme.space-sm;
+
+                    Text {
+                        text: root.device-name;
+                        color: Theme.text-primary;
+                        font-size: 15px;
+                        font-weight: 600;
+                    }
+
+                    badge := Rectangle {
+                        background: Theme.surface-variant;
+                        border-radius: Theme.radius-small;
+                        height: 20px;
+                        width: 60px;
+
+                        Text {
+                            text: root.is-trusted ? "Trusted" : "Pending";
+                            color: Theme.accent;
+                            font-size: 11px;
+                            font-weight: 500;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                Text {
+                    text: "ID: " + root.device-id + " • Last active: " + root.last-connected;
+                    color: Theme.text-secondary;
+                    font-size: 12px;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+
+                SecondaryButton {
+                    text: "Revoke";
+                    min-width: 80px;
+                    clicked => { root.revoke-clicked(); }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,188 @@
+import { Theme } from "../theme.slint";
+import { PrimaryButton } from "../components/primary-button.slint";
+import { SecondaryButton } from "../components/secondary-button.slint";
+import { PairingCodeInput } from "../components/pairing-code-input.slint";
+import { TextField } from "../components/text-field.slint";
+import { PermissionSwitch } from "../components/permission-switch.slint";
+import { ProgressIndicator } from "../components/progress-indicator.slint";
+
+export component ConnectScreen {
+    in-out property <string> pairing-code: "";
+    in-out property <string> host-ip: "127.0.0.1";
+    in property <bool> is-connecting: false;
+    in property <int> connect-step: 0; // 0=idle, 1=validating, 2=signaling, 3=ice, 4=ready
+    in property <string> error-message: "";
+
+    in-out property <bool> request-audio: true;
+    in-out property <bool> request-input: true;
+
+    callback connect-clicked();
+    callback cancel-clicked();
+    callback paste-clicked();
+    callback code-edited(string);
+
+    Flickable {
+        VerticalLayout {
+            padding: Theme.space-xl;
+            spacing: Theme.space-xl;
+            alignment: start;
+
+            // Screen Header
+            VerticalLayout {
+                spacing: Theme.space-xs;
+
+                Text {
+                    text: "Connect to a Device";
+                    color: Theme.text-primary;
+                    font-size: 24px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: "Enter the 6-character code displayed on the host PC to initiate an authorized streaming session.";
+                    color: Theme.text-secondary;
+                    font-size: 14px;
+                }
+            }
+
+            // Code Entry Section
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-xl;
+                    spacing: Theme.space-lg;
+
+                    Text {
+                        text: "Pairing Code";
+                        color: Theme.text-primary;
+                        font-size: 15px;
+                        font-weight: 600;
+                    }
+
+                    PairingCodeInput {
+                        code <=> root.pairing-code;
+                        enabled: !root.is-connecting;
+                        edited(s) => { root.code-edited(s); }
+                        paste-clicked => { root.paste-clicked(); }
+                        submitted => { root.connect-clicked(); }
+                    }
+
+                    Text {
+                        text: "Host Network Address (LAN IP / Hostname)";
+                        color: Theme.text-secondary;
+                        font-size: 13px;
+                        font-weight: 500;
+                    }
+
+                    TextField {
+                        text <=> root.host-ip;
+                        placeholder: "e.g. 192.168.1.100 or 127.0.0.1";
+                        enabled: !root.is-connecting;
+                    }
+                }
+            }
+
+            // Requested Permissions Options
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: "Session Capabilities";
+                        color: Theme.text-primary;
+                        font-size: 15px;
+                        font-weight: 600;
+                    }
+
+                    PermissionSwitch {
+                        text: "Receive High-Fidelity Audio";
+                        checked <=> root.request-audio;
+                        enabled: !root.is-connecting;
+                    }
+
+                    PermissionSwitch {
+                        text: "Request Remote Control (Keyboard / Mouse / Gamepad)";
+                        checked <=> root.request-input;
+                        enabled: !root.is-connecting;
+                    }
+                }
+            }
+
+            // Connection Progress & Feedback
+            if root.is-connecting : Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-medium;
+                border-width: 1px;
+                border-color: Theme.primary;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: root.connect-step == 1 ? "1/4: Submitting code to remote host..." :
+                              root.connect-step == 2 ? "2/4: Connecting to signaling service..." :
+                              root.connect-step == 3 ? "3/4: Negotiating WebRTC peer connection..." :
+                              "4/4: Initializing hardware video decoder...";
+                        color: Theme.primary;
+                        font-size: 14px;
+                        font-weight: 600;
+                    }
+
+                    ProgressIndicator {
+                        is-loading: true;
+                    }
+                }
+            }
+
+            // Error Message Display
+            if root.error-message != "" : Rectangle {
+                background: Theme.error-container;
+                border-radius: Theme.radius-medium;
+                border-width: 1px;
+                border-color: Theme.error;
+
+                HorizontalLayout {
+                    padding: Theme.space-md;
+                    spacing: Theme.space-sm;
+
+                    Text {
+                        text: "⚠ " + root.error-message;
+                        color: Theme.error;
+                        font-size: 14px;
+                        font-weight: 500;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Action Buttons
+            HorizontalLayout {
+                alignment: end;
+                spacing: Theme.space-md;
+
+                if root.is-connecting : SecondaryButton {
+                    text: "Cancel";
+                    clicked => { root.cancel-clicked(); }
+                }
+
+                PrimaryButton {
+                    text: root.is-connecting ? "Connecting..." : "Connect to Host";
+                    enabled: !root.is-connecting && root.pairing-code != "";
+                    min-width: 160px;
+                    clicked => { root.connect-clicked(); }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,14 @@
+[package]
+name = "mist-session"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+mist-core = { path = "../mist-core" }
+mist-domain = { path = "../mist-domain" }
+mist-config = { path = "../mist-config" }
+mist-ipc = { path = "../mist-ipc" }
+mist-telemetry = { path = "../mist-telemetry" }
+tracing.workspace = true

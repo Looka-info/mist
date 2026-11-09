@@ -1,0 +1,34 @@
+import { Theme } from "../theme.slint";
+
+export component PrimaryButton {
+    in property <string> text: "Button";
+    in property <bool> enabled: true;
+    in property <length> btn-width: 120px;
+    callback clicked();
+
+    min-width: btn-width;
+    height: 40px;
+
+    rect := Rectangle {
+        background: !root.enabled ? Theme.surface-variant :
+                    touch.pressed ? Theme.forest-green :
+                    touch.has-hover ? Theme.primary-hover : Theme.primary;
+        border-radius: Theme.radius-pill;
+
+        animate background { duration: 150ms; easing: ease-out; }
+
+        Text {
+            text: root.text;
+            color: !root.enabled ? Theme.text-disabled : Theme.on-primary;
+            font-size: 14px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}

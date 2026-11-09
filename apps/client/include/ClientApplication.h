@@ -2,10 +2,12 @@
 
 #include "mist/common/Config.h"
 #include "mist/common/Result.h"
+#include "mist/common/IpcProtocol.h"
 #include "mist/decode/DecodePresentPipeline.h"
 #include <atomic>
 #include <string>
 #include <optional>
+#include <memory>
 
 namespace mist::client {
 
@@ -48,6 +50,8 @@ struct ClientCliOptions {
     std::string turnServer;
     std::string turnUsername;
     std::string turnPassword;
+    std::wstring ipcPipe;
+    uint64_t parentHwnd{0};
 };
 
 class ClientApplication {
@@ -84,6 +88,9 @@ private:
     ClientCliOptions options_;
     std::atomic<bool> isRunning_{false};
     std::atomic<bool> isInitialized_{false};
+#if defined(_WIN32)
+    std::unique_ptr<ipc::NamedPipeClient> ipcClient_;
+#endif
 };
 
 } // namespace mist::client

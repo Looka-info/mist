@@ -118,6 +118,11 @@ common::Result<std::optional<int>> ClientApplication::initialize(int argc, char*
             options_.turnUsername = argv[++i];
         } else if (arg == "--turn-password" && i + 1 < argc) {
             options_.turnPassword = argv[++i];
+        } else if (arg == "--ipc-pipe" && i + 1 < argc) {
+            std::string pipeStr = argv[++i];
+            options_.ipcPipe = std::wstring(pipeStr.begin(), pipeStr.end());
+        } else if (arg == "--parent-hwnd" && i + 1 < argc) {
+            options_.parentHwnd = std::stoull(argv[++i]);
         } else if (arg == "--input") {
             if (i + 1 < argc) {
                 options_.inputPath = argv[++i];
@@ -531,7 +536,59 @@ int ClientApplication::executeReceiveStream() {
             std::cerr << "Renderer initialization failed: " << rendInit.error().format() << "\n";
             return 1;
         }
+
+#if defined(_WIN32)
+        if (renderer && renderer->getHwnd()) {
+            HWND childHwnd = renderer->getHwnd();
+            if (options_.parentHwnd != 0) {
+                HWND parentHwnd = reinterpret_cast<HWND>(options_.parentHwnd);
+                SetParent(childHwnd, parentHwnd);
+                LONG_PTR style = GetWindowLongPtrW(childHwnd, GWL_STYLE);
+                style &= ~WS_POPUP;
+                style &= ~WS_CAPTION;
+                style &= ~WS_THICKFRAME;
+                style |= WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS;
+                SetWindowLongPtrW(childHwnd, GWL_STYLE, style);
+                SetWindowPos(childHwnd, HWND_TOP, 0, 0, options_.width, options_.height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+            }
+        }
+#endif
     }
+
+#if defined(_WIN32)
+    if (!options_.ipcPipe.empty()) {
+        ipcClient_ = std::make_unique<ipc::NamedPipeClient>();
+        auto* rendRaw = renderer.get();
+        (void)ipcClient_->connect(options_.ipcPipe, [rendRaw](const ipc::IpcMessage& msg) {
+            if (msg.type == ipc::MessageType::SetViewport && rendRaw && rendRaw->getHwnd()) {
+                auto vp = msg.getPayload<ipc::IpcViewportPayload>();
+                if (vp) {
+                    SetWindowPos(rendRaw->getHwnd(), HWND_TOP, vp->x, vp->y, vp->width, vp->height, SWP_NOACTIVATE | SWP_NOZORDER | SWP_SHOWWINDOW);
+                }
+            }
+        });
+        if (ipcClient_ && ipcClient_->isConnected()) {
+            ipc::IpcMessage initMsg{};
+            initMsg.type = ipc::MessageType::ProcessInitialized;
+            ipcClient_->sendMessage(initMsg);
+
+            ipc::IpcMessage decMsg{};
+            decMsg.type = ipc::MessageType::DecoderInitialized;
+            ipcClient_->sendMessage(decMsg);
+
+            if (renderer && renderer->getHwnd()) {
+                ipc::IpcMessage winMsg{};
+                winMsg.type = ipc::MessageType::WindowHandle;
+                ipc::IpcWindowPayload winPayload{};
+                winPayload.hwnd = reinterpret_cast<uint64_t>(renderer->getHwnd());
+                winPayload.width = options_.width;
+                winPayload.height = options_.height;
+                winMsg.setPayload(winPayload);
+                ipcClient_->sendMessage(winMsg);
+            }
+        }
+    }
+#endif
 
     auto signaling = std::make_shared<services::WebSocketSignalingClient>();
     transport::WebRtcTransportConfig rtcConfig{};
@@ -569,7 +626,15 @@ int ClientApplication::executeReceiveStream() {
     };
 
     rtcTransport.setFrameReceivedCallback([&](const std::vector<uint8_t>& accessUnit, uint64_t timestampNs) {
-        framesReceived.fetch_add(1, std::memory_order_relaxed);
+        if (framesReceived.fetch_add(1, std::memory_order_relaxed) == 0) {
+#if defined(_WIN32)
+            if (ipcClient_ && ipcClient_->isConnected()) {
+                ipc::IpcMessage vTrackMsg{};
+                vTrackMsg.type = ipc::MessageType::VideoTrackReceived;
+                ipcClient_->sendMessage(vTrackMsg);
+            }
+#endif
+        }
         totalBytesReceived.fetch_add(accessUnit.size(), std::memory_order_relaxed);
         lastVideoTimestampNs.store(getSteadyNowNs(), std::memory_order_relaxed);
 
@@ -587,7 +652,15 @@ int ClientApplication::executeReceiveStream() {
                 if (renderer) {
                     auto presRes = renderer->present(frame);
                     if (presRes) {
-                        framesPresented.fetch_add(1, std::memory_order_relaxed);
+                        if (framesPresented.fetch_add(1, std::memory_order_relaxed) == 0) {
+#if defined(_WIN32)
+                            if (ipcClient_ && ipcClient_->isConnected()) {
+                                ipc::IpcMessage firstMsg{};
+                                firstMsg.type = ipc::MessageType::FirstFramePresented;
+                                ipcClient_->sendMessage(firstMsg);
+                            }
+#endif
+                        }
                     }
                 }
                 (void)decoder.releaseFrame(frame);
@@ -622,6 +695,13 @@ int ClientApplication::executeReceiveStream() {
         auto playInit = audioPlayback.initialize(aCfg);
         if (playInit) {
             (void)audioPlayback.start();
+#if defined(_WIN32)
+            if (ipcClient_ && ipcClient_->isConnected()) {
+                ipc::IpcMessage audioMsg{};
+                audioMsg.type = ipc::MessageType::AudioPlaybackActive;
+                ipcClient_->sendMessage(audioMsg);
+            }
+#endif
         }
 
         rtcTransport.setAudioFrameCallback([&](std::span<const uint8_t> payload, const transport::AudioFrameInfo& info) {
@@ -663,6 +743,28 @@ int ClientApplication::executeReceiveStream() {
         clientInput->sendPermissionRequest(0x07);
     }
 
+#if defined(_WIN32)
+    if (auto pcMgr = rtcTransport.getPeerConnectionManager()) {
+        pcMgr->setStateChangeCallback([this](transport::WebRtcState st) {
+            if (ipcClient_ && ipcClient_->isConnected()) {
+                if (st == transport::WebRtcState::Connecting) {
+                    ipc::IpcMessage msg{};
+                    msg.type = ipc::MessageType::IceNegotiationStarted;
+                    ipcClient_->sendMessage(msg);
+                } else if (st == transport::WebRtcState::Connected) {
+                    ipc::IpcMessage msg{};
+                    msg.type = ipc::MessageType::IceConnected;
+                    ipcClient_->sendMessage(msg);
+                } else if (st == transport::WebRtcState::Disconnected || st == transport::WebRtcState::Failed) {
+                    ipc::IpcMessage msg{};
+                    msg.type = ipc::MessageType::ConnectionLost;
+                    ipcClient_->sendMessage(msg);
+                }
+            }
+        });
+    }
+#endif
+
     auto connRes = rtcTransport.connect();
     if (!connRes) {
         std::cerr << "Signaling connection failed: " << connRes.error().format() << "\n";
@@ -672,11 +774,55 @@ int ClientApplication::executeReceiveStream() {
         return 1;
     }
 
+#if defined(_WIN32)
+    if (ipcClient_ && ipcClient_->isConnected()) {
+        ipc::IpcMessage sigMsg{};
+        sigMsg.type = ipc::MessageType::SignalingConnected;
+        ipcClient_->sendMessage(sigMsg);
+    }
+#endif
+
     std::cout << "Client stream receive started for " << options_.durationSeconds
               << "s (Session: " << options_.sessionId << ", Signaling: " << options_.signalingUrl
               << (options_.headless ? ", Headless" : ", GUI Window")
               << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled")
               << (options_.enableInput ? ", Input: Enabled" : ", Input: Disabled") << ")...\n";
+
+#if defined(_WIN32)
+    std::atomic<bool> stopTelemetry{false};
+    std::thread telemetryThread([&]() {
+        uint64_t lastDec = 0;
+        auto lastTm = std::chrono::steady_clock::now();
+        while (!stopTelemetry.load(std::memory_order_relaxed)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            if (stopTelemetry.load(std::memory_order_relaxed)) break;
+
+            auto curTm = std::chrono::steady_clock::now();
+            double elSec = std::chrono::duration<double>(curTm - lastTm).count();
+            uint64_t curDec = framesDecoded.load(std::memory_order_relaxed);
+            float curFps = (elSec > 0.0) ? static_cast<float>((curDec - lastDec) / elSec) : 0.0f;
+            lastDec = curDec;
+            lastTm = curTm;
+
+            auto stSnap = rtcTransport.getStatsSnapshot();
+            if (ipcClient_ && ipcClient_->isConnected()) {
+                ipc::IpcMessage telemMsg{};
+                telemMsg.type = ipc::MessageType::TelemetryUpdate;
+                telemMsg.timestampNs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(curTm.time_since_epoch()).count());
+                ipc::IpcTelemetryPayload p{};
+                p.bitrateKbps = stSnap.bitrateKbps;
+                p.rttMs = stSnap.rttMs;
+                p.jitterMs = stSnap.jitterMs;
+                p.fps = curFps;
+                p.packetLossPercent = stSnap.packetLossPercent;
+                p.framesProcessed = static_cast<uint64_t>(curDec);
+                p.framesDropped = static_cast<uint64_t>(decoderErrors.load(std::memory_order_relaxed));
+                telemMsg.setPayload(p);
+                ipcClient_->sendMessage(telemMsg);
+            }
+        }
+    });
+#endif
 
     auto startTime = std::chrono::steady_clock::now();
     uint64_t inputTicks = 0;

@@ -1,0 +1,97 @@
+import { Theme } from "../theme.slint";
+import { DeviceCard } from "../components/device-card.slint";
+import { EmptyState } from "../components/empty-state.slint";
+
+export struct DeviceItemData {
+    device-id: string,
+    device-name: string,
+    last-connected: string,
+    is-trusted: bool,
+    has-audio: bool,
+    has-input: bool,
+}
+
+export component DevicesScreen {
+    in property <[DeviceItemData]> devices: [];
+    in property <bool> is-locked-out: false;
+    in property <int> lockout-seconds: 0;
+
+    callback revoke-device(string);
+    callback start-share-clicked();
+
+    Flickable {
+        VerticalLayout {
+            padding: Theme.space-xl;
+            spacing: Theme.space-xl;
+            alignment: start;
+
+            // Screen Header
+            VerticalLayout {
+                spacing: Theme.space-xs;
+
+                Text {
+                    text: "Paired Devices";
+                    color: Theme.text-primary;
+                    font-size: 24px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    text: "Devices authorized to connect and stream with this computer.";
+                    color: Theme.text-secondary;
+                    font-size: 14px;
+                }
+            }
+
+            // Lockout banner if active
+            if root.is-locked-out : Rectangle {
+                background: Theme.error-container;
+                border-radius: Theme.radius-medium;
+                border-width: 1px;
+                border-color: Theme.error;
+
+                HorizontalLayout {
+                    padding: Theme.space-md;
+
+                    Text {
+                        text: "⚠ Rate limit active. Pairing locked out for " + root.lockout-seconds + " seconds due to repeated invalid attempts.";
+                        color: Theme.error;
+                        font-size: 14px;
+                        font-weight: 600;
+                    }
+                }
+            }
+
+            // Device List or Empty State
+            if root.devices.length > 0 : VerticalLayout {
+                spacing: Theme.space-md;
+
+                for dev in root.devices : DeviceCard {
+                    device-name: dev.device-name;
+                    device-id: dev.device-id;
+                    last-connected: dev.last-connected;
+                    is-trusted: dev.is-trusted;
+                    has-audio: dev.has-audio;
+                    has-input: dev.has-input;
+                    revoke-clicked => { root.revoke-device(dev.device-id); }
+                }
+            }
+
+            if root.devices.length == 0 : Rectangle {
+                height: 320px;
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                EmptyState {
+                    icon: "💻";
+                    title: "No Paired Devices";
+                    description: "Share your screen or connect with a code to establish a trusted session.";
+                    button-text: "Start Wi-Fi Share";
+                    action-clicked => { root.start-share-clicked(); }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,131 @@
+import { Theme } from "../theme.slint";
+
+export component AboutScreen {
+    Flickable {
+        VerticalLayout {
+            padding: Theme.space-xl;
+            spacing: Theme.space-xl;
+            alignment: start;
+
+            // Header Section
+            HorizontalLayout {
+                spacing: Theme.space-lg;
+
+                Rectangle {
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 16px;
+                    background: Theme.primary;
+
+                    Text {
+                        text: "M";
+                        color: Theme.on-primary;
+                        font-size: 32px;
+                        font-weight: 800;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: Theme.space-xs;
+
+                    Text {
+                        text: "Mist Desktop Platform";
+                        color: Theme.text-primary;
+                        font-size: 22px;
+                        font-weight: 700;
+                    }
+
+                    Text {
+                        text: "Version 0.2.0 • Rust-First Native Windows Architecture";
+                        color: Theme.text-secondary;
+                        font-size: 14px;
+                    }
+                }
+            }
+
+            // Description Card
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: "About Mist";
+                        color: Theme.text-primary;
+                        font-size: 16px;
+                        font-weight: 600;
+                    }
+
+                    Text {
+                        text: "Mist is an ultra-low latency peer-to-peer game-streaming application designed for Windows 11. It leverages direct GPU memory capture, hardware-accelerated video encoding and decoding, WASAPI loopback audio, and WebRTC data channels to deliver a seamless remote gaming experience.";
+                        color: Theme.text-secondary;
+                        font-size: 14px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            // Subsystem & Technology Card
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-sm;
+
+                    Text {
+                        text: "Underlying Subsystems & Technologies";
+                        color: Theme.text-primary;
+                        font-size: 16px;
+                        font-weight: 600;
+                    }
+
+                    Text { text: "• Application & UI: Rust 2021 + Slint 1.18.1 Native Desktop Engine"; color: Theme.text-secondary; font-size: 13px; }
+                    Text { text: "• Video Capture: DXGI Desktop Duplication 1.2"; color: Theme.text-secondary; font-size: 13px; }
+                    Text { text: "• Hardware Encoder: NVIDIA NVENC H.264 Ultra-Low Latency"; color: Theme.text-secondary; font-size: 13px; }
+                    Text { text: "• Hardware Decoder: Microsoft Media Foundation D3D11VA"; color: Theme.text-secondary; font-size: 13px; }
+                    Text { text: "• Audio Pipeline: Windows WASAPI Loopback + Xiph Opus Audio"; color: Theme.text-secondary; font-size: 13px; }
+                    Text { text: "• Transport: RFC 8829 WebRTC (libdatachannel / Rust Signaling)"; color: Theme.text-secondary; font-size: 13px; }
+                    Text { text: "• Inter-Process: Win32 Named Pipes Message Protocol"; color: Theme.text-secondary; font-size: 13px; }
+                }
+            }
+
+            // Licensing & Attribution Card
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-sm;
+
+                    Text {
+                        text: "Open Source Licensing & Third-Party Attribution";
+                        color: Theme.text-primary;
+                        font-size: 16px;
+                        font-weight: 600;
+                    }
+
+                    Text { text: "Slint UI Toolkit © SixtyFPS GmbH. Licensed under GPLv3 / Commercial."; color: Theme.text-secondary; font-size: 12px; }
+                    Text { text: "libdatachannel © Paul-Louis Ageneau. Licensed under MPL 2.0."; color: Theme.text-secondary; font-size: 12px; }
+                    Text { text: "Mbed TLS © Arm Limited. Licensed under Apache 2.0."; color: Theme.text-secondary; font-size: 12px; }
+                    Text { text: "Opus Audio Codec © Xiph.Org Foundation. Licensed under BSD 3-Clause."; color: Theme.text-secondary; font-size: 12px; }
+                    Text { text: "Tokio Async Engine © Tokio Contributors. Licensed under MIT."; color: Theme.text-secondary; font-size: 12px; }
+                }
+            }
+        }
+    }
+}

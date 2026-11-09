@@ -1,0 +1,25 @@
+[package]
+name = "mist-desktop"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[dependencies]
+slint.workspace = true
+mist-core = { path = "../../crates/mist-core" }
+mist-domain = { path = "../../crates/mist-domain" }
+mist-config = { path = "../../crates/mist-config" }
+mist-pairing = { path = "../../crates/mist-pairing" }
+mist-ipc = { path = "../../crates/mist-ipc" }
+mist-telemetry = { path = "../../crates/mist-telemetry" }
+mist-platform-windows = { path = "../../crates/mist-platform-windows" }
+mist-session = { path = "../../crates/mist-session" }
+tracing.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+windows-sys.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true

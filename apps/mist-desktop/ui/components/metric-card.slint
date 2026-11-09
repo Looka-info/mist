@@ -1,0 +1,53 @@
+import { Theme } from "../theme.slint";
+
+export component MetricCard {
+    in property <string> title: "Latency";
+    in property <string> value: "12 ms";
+    in property <string> subtitle: "Direct LAN connection";
+    in property <color> accent-color: Theme.accent;
+
+    height: 100px;
+
+    rect := Rectangle {
+        background: Theme.surface;
+        border-radius: Theme.radius-medium;
+        border-width: 1px;
+        border-color: Theme.surface-border;
+
+        VerticalLayout {
+            padding: Theme.space-md;
+            alignment: space-between;
+
+            HorizontalLayout {
+                alignment: space-between;
+
+                Text {
+                    text: root.title;
+                    color: Theme.text-secondary;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+
+                Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background: root.accent-color;
+                }
+            }
+
+            Text {
+                text: root.value;
+                color: Theme.text-primary;
+                font-size: 22px;
+                font-weight: 700;
+            }
+
+            Text {
+                text: root.subtitle;
+                color: Theme.text-secondary;
+                font-size: 11px;
+            }
+        }
+    }
+}

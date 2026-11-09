@@ -1,0 +1,35 @@
+import { Theme } from "../theme.slint";
+
+export component SecondaryButton {
+    in property <string> text: "Cancel";
+    in property <bool> enabled: true;
+    in property <length> btn-width: 100px;
+    callback clicked();
+
+    min-width: btn-width;
+    height: 40px;
+
+    rect := Rectangle {
+        background: touch.pressed ? Theme.surface-variant :
+                    touch.has-hover ? Theme.surface-variant : Theme.surface;
+        border-width: 1px;
+        border-color: touch.has-hover ? Theme.primary : Theme.surface-border;
+        border-radius: Theme.radius-pill;
+
+        animate background, border-color { duration: 150ms; easing: ease-out; }
+
+        Text {
+            text: root.text;
+            color: !root.enabled ? Theme.text-disabled : Theme.text-primary;
+            font-size: 14px;
+            font-weight: 500;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}

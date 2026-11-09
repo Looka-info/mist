@@ -1,0 +1,44 @@
+export global Theme {
+    in-out property <bool> dark-mode: true;
+
+    // Pixel Mint Official Palette
+    out property <color> pixel-mint: #B8EBD5;
+    out property <color> fresh-mint: #8ED8BA;
+    out property <color> forest-green: #174B38;
+    out property <color> deep-evergreen: #0D3024;
+    out property <color> cloud: #F2F8F4;
+    out property <color> soft-sage: #DDEFE4;
+
+    // Adaptive Theme Surfaces
+    out property <color> background: dark-mode ? #101A15 : #F2F8F4;
+    out property <color> surface: dark-mode ? #18231C : #FFFFFF;
+    out property <color> surface-variant: dark-mode ? #202E25 : #DDEFE4;
+    out property <color> surface-border: dark-mode ? #2A3C31 : #CADFD2;
+    out property <color> text-primary: dark-mode ? #F2F8F4 : #0D3024;
+    out property <color> text-secondary: dark-mode ? #8FAAA0 : #3B5A4D;
+    out property <color> text-disabled: dark-mode ? #4D6358 : #8E9F97;
+
+    out property <color> primary: dark-mode ? #B8EBD5 : #174B38;
+    out property <color> on-primary: dark-mode ? #0D3024 : #F2F8F4;
+    out property <color> primary-hover: dark-mode ? #9EE0C5 : #1E5C46;
+    out property <color> accent: #8ED8BA;
+
+    out property <color> error: #FF6B6B;
+    out property <color> error-container: dark-mode ? #3A1E1E : #FFEBEB;
+    out property <color> success: #8ED8BA;
+
+    // Corner Radii
+    out property <length> radius-small: 8px;
+    out property <length> radius-medium: 12px;
+    out property <length> radius-large: 16px;
+    out property <length> radius-xlarge: 28px;
+    out property <length> radius-pill: 999px;
+
+    // Spacing
+    out property <length> space-xs: 4px;
+    out property <length> space-sm: 8px;
+    out property <length> space-md: 12px;
+    out property <length> space-lg: 16px;
+    out property <length> space-xl: 24px;
+    out property <length> space-xxl: 32px;
+}

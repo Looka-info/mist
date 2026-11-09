@@ -1,0 +1,33 @@
+import { Theme } from "../theme.slint";
+
+export component IconButton {
+    in property <string> text: "✕";
+    in property <bool> enabled: true;
+    in property <length> size: 36px;
+    callback clicked();
+
+    width: size;
+    height: size;
+
+    rect := Rectangle {
+        background: touch.pressed ? Theme.surface-variant :
+                    touch.has-hover ? Theme.surface-variant : #00000000;
+        border-radius: Theme.radius-pill;
+
+        animate background { duration: 120ms; easing: ease-out; }
+
+        Text {
+            text: root.text;
+            color: !root.enabled ? Theme.text-disabled : Theme.text-primary;
+            font-size: 16px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}

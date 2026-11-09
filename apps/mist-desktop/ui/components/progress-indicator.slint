@@ -1,0 +1,27 @@
+import { Theme } from "../theme.slint";
+
+export component ProgressIndicator {
+    in property <bool> is-loading: true;
+
+    height: 4px;
+
+    Rectangle {
+        background: Theme.surface-variant;
+        border-radius: 2px;
+        clip: true;
+
+        if root.is-loading : Rectangle {
+            width: parent.width / 3;
+            height: parent.height;
+            background: Theme.primary;
+            border-radius: 2px;
+            x: 0px;
+
+            animate x {
+                duration: 1000ms;
+                iteration-count: -1;
+                easing: ease-in-out;
+            }
+        }
+    }
+}

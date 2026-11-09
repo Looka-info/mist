@@ -1,0 +1,79 @@
+import { Theme } from "../theme.slint";
+import { SecondaryButton } from "secondary-button.slint";
+import { PrimaryButton } from "primary-button.slint";
+
+export component PairingCodeDisplay {
+    in property <string> code: "------";
+    in property <int> remaining-seconds: 300;
+    in property <bool> is-active: false;
+    callback copy-clicked();
+    callback revoke-clicked();
+
+    height: 180px;
+
+    rect := Rectangle {
+        background: Theme.surface;
+        border-radius: Theme.radius-large;
+        border-width: 1px;
+        border-color: Theme.surface-border;
+
+        VerticalLayout {
+            padding: Theme.space-xl;
+            alignment: space-between;
+
+            HorizontalLayout {
+                alignment: space-between;
+
+                Text {
+                    text: "Active Pairing Code";
+                    color: Theme.text-secondary;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+
+                Text {
+                    text: root.remaining-seconds > 0 ?
+                        ("Expires in: " + Math.floor(root.remaining-seconds / 60) + "m " + Math.mod(root.remaining-seconds, 60) + "s") :
+                        "Code Expired";
+                    color: root.remaining-seconds > 30 ? Theme.accent : Theme.error;
+                    font-size: 13px;
+                    font-weight: 500;
+                }
+            }
+
+            // Big 6-character code display
+            Rectangle {
+                height: 64px;
+                background: Theme.surface-variant;
+                border-radius: Theme.radius-medium;
+
+                Text {
+                    text: root.code;
+                    color: Theme.primary;
+                    font-size: 32px;
+                    font-weight: 700;
+                    letter-spacing: 10px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            HorizontalLayout {
+                alignment: end;
+                spacing: Theme.space-md;
+
+                SecondaryButton {
+                    text: "Revoke";
+                    min-width: 90px;
+                    clicked => { root.revoke-clicked(); }
+                }
+
+                PrimaryButton {
+                    text: "Copy Code";
+                    min-width: 110px;
+                    clicked => { root.copy-clicked(); }
+                }
+            }
+        }
+    }
+}

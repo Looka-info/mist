@@ -48,6 +48,10 @@ foreach ($b in $binaries) {
     Copy-Item -Path $b -Destination "$DistDir\bin" -Force
     Write-Host "  -> Staged: $(Split-Path $b -Leaf)" -ForegroundColor Gray
 }
+if (Test-Path "bin\mist.exe") {
+    Copy-Item -Path "bin\mist.exe" -Destination "$DistDir\bin" -Force
+    Write-Host "  -> Staged: mist.exe" -ForegroundColor Gray
+}
 
 if (Test-Path "resources\mist.ico") {
     Copy-Item -Path "resources\mist.ico" -Destination "$DistDir\bin" -Force

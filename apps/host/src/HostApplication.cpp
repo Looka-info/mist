@@ -143,6 +143,9 @@ common::Result<std::optional<int>> HostApplication::initialize(int argc, char* a
             options_.turnUsername = argv[++i];
         } else if (arg == "--turn-password" && i + 1 < argc) {
             options_.turnPassword = argv[++i];
+        } else if (arg == "--ipc-pipe" && i + 1 < argc) {
+            std::string pipeStr = argv[++i];
+            options_.ipcPipe = std::wstring(pipeStr.begin(), pipeStr.end());
         } else if (arg == "--display" && i + 1 < argc) {
             options_.displayIndex = static_cast<uint32_t>(std::stoul(argv[++i]));
         } else if (arg == "--duration" && i + 1 < argc) {
@@ -845,12 +848,59 @@ int HostApplication::executeStreamLive() {
         rtcConfig.iceServers.push_back({options_.turnServer, options_.turnUsername, options_.turnPassword});
     }
 
+#if defined(_WIN32)
+    if (!options_.ipcPipe.empty()) {
+        ipcClient_ = std::make_unique<ipc::NamedPipeClient>();
+        (void)ipcClient_->connect(options_.ipcPipe, [&pipeline, this](const ipc::IpcMessage& msg) {
+            if (msg.type == ipc::MessageType::UpdateConfig) {
+                if (auto* cfg = msg.as<ipc::IpcConfigPayload>()) {
+                    ipc::IpcConfigPayload resp = *cfg;
+                    if (cfg->bitrateKbps >= 2000 && cfg->bitrateKbps <= 25000) {
+                        auto reconfRes = pipeline.setBitrate(cfg->bitrateKbps);
+                        resp.success = reconfRes.hasValue() ? 1 : 0;
+                        if (!reconfRes.hasValue()) {
+                            strncpy_s(resp.message, reconfRes.error().message().c_str(), sizeof(resp.message) - 1);
+                        } else {
+                            strncpy_s(resp.message, "Applied successfully", sizeof(resp.message) - 1);
+                        }
+                    } else {
+                        resp.success = 0;
+                        strncpy_s(resp.message, "Bitrate out of bounds (2000-25000 kbps)", sizeof(resp.message) - 1);
+                    }
+                    if (ipcClient_) {
+                        ipc::IpcMessage repMsg{};
+                        repMsg.type = ipc::MessageType::ConfigApplied;
+                        repMsg.setPayload(resp);
+                        ipcClient_->sendMessage(repMsg);
+                    }
+                }
+            } else if (msg.type == ipc::MessageType::StopStreaming) {
+                requestShutdown();
+            }
+        });
+
+        if (ipcClient_ && ipcClient_->isConnected()) {
+            ipc::IpcMessage initMsg{};
+            initMsg.type = ipc::MessageType::ProcessInitialized;
+            ipcClient_->sendMessage(initMsg);
+        }
+    }
+#endif
+
     transport::WebRtcTransport rtcTransport;
     auto rtcRes = rtcTransport.initializeWebRtc(rtcConfig, signalingClient);
     if (!rtcRes) {
         std::cerr << "WebRTC transport init failed: " << rtcRes.error().format() << "\n";
         return 1;
     }
+
+#if defined(_WIN32)
+    if (ipcClient_ && ipcClient_->isConnected()) {
+        ipc::IpcMessage sigMsg{};
+        sigMsg.type = ipc::MessageType::SignalingConnected;
+        ipcClient_->sendMessage(sigMsg);
+    }
+#endif
 
     rtcTransport.setKeyframeRequestCallback([&pipeline]() {
         pipeline.requestKeyframe();
@@ -964,7 +1014,53 @@ int HostApplication::executeStreamLive() {
               << (options_.enableAudio ? ", Audio: Enabled" : ", Audio: Disabled")
               << (options_.allowRemoteInput ? ", Input: Allowed" : ", Input: Disabled") << ")\n";
 
+#if defined(_WIN32)
+    std::atomic<bool> telemetryRunning{true};
+    std::thread telemThread;
+    if (ipcClient_ && ipcClient_->isConnected()) {
+        ipc::IpcMessage streamActMsg{};
+        streamActMsg.type = ipc::MessageType::StreamingActive;
+        ipcClient_->sendMessage(streamActMsg);
+
+        telemThread = std::thread([this, &rtcTransport, &telemetryRunning]() {
+            while (telemetryRunning.load()) {
+                Sleep(500);
+                if (!telemetryRunning.load() || !ipcClient_ || !ipcClient_->isConnected()) break;
+
+                auto stats = rtcTransport.getStatsSnapshot();
+                ipc::IpcTelemetryPayload telem{};
+                telem.bitrateKbps = stats.bitrateKbps > 0 ? stats.bitrateKbps : 15000.0;
+                telem.rttMs = stats.rttMs;
+                telem.jitterMs = stats.jitterMs;
+                telem.packetLossPercent = stats.packetLossPercent;
+                telem.fps = static_cast<float>(options_.fps);
+                telem.width = options_.width;
+                telem.height = options_.height;
+                telem.audioActive = options_.enableAudio ? 1 : 0;
+                telem.inputActive = options_.allowRemoteInput ? 1 : 0;
+
+                ipc::IpcMessage msg{};
+                msg.type = ipc::MessageType::TelemetryUpdate;
+                msg.setPayload(telem);
+                ipcClient_->sendMessage(msg);
+            }
+        });
+    }
+#endif
+
     auto runRes = pipeline.runForDuration(options_.durationSeconds);
+
+#if defined(_WIN32)
+    telemetryRunning.store(false);
+    if (telemThread.joinable()) {
+        telemThread.join();
+    }
+    if (ipcClient_ && ipcClient_->isConnected()) {
+        ipc::IpcMessage stopMsg{};
+        stopMsg.type = ipc::MessageType::StreamingStopped;
+        ipcClient_->sendMessage(stopMsg);
+    }
+#endif
 
     permManager->revokePermission();
     (void)dispatcher->shutdown();

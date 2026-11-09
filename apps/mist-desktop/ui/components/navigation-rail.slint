@@ -1,0 +1,154 @@
+import { Theme } from "../theme.slint";
+
+export component NavItem {
+    in property <string> icon: "🏠";
+    in property <string> label: "Home";
+    in property <bool> is-active: false;
+    callback clicked();
+
+    height: 52px;
+
+    rect := Rectangle {
+        background: touch.has-hover && !root.is-active ? Theme.surface-variant : #00000000;
+        border-radius: Theme.radius-medium;
+
+        animate background { duration: 120ms; }
+
+        HorizontalLayout {
+            padding-left: Theme.space-md;
+            padding-right: Theme.space-md;
+            spacing: Theme.space-md;
+            alignment: start;
+
+            indicator := Rectangle {
+                width: 4px;
+                height: 24px;
+                y: (parent.height - self.height) / 2;
+                border-radius: 2px;
+                background: root.is-active ? Theme.primary : #00000000;
+
+                animate background { duration: 150ms; }
+            }
+
+            Text {
+                text: root.icon;
+                font-size: 18px;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: root.label;
+                color: root.is-active ? Theme.primary :
+                       touch.has-hover ? Theme.text-primary : Theme.text-secondary;
+                font-size: 14px;
+                font-weight: root.is-active ? 600 : 500;
+                vertical-alignment: center;
+
+                animate color { duration: 120ms; }
+            }
+        }
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component NavigationRail {
+    in property <int> active-tab: 0;
+    callback tab-selected(int);
+
+    width: 220px;
+
+    Rectangle {
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.surface-border;
+
+        VerticalLayout {
+            padding: Theme.space-lg;
+            spacing: Theme.space-sm;
+            alignment: start;
+
+            // Brand Header
+            HorizontalLayout {
+                spacing: Theme.space-sm;
+                padding-bottom: Theme.space-lg;
+
+                Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 8px;
+                    background: Theme.primary;
+
+                    Text {
+                        text: "M";
+                        color: Theme.on-primary;
+                        font-size: 16px;
+                        font-weight: 800;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: "MIST";
+                    color: Theme.text-primary;
+                    font-size: 18px;
+                    font-weight: 800;
+                    letter-spacing: 2px;
+                    vertical-alignment: center;
+                }
+            }
+
+            NavItem {
+                icon: "🏠";
+                label: "Home";
+                is-active: root.active-tab == 0;
+                clicked => { root.tab-selected(0); }
+            }
+
+            NavItem {
+                icon: "📡";
+                label: "Wi-Fi Share";
+                is-active: root.active-tab == 1;
+                clicked => { root.tab-selected(1); }
+            }
+
+            NavItem {
+                icon: "🔗";
+                label: "Connect";
+                is-active: root.active-tab == 2;
+                clicked => { root.tab-selected(2); }
+            }
+
+            NavItem {
+                icon: "💻";
+                label: "Devices";
+                is-active: root.active-tab == 3;
+                clicked => { root.tab-selected(3); }
+            }
+
+            NavItem {
+                icon: "📶";
+                label: "Network";
+                is-active: root.active-tab == 4;
+                clicked => { root.tab-selected(4); }
+            }
+
+            NavItem {
+                icon: "⚙";
+                label: "Settings";
+                is-active: root.active-tab == 5;
+                clicked => { root.tab-selected(5); }
+            }
+
+            NavItem {
+                icon: "ℹ";
+                label: "About";
+                is-active: root.active-tab == 6;
+                clicked => { root.tab-selected(6); }
+            }
+        }
+    }
+}

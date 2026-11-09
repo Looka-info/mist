@@ -1,0 +1,270 @@
+import { Theme } from "theme.slint";
+import { NavigationRail } from "components/navigation-rail.slint";
+import { Dialog } from "components/dialog.slint";
+import { Toast } from "components/toast.slint";
+import { HomeScreen } from "screens/home.slint";
+import { HostScreen } from "screens/host.slint";
+import { ConnectScreen } from "screens/connect.slint";
+import { DevicesScreen, DeviceItemData } from "screens/devices.slint";
+import { NetworkScreen } from "screens/network.slint";
+import { LiveSessionScreen } from "screens/live-session.slint";
+import { SettingsScreen } from "screens/settings.slint";
+import { AboutScreen } from "screens/about.slint";
+
+export component MainWindow inherits Window {
+    title: "Mist — Peer-to-Peer Game Streaming";
+    min-width: 1024px;
+    min-height: 700px;
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    background: Theme.background;
+
+    // Navigation state: 0=Home, 1=Share, 2=Connect, 3=Devices, 4=Network, 5=Settings, 6=About, 7=LiveSession
+    in-out property <int> active-tab: 0;
+
+    // Wi-Fi and Hardware state
+    in property <string> wifi-adapter: "Wi-Fi";
+    in property <string> wifi-ssid: "Unavailable";
+    in property <int> wifi-signal: 0;
+    in property <string> wifi-band: "5 GHz";
+    in property <string> gpu-name: "Direct3D 11 Display Adapter";
+    in property <bool> nvenc-ready: true;
+
+    // Pairing & Host state
+    in property <bool> is-sharing: false;
+    in property <string> pairing-code: "------";
+    in property <int> remaining-seconds: 300;
+
+    // Connect & Client state
+    in-out property <string> connect-code: "";
+    in-out property <string> connect-host-ip: "127.0.0.1";
+    in property <bool> is-connecting: false;
+    in property <int> connect-step: 0;
+    in property <string> connect-error: "";
+
+    // Device Management state
+    in property <[DeviceItemData]> devices: [];
+    in property <bool> is-locked-out: false;
+    in property <int> lockout-seconds: 0;
+
+    // Telemetry state
+    in property <bool> is-session-active: false;
+    in property <string> telem-fps: "60 FPS";
+    in property <string> telem-bitrate: "12.0 Mbps";
+    in property <string> telem-rtt: "8.5 ms";
+    in property <string> telem-jitter: "1.2 ms";
+    in property <string> telem-loss: "0.0%";
+    in property <string> gateway-ping: "Unavailable";
+    in property <string> internet-ping: "Unavailable";
+
+    // Dialog state (Host Approval)
+    in property <bool> dialog-open: false;
+    in property <string> dialog-title: "Incoming Connection Request";
+    in property <string> dialog-message: "Device 'Remote PC' wants to pair and stream.";
+
+    // Toast state
+    in property <bool> toast-visible: false;
+    in property <string> toast-message: "Action completed";
+
+    // Callbacks from UI to Rust Controller
+    callback nav-changed(int);
+    callback start-share();
+    callback stop-share();
+    callback copy-code();
+    callback revoke-code();
+    callback connect-requested(string, string);
+    callback cancel-connect();
+    callback paste-code();
+    callback code-typed(string);
+    callback revoke-device(string);
+    callback save-settings(bool, bool, int, int, string, string, bool);
+    callback dialog-confirmed();
+    callback dialog-cancelled();
+    callback disconnect-stream();
+    callback toggle-fullscreen();
+
+    HorizontalLayout {
+        // Navigation Rail on the left (hidden during fullscreen live session)
+        if root.active-tab != 7 : NavigationRail {
+            active-tab: root.active-tab;
+            tab-selected(idx) => {
+                root.active-tab = idx;
+                root.nav-changed(idx);
+            }
+        }
+
+        // Main Content Area
+        VerticalLayout {
+            // Top App Bar
+            Rectangle {
+                height: 48px;
+                background: Theme.surface;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                HorizontalLayout {
+                    padding-left: Theme.space-xl;
+                    padding-right: Theme.space-xl;
+                    alignment: space-between;
+
+                    Text {
+                        text: root.active-tab == 0 ? "Home" :
+                              root.active-tab == 1 ? "Wi-Fi Screen Share" :
+                              root.active-tab == 2 ? "Connect to Device" :
+                              root.active-tab == 3 ? "Paired Devices" :
+                              root.active-tab == 4 ? "Network Diagnostics" :
+                              root.active-tab == 5 ? "Settings" :
+                              root.active-tab == 6 ? "About Mist" : "Live Streaming Session";
+                        color: Theme.text-primary;
+                        font-size: 15px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.space-md;
+                        alignment: center;
+
+                        Rectangle {
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 4px;
+                            background: root.is-session-active ? Theme.fresh-mint : Theme.text-disabled;
+                        }
+
+                        Text {
+                            text: root.is-session-active ? "Streaming Active" : "Ready";
+                            color: Theme.text-secondary;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            // Screen Switcher
+            Rectangle {
+                clip: true;
+
+                if root.active-tab == 0 : HomeScreen {
+                    wifi-ssid: root.wifi-ssid;
+                    wifi-signal: root.wifi-signal;
+                    gpu-name: root.gpu-name;
+                    nvenc-ready: root.nvenc-ready;
+                    trusted-device-count: root.devices.length;
+                    is-streaming: root.is-session-active;
+                    share-clicked => { root.active-tab = 1; root.nav-changed(1); }
+                    connect-clicked => { root.active-tab = 2; root.nav-changed(2); }
+                }
+
+                if root.active-tab == 1 : HostScreen {
+                    is-sharing: root.is-sharing;
+                    pairing-code: root.pairing-code;
+                    remaining-seconds: root.remaining-seconds;
+                    wifi-adapter: root.wifi-adapter;
+                    wifi-ssid: root.wifi-ssid;
+                    wifi-signal: root.wifi-signal;
+                    wifi-band: root.wifi-band;
+                    nvenc-ready: root.nvenc-ready;
+                    toggle-sharing => {
+                        if root.is-sharing {
+                            root.stop-share();
+                        } else {
+                            root.start-share();
+                        }
+                    }
+                    copy-code => { root.copy-code(); }
+                    revoke-code => { root.revoke-code(); }
+                }
+
+                if root.active-tab == 2 : ConnectScreen {
+                    pairing-code <=> root.connect-code;
+                    host-ip <=> root.connect-host-ip;
+                    is-connecting: root.is-connecting;
+                    connect-step: root.connect-step;
+                    error-message: root.connect-error;
+                    connect-clicked => { root.connect-requested(root.connect-code, root.connect-host-ip); }
+                    cancel-clicked => { root.cancel-connect(); }
+                    paste-clicked => { root.paste-code(); }
+                    code-edited(s) => { root.code-typed(s); }
+                }
+
+                if root.active-tab == 3 : DevicesScreen {
+                    devices: root.devices;
+                    is-locked-out: root.is-locked-out;
+                    lockout-seconds: root.lockout-seconds;
+                    revoke-device(id) => { root.revoke-device(id); }
+                    start-share-clicked => { root.active-tab = 1; root.nav-changed(1); }
+                }
+
+                if root.active-tab == 4 : NetworkScreen {
+                    wifi-adapter: root.wifi-adapter;
+                    wifi-ssid: root.wifi-ssid;
+                    wifi-signal: root.wifi-signal;
+                    wifi-band: root.wifi-band;
+                    media-rtt: root.telem-rtt;
+                    gateway-ping: root.gateway-ping;
+                    internet-ping: root.internet-ping;
+                    session-bitrate: root.telem-bitrate;
+                    jitter: root.telem-jitter;
+                    packet-loss: root.telem-loss;
+                    is-session-active: root.is-session-active;
+                }
+
+                if root.active-tab == 5 : SettingsScreen {
+                    save-clicked => {
+                        root.save-settings(self.dark-theme, self.high-contrast, self.fps, self.bitrate-kbps, self.signaling-url, self.stun-server, self.audio-enabled);
+                    }
+                    reset-clicked => {
+                        self.dark-theme = true;
+                        self.high-contrast = false;
+                        self.fps = 60;
+                        self.bitrate-kbps = 12000;
+                        self.signaling-url = "ws://127.0.0.1:8080";
+                        self.stun-server = "stun:stun.l.google.com:19302";
+                        self.audio-enabled = true;
+                    }
+                }
+
+                if root.active-tab == 6 : AboutScreen {}
+
+                if root.active-tab == 7 : LiveSessionScreen {
+                    is-active: root.is-session-active;
+                    fps-text: root.telem-fps;
+                    bitrate-text: root.telem-bitrate;
+                    rtt-text: root.telem-rtt;
+                    jitter-text: root.telem-jitter;
+                    loss-text: root.telem-loss;
+                    disconnect-clicked => { root.disconnect-stream(); }
+                    fullscreen-clicked => { root.toggle-fullscreen(); }
+                }
+            }
+        }
+    }
+
+    // Modal Approval Dialog
+    Dialog {
+        is-open: root.dialog-open;
+        title: root.dialog-title;
+        message: root.dialog-message;
+        confirm-text: "Approve";
+        cancel-text: "Deny";
+        confirmed => { root.dialog-confirmed(); }
+        cancelled => { root.dialog-cancelled(); }
+    }
+
+    // Floating Toast Notification
+    if root.toast-visible : VerticalLayout {
+        alignment: end;
+        padding-bottom: Theme.space-xl;
+
+        HorizontalLayout {
+            alignment: center;
+
+            Toast {
+                is-visible: root.toast-visible;
+                message: root.toast-message;
+            }
+        }
+    }
+}

@@ -1,0 +1,17 @@
+[package]
+name = "mist-pairing"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+mist-core = { path = "../mist-core" }
+mist-domain = { path = "../mist-domain" }
+mist-config = { path = "../mist-config" }
+serde.workspace = true
+serde_json.workspace = true
+rand.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+tokio.workspace = true

@@ -1,0 +1,28 @@
+import { Theme } from "../theme.slint";
+
+export component Toast {
+    in property <bool> is-visible: false;
+    in property <string> message: "Action successful";
+
+    if root.is-visible : Rectangle {
+        height: 48px;
+        background: Theme.surface-variant;
+        border-radius: Theme.radius-pill;
+        border-width: 1px;
+        border-color: Theme.primary;
+
+        HorizontalLayout {
+            padding-left: Theme.space-xl;
+            padding-right: Theme.space-xl;
+            alignment: center;
+
+            Text {
+                text: root.message;
+                color: Theme.text-primary;
+                font-size: 14px;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

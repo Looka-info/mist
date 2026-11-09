@@ -1,0 +1,30 @@
+import { Theme } from "../theme.slint";
+
+export component StatusIndicator {
+    in property <bool> is-active: false;
+    in property <string> active-text: "Online";
+    in property <string> inactive-text: "Offline";
+
+    HorizontalLayout {
+        spacing: Theme.space-sm;
+        alignment: start;
+
+        dot := Rectangle {
+            width: 8px;
+            height: 8px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 4px;
+            background: root.is-active ? Theme.fresh-mint : Theme.text-disabled;
+
+            animate background { duration: 200ms; }
+        }
+
+        Text {
+            text: root.is-active ? root.active-text : root.inactive-text;
+            color: root.is-active ? Theme.text-primary : Theme.text-secondary;
+            font-size: 13px;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+    }
+}

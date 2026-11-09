@@ -1,0 +1,72 @@
+import { Theme } from "../theme.slint";
+import { PrimaryButton } from "primary-button.slint";
+import { SecondaryButton } from "secondary-button.slint";
+
+export component Dialog {
+    in property <bool> is-open: false;
+    in property <string> title: "Device Connection Request";
+    in property <string> message: "A remote device is requesting permission to connect.";
+    in property <string> confirm-text: "Accept";
+    in property <string> cancel-text: "Deny";
+    callback confirmed();
+    callback cancelled();
+
+    if root.is-open : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088;
+
+        TouchArea {
+            // Block clicks from propagating underneath
+        }
+
+        modal := Rectangle {
+            width: 440px;
+            height: 240px;
+            background: Theme.surface;
+            border-radius: Theme.radius-large;
+            border-width: 1px;
+            border-color: Theme.surface-border;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+
+            VerticalLayout {
+                padding: Theme.space-xl;
+                alignment: space-between;
+
+                VerticalLayout {
+                    spacing: Theme.space-sm;
+
+                    Text {
+                        text: root.title;
+                        color: Theme.text-primary;
+                        font-size: 18px;
+                        font-weight: 700;
+                    }
+
+                    Text {
+                        text: root.message;
+                        color: Theme.text-secondary;
+                        font-size: 14px;
+                        wrap: word-wrap;
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: Theme.space-md;
+
+                    SecondaryButton {
+                        text: root.cancel-text;
+                        clicked => { root.cancelled(); }
+                    }
+
+                    PrimaryButton {
+                        text: root.confirm-text;
+                        clicked => { root.confirmed(); }
+                    }
+                }
+            }
+        }
+    }
+}

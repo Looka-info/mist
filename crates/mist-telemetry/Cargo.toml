@@ -1,0 +1,13 @@
+[package]
+name = "mist-telemetry"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+mist-core = { path = "../mist-core" }
+mist-domain = { path = "../mist-domain" }
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true

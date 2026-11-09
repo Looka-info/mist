@@ -1,0 +1,49 @@
+import { Theme } from "../theme.slint";
+import { PrimaryButton } from "primary-button.slint";
+
+export component EmptyState {
+    in property <string> icon: "📡";
+    in property <string> title: "No Devices Paired";
+    in property <string> description: "Start Wi-Fi Screen Share or connect with a 6-character code to begin streaming.";
+    in property <string> button-text: "Start Sharing";
+    callback action-clicked();
+
+    VerticalLayout {
+        alignment: center;
+        spacing: Theme.space-lg;
+
+        Text {
+            text: root.icon;
+            font-size: 48px;
+            horizontal-alignment: center;
+        }
+
+        VerticalLayout {
+            spacing: Theme.space-xs;
+
+            Text {
+                text: root.title;
+                color: Theme.text-primary;
+                font-size: 18px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: root.description;
+                color: Theme.text-secondary;
+                font-size: 14px;
+                horizontal-alignment: center;
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+
+            PrimaryButton {
+                text: root.button-text;
+                clicked => { root.action-clicked(); }
+            }
+        }
+    }
+}

@@ -1,0 +1,85 @@
+import { Theme } from "../theme.slint";
+import { SecondaryButton } from "secondary-button.slint";
+
+export component StreamingHud {
+    in property <string> fps-text: "60 FPS";
+    in property <string> bitrate-text: "12.0 Mbps";
+    in property <string> rtt-text: "8.5 ms";
+    in property <string> jitter-text: "1.2 ms";
+    in property <string> loss-text: "0.0%";
+    in property <bool> is-visible: true;
+    callback disconnect-clicked();
+
+    if root.is-visible : Rectangle {
+        height: 48px;
+        background: #101A15DD;
+        border-radius: Theme.radius-pill;
+        border-width: 1px;
+        border-color: Theme.surface-border;
+
+        HorizontalLayout {
+            padding-left: Theme.space-lg;
+            padding-right: Theme.space-md;
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: Theme.space-lg;
+                alignment: center;
+
+                Rectangle {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 4px;
+                    background: Theme.accent;
+                }
+
+                Text {
+                    text: root.fps-text;
+                    color: Theme.text-primary;
+                    font-size: 13px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: root.bitrate-text;
+                    color: Theme.text-primary;
+                    font-size: 13px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "RTT: " + root.rtt-text;
+                    color: Theme.text-secondary;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "Jitter: " + root.jitter-text;
+                    color: Theme.text-secondary;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "Loss: " + root.loss-text;
+                    color: Theme.text-secondary;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+
+                SecondaryButton {
+                    text: "Disconnect";
+                    min-width: 90px;
+                    clicked => { root.disconnect-clicked(); }
+                }
+            }
+        }
+    }
+}

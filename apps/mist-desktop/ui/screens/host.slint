@@ -1,0 +1,220 @@
+import { Theme } from "../theme.slint";
+import { PrimaryButton } from "../components/primary-button.slint";
+import { SecondaryButton } from "../components/secondary-button.slint";
+import { PairingCodeDisplay } from "../components/pairing-code-display.slint";
+import { PermissionSwitch } from "../components/permission-switch.slint";
+import { StatusIndicator } from "../components/status-indicator.slint";
+
+export component HostScreen {
+    in property <bool> is-sharing: false;
+    in property <string> pairing-code: "------";
+    in property <int> remaining-seconds: 300;
+    in property <string> wifi-adapter: "Wi-Fi";
+    in property <string> wifi-ssid: "Unavailable";
+    in property <int> wifi-signal: 0;
+    in property <string> wifi-band: "5 GHz";
+    in property <bool> nvenc-ready: true;
+    in property <string> status-message: "Ready to share screen";
+
+    in-out property <bool> allow-keyboard: true;
+    in-out property <bool> allow-mouse: true;
+    in-out property <bool> allow-gamepad: true;
+    in-out property <bool> allow-audio: true;
+
+    callback toggle-sharing();
+    callback copy-code();
+    callback revoke-code();
+
+    Flickable {
+        VerticalLayout {
+            padding: Theme.space-xl;
+            spacing: Theme.space-xl;
+            alignment: start;
+
+            // Screen Header
+            HorizontalLayout {
+                alignment: space-between;
+
+                VerticalLayout {
+                    spacing: Theme.space-xs;
+
+                    Text {
+                        text: "Wi-Fi Screen Share";
+                        color: Theme.text-primary;
+                        font-size: 24px;
+                        font-weight: 700;
+                    }
+
+                    Text {
+                        text: "Stream your desktop to authorized devices on your network.";
+                        color: Theme.text-secondary;
+                        font-size: 14px;
+                    }
+                }
+
+                StatusIndicator {
+                    is-active: root.is-sharing;
+                    active-text: "Session Active";
+                    inactive-text: "Standby";
+                }
+            }
+
+            // Pre-flight Network & Hardware Information
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: "Network & Hardware Pre-Flight Checks";
+                        color: Theme.text-primary;
+                        font-size: 15px;
+                        font-weight: 600;
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.space-xl;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Active Wi-Fi Adapter"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.wifi-adapter; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Connected SSID"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.wifi-ssid; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Frequency Band"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.wifi-band; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Signal Quality"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.wifi-signal > 0 ? (root.wifi-signal + "%") : "Unavailable"; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Encoder Support"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.nvenc-ready ? "NVENC (Hardware)" : "D3D11 / MFT"; color: Theme.accent; font-size: 14px; font-weight: 600; }
+                        }
+                    }
+                }
+            }
+
+            // Sharing Controls & Code Display
+            if root.is-sharing : VerticalLayout {
+                spacing: Theme.space-lg;
+
+                PairingCodeDisplay {
+                    code: root.pairing-code;
+                    remaining-seconds: root.remaining-seconds;
+                    is-active: root.is-sharing;
+                    copy-clicked => { root.copy-code(); }
+                    revoke-clicked => { root.revoke-code(); }
+                }
+
+                // Host Permission Controls
+                Rectangle {
+                    background: Theme.surface;
+                    border-radius: Theme.radius-large;
+                    border-width: 1px;
+                    border-color: Theme.surface-border;
+
+                    VerticalLayout {
+                        padding: Theme.space-lg;
+                        spacing: Theme.space-md;
+
+                        Text {
+                            text: "Host Remote Control Permissions";
+                            color: Theme.text-primary;
+                            font-size: 15px;
+                            font-weight: 600;
+                        }
+
+                        PermissionSwitch {
+                            text: "Allow Keyboard Input";
+                            checked <=> root.allow-keyboard;
+                        }
+
+                        PermissionSwitch {
+                            text: "Allow Mouse Input";
+                            checked <=> root.allow-mouse;
+                        }
+
+                        PermissionSwitch {
+                            text: "Allow Gamepad Controller";
+                            checked <=> root.allow-gamepad;
+                        }
+
+                        PermissionSwitch {
+                            text: "Stream Host System Audio";
+                            checked <=> root.allow-audio;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+
+                    SecondaryButton {
+                        text: "Stop Sharing";
+                        min-width: 140px;
+                        clicked => { root.toggle-sharing(); }
+                    }
+                }
+            }
+
+            if !root.is-sharing : Rectangle {
+                height: 180px;
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-xl;
+                    alignment: space-between;
+
+                    VerticalLayout {
+                        spacing: Theme.space-xs;
+
+                        Text {
+                            text: "Ready to Start Session";
+                            color: Theme.text-primary;
+                            font-size: 18px;
+                            font-weight: 700;
+                        }
+
+                        Text {
+                            text: "Clicking 'Start Wi-Fi Share' will generate a secure 6-character code and begin listening for client connections.";
+                            color: Theme.text-secondary;
+                            font-size: 14px;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: start;
+
+                        PrimaryButton {
+                            text: "Start Wi-Fi Share";
+                            min-width: 160px;
+                            clicked => { root.toggle-sharing(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

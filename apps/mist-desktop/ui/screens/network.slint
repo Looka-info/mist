@@ -1,0 +1,176 @@
+import { Theme } from "../theme.slint";
+import { MetricCard } from "../components/metric-card.slint";
+import { StatusIndicator } from "../components/status-indicator.slint";
+
+export component NetworkScreen {
+    in property <string> wifi-adapter: "Wi-Fi";
+    in property <string> wifi-ssid: "Unavailable";
+    in property <int> wifi-signal: 0;
+    in property <string> wifi-band: "5 GHz";
+    in property <string> radio-type: "802.11ax";
+    in property <int> wifi-channel: 36;
+
+    in property <string> media-rtt: "Unavailable";
+    in property <string> gateway-ping: "Unavailable";
+    in property <string> internet-ping: "Unavailable";
+    in property <string> session-bitrate: "Unavailable";
+    in property <string> jitter: "Unavailable";
+    in property <string> packet-loss: "0.0%";
+    in property <bool> is-session-active: false;
+
+    Flickable {
+        VerticalLayout {
+            padding: Theme.space-xl;
+            spacing: Theme.space-xl;
+            alignment: start;
+
+            // Screen Header
+            HorizontalLayout {
+                alignment: space-between;
+
+                VerticalLayout {
+                    spacing: Theme.space-xs;
+
+                    Text {
+                        text: "Network Health & Diagnostics";
+                        color: Theme.text-primary;
+                        font-size: 24px;
+                        font-weight: 700;
+                    }
+
+                    Text {
+                        text: "Real-time network telemetry and Wi-Fi interface analysis.";
+                        color: Theme.text-secondary;
+                        font-size: 14px;
+                    }
+                }
+
+                StatusIndicator {
+                    is-active: root.is-session-active;
+                    active-text: "Live Stream Telemetry";
+                    inactive-text: "No Active Stream";
+                }
+            }
+
+            // Wi-Fi Connection Details
+            Rectangle {
+                background: Theme.surface;
+                border-radius: Theme.radius-large;
+                border-width: 1px;
+                border-color: Theme.surface-border;
+
+                VerticalLayout {
+                    padding: Theme.space-lg;
+                    spacing: Theme.space-md;
+
+                    Text {
+                        text: "Active Wireless Interface";
+                        color: Theme.text-primary;
+                        font-size: 16px;
+                        font-weight: 600;
+                    }
+
+                    HorizontalLayout {
+                        spacing: Theme.space-xl;
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Interface Name"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.wifi-adapter; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Network SSID"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.wifi-ssid; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Radio Standard"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.radio-type; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Operating Band"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.wifi-band + (root.wifi-channel > 0 ? (" (Ch " + root.wifi-channel + ")") : ""); color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        }
+
+                        VerticalLayout {
+                            spacing: Theme.space-xs;
+                            Text { text: "Signal Quality"; color: Theme.text-secondary; font-size: 12px; }
+                            Text { text: root.wifi-signal > 0 ? (root.wifi-signal + "%") : "Unavailable"; color: Theme.accent; font-size: 14px; font-weight: 600; }
+                        }
+                    }
+                }
+            }
+
+            // Latency & Ping Distinction
+            Text {
+                text: "Latency & Route Separation";
+                color: Theme.text-primary;
+                font-size: 16px;
+                font-weight: 700;
+            }
+
+            HorizontalLayout {
+                spacing: Theme.space-md;
+
+                MetricCard {
+                    title: "WebRTC Media RTT";
+                    value: root.media-rtt;
+                    subtitle: "Direct peer-to-peer transport latency";
+                    accent-color: root.is-session-active ? Theme.accent : Theme.text-disabled;
+                }
+
+                MetricCard {
+                    title: "Local Gateway Ping";
+                    value: root.gateway-ping;
+                    subtitle: "Router / Wi-Fi Access Point ICMP echo";
+                    accent-color: Theme.accent;
+                }
+
+                MetricCard {
+                    title: "Internet ICMP Ping";
+                    value: root.internet-ping;
+                    subtitle: "Cloud DNS / Public WAN ping";
+                    accent-color: Theme.text-secondary;
+                }
+            }
+
+            // WebRTC Quality Telemetry
+            Text {
+                text: "Transport Quality";
+                color: Theme.text-primary;
+                font-size: 16px;
+                font-weight: 700;
+            }
+
+            HorizontalLayout {
+                spacing: Theme.space-md;
+
+                MetricCard {
+                    title: "Session Bitrate";
+                    value: root.session-bitrate;
+                    subtitle: "Real video & audio transport throughput";
+                    accent-color: root.is-session-active ? Theme.accent : Theme.text-disabled;
+                }
+
+                MetricCard {
+                    title: "Jitter Variance";
+                    value: root.jitter;
+                    subtitle: "Packet inter-arrival delay variance";
+                    accent-color: root.is-session-active ? Theme.accent : Theme.text-disabled;
+                }
+
+                MetricCard {
+                    title: "Packet Loss";
+                    value: root.packet-loss;
+                    subtitle: "Unrecovered RTP transmission loss";
+                    accent-color: root.packet-loss == "0.0%" ? Theme.accent : Theme.error;
+                }
+            }
+        }
+    }
+}
