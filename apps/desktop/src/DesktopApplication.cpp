@@ -44,6 +44,15 @@ LRESULT CALLBACK DesktopWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
                 }
             }
             return 0;
+        case WM_KEYDOWN:
+            if (wParam == VK_F11) {
+                auto* app = reinterpret_cast<mist::desktop::DesktopApplication*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
+                if (app) {
+                    app->toggleFullscreen();
+                }
+                return 0;
+            }
+            break;
         case WM_SYSCOMMAND:
             if ((wParam & 0xfff0) == SC_KEYMENU) {
                 return 0; // Disable ALT application menu
@@ -529,6 +538,38 @@ void DesktopApplication::handleResize(uint32_t width, uint32_t height) {
         if (SUCCEEDED(hr)) {
             (void)d3d11Device_->CreateRenderTargetView(backBuffer.Get(), nullptr, rtv_.GetAddressOf());
         }
+    }
+}
+
+void DesktopApplication::toggleFullscreen() {
+    if (!hwnd_) return;
+
+    DWORD dwStyle = GetWindowLongW(hwnd_, GWL_STYLE);
+    if (!isFullscreenWindow_) {
+        prevWindowPlacement_.length = sizeof(WINDOWPLACEMENT);
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(mi);
+        if (GetWindowPlacement(hwnd_, &prevWindowPlacement_) &&
+            GetMonitorInfoW(MonitorFromWindow(hwnd_, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+            SetWindowLongW(hwnd_, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos(hwnd_, HWND_TOP,
+                         mi.rcMonitor.left, mi.rcMonitor.top,
+                         mi.rcMonitor.right - mi.rcMonitor.left,
+                         mi.rcMonitor.bottom - mi.rcMonitor.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            isFullscreenWindow_ = true;
+            isStreamingFullscreen_ = true;
+            showToast("Entered Fullscreen mode (F11)");
+        }
+    } else {
+        SetWindowLongW(hwnd_, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(hwnd_, &prevWindowPlacement_);
+        SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        isFullscreenWindow_ = false;
+        isStreamingFullscreen_ = false;
+        showToast("Exited Fullscreen mode (F11)");
     }
 }
 
@@ -2241,32 +2282,45 @@ void DesktopApplication::renderGuiHomeScreen() {
     ImGui::Spacing();
 
     float availW = ImGui::GetContentRegionAvail().x;
-    float carCardW = std::max(220.0f, (availW - 32.0f) / 3.0f);
-
-    struct SessionCardData {
-        const char* name;
-        const char* timeAgo;
-        const char* metrics;
-    };
-    const SessionCardData sessions[] = {
-        { "Living room PC", "Yesterday * 48 min", "60 fps * 11.5 Mbps" },
-        { "Pixel Tablet",   "Sat * 2 h 10 min",  "60 fps * 9.8 Mbps"  },
-        { "Studio desktop", "Thu * 15 min",      "30 fps * 6.2 Mbps"  }
-    };
-
-    for (int i = 0; i < 3; ++i) {
-        if (i > 0) ImGui::SameLine(0, 14.0f);
-        BeginCardContainer(("SessionCard" + std::to_string(i)).c_str(), c, ImVec2(carCardW, 126.0f), 24.0f);
+    auto trusted = pairingManager_.getTrustedDevices();
+    if (trusted.empty()) {
+        BeginCardContainer("NoSessionsCard", c, ImVec2(availW, 110.0f), 24.0f);
+        ImVec2 emptyPos = ImGui::GetCursorScreenPos();
+        renderVectorIcon("devices", ImVec2(emptyPos.x + 24.0f, emptyPos.y + 24.0f), 28.0f, ImGui::ColorConvertFloat4ToU32(c.mute));
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 64.0f);
         if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextColored(c.ink, "%s", sessions[i].name);
+        ImGui::TextColored(c.ink, "No Previous Sessions");
         if (fontBold_) ImGui::PopFont();
-
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 64.0f);
         if (fontSmall_) ImGui::PushFont(fontSmall_);
-        ImGui::TextColored(c.mute, "%s", sessions[i].timeAgo);
-        ImGui::Spacing();
-        ImGui::TextColored(c.ink, "%s", sessions[i].metrics);
+        ImGui::TextColored(c.mute, "Pair a device using a 6-character code to see your trusted connections here.");
         if (fontSmall_) ImGui::PopFont();
+        ImGui::SameLine(availW - 190.0f);
+        if (renderPillButton("Start Sharing", true, false, ImVec2(150.0f, 38.0f), "cast")) {
+            navigateToScreen(DesktopScreen::Host);
+        }
         EndCardContainer();
+    } else {
+        float carCardW = std::max(220.0f, (availW - 32.0f) / 3.0f);
+        size_t count = std::min(trusted.size(), size_t{3});
+        for (size_t i = 0; i < count; ++i) {
+            if (i > 0) ImGui::SameLine(0, 14.0f);
+            BeginCardContainer(("SessionCard" + std::to_string(i)).c_str(), c, ImVec2(carCardW, 126.0f), 24.0f);
+            if (fontBold_) ImGui::PushFont(fontBold_);
+            ImGui::TextColored(c.ink, "%s", trusted[i].deviceName.c_str());
+            if (fontBold_) ImGui::PopFont();
+
+            if (fontSmall_) ImGui::PushFont(fontSmall_);
+            ImGui::TextColored(c.mute, "Trusted Device * %s", trusted[i].deviceId.substr(0, std::min(size_t{8}, trusted[i].deviceId.size())).c_str());
+            ImGui::Spacing();
+            std::string permStr;
+            if (trusted[i].permissions.allowKeyboard || trusted[i].permissions.allowMouse) permStr += "Mouse/Keys ";
+            if (trusted[i].permissions.allowGamepad) permStr += "Gamepad ";
+            if (permStr.empty()) permStr = "Audio/Video Only";
+            ImGui::TextColored(c.acc, "%s", permStr.c_str());
+            if (fontSmall_) ImGui::PopFont();
+            EndCardContainer();
+        }
     }
 
     ImGui::Spacing();
@@ -2462,10 +2516,15 @@ void DesktopApplication::renderGuiHostScreen() {
         if (fontSmall_) ImGui::PopFont();
         ImGui::Spacing();
 
+        std::string displayCode;
+        for (char ch : pairingCode_) {
+            if (ch != '-') displayCode += ch;
+        }
+
         float spanW = std::min(52.0f, (colW - 80.0f) / 6.0f);
         float spanH = 68.0f;
 
-        for (size_t i = 0; i < 6 && i < pairingCode_.size(); ++i) {
+        for (size_t i = 0; i < 6 && i < displayCode.size(); ++i) {
             if (i > 0) ImGui::SameLine(0, 8.0f);
             ImVec2 p = ImGui::GetCursorScreenPos();
 
@@ -2474,7 +2533,7 @@ void DesktopApplication::renderGuiHostScreen() {
             drawList->AddRectFilled(p, ImVec2(p.x + spanW, p.y + spanH), ImGui::ColorConvertFloat4ToU32(boxBg), 16.0f);
             drawList->AddRect(p, ImVec2(p.x + spanW, p.y + spanH), ImGui::ColorConvertFloat4ToU32(c.mint), 16.0f, 0, 1.6f);
 
-            char digitStr[2] = { pairingCode_[i], '\0' };
+            char digitStr[2] = { displayCode[i], '\0' };
             if (fontCode_) ImGui::PushFont(fontCode_);
             ImVec2 ts = ImGui::CalcTextSize(digitStr);
             drawList->AddText(ImVec2(p.x + (spanW - ts.x) * 0.5f, p.y + (spanH - ts.y) * 0.5f), ImGui::ColorConvertFloat4ToU32(c.onCt), digitStr);
@@ -2598,13 +2657,17 @@ void DesktopApplication::renderGuiHostScreen() {
     if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
 
-    if (incomingRequestActive_) {
+    auto pendingList = pairingManager_.getPendingRequests();
+    if (!pendingList.empty() || incomingRequestActive_) {
+        std::string reqDevId = !pendingList.empty() ? pendingList[0].deviceId : pendingDeviceId_;
+        std::string reqDevName = !pendingList.empty() ? pendingList[0].deviceName : pendingDeviceName_;
+
         ImVec2 reqPos = ImGui::GetCursorScreenPos();
         drawList->AddRectFilled(reqPos, ImVec2(reqPos.x + colW - 48.0f, reqPos.y + 60.0f), ImGui::ColorConvertFloat4ToU32(c.ct), 16.0f);
 
         ImGui::SetCursorScreenPos(ImVec2(reqPos.x + 16.0f, reqPos.y + 10.0f));
         if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextColored(c.onCt, "%s", pendingDeviceName_.c_str());
+        ImGui::TextColored(c.onCt, "%s", reqDevName.c_str());
         if (fontBold_) ImGui::PopFont();
         if (fontSmall_) ImGui::PushFont(fontSmall_);
         ImGui::TextColored(c.acc, "Pairing code verified. Awaiting host approval.");
@@ -2623,61 +2686,80 @@ void DesktopApplication::renderGuiHostScreen() {
         ImGui::Spacing();
 
         if (renderPillButton("Approve Device", true, false, ImVec2(160.0f, 42.0f), "check_circle")) {
-            (void)pairingManager_.approvePairingRequest(pendingDeviceId_, pendingPermissions_);
-            trustedDevices_.push_back({pendingDeviceName_, "Paired over Wi-Fi", pendingPermissions_.allowKeyboard, pendingPermissions_.allowGamepad});
+            security::DevicePermissions perms;
+            perms.allowAudio = pendingPermissions_.allowAudio;
+            perms.allowKeyboard = pendingPermissions_.allowKeyboard;
+            perms.allowMouse = pendingPermissions_.allowKeyboard;
+            perms.allowGamepad = pendingPermissions_.allowGamepad;
+            (void)pairingManager_.approvePairingRequest(reqDevId, perms);
             incomingRequestActive_ = false;
-            showToast(pendingDeviceName_ + " approved and connected!");
+            showToast(reqDevName + " approved and connected!");
         }
         ImGui::SameLine(0, 10.0f);
         if (renderPillButton("Deny & Block", false, true, ImVec2(130.0f, 42.0f), "close")) {
-            (void)pairingManager_.rejectPairingRequest(pendingDeviceId_);
+            (void)pairingManager_.rejectPairingRequest(reqDevId);
             incomingRequestActive_ = false;
             showToast("Pairing request rejected");
         }
     } else {
-        if (fontRegular_) ImGui::PushFont(fontRegular_);
-        ImGui::TextColored(c.mute, "No devices waiting for approval.");
-        if (fontRegular_) ImGui::PopFont();
+        auto trustedList = pairingManager_.getTrustedDevices();
+        if (trustedList.empty()) {
+            if (fontRegular_) ImGui::PushFont(fontRegular_);
+            ImGui::TextColored(c.mute, "No devices waiting for approval.");
+            if (fontRegular_) ImGui::PopFont();
 
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextColored(c.ink, "Trusted Devices");
-        if (fontBold_) ImGui::PopFont();
-        ImGui::Spacing();
-
-        int toRemove = -1;
-        for (size_t i = 0; i < trustedDevices_.size(); ++i) {
-            ImGui::AlignTextToFramePadding();
-            if (fontBold_) ImGui::PushFont(fontBold_);
-            ImGui::TextColored(c.ink, "%s", trustedDevices_[i].name.c_str());
-            if (fontBold_) ImGui::PopFont();
-
-            std::string kbdId = "KbdSwitch_" + std::to_string(i);
-            if (renderM3Switch(kbdId.c_str(), "Mouse/Keys", &trustedDevices_[i].allowKbdMouse, nullptr, 140.0f)) {
-                showToast("Permission updated");
-            }
-
-            ImGui::SameLine(0, 16.0f);
-            std::string padId = "PadSwitch_" + std::to_string(i);
-            if (renderM3Switch(padId.c_str(), "Gamepad", &trustedDevices_[i].allowController, nullptr, 130.0f)) {
-                showToast("Permission updated");
-            }
-
-            ImGui::SameLine(0, 16.0f);
-            std::string remId = "Revoke##" + std::to_string(i);
-            if (renderPillButton(remId.c_str(), false, true, ImVec2(80.0f, 32.0f))) {
-                toRemove = static_cast<int>(i);
-            }
             ImGui::Spacing();
-        }
+            ImGui::Separator();
+            ImGui::Spacing();
 
-        if (toRemove >= 0 && toRemove < static_cast<int>(trustedDevices_.size())) {
-            std::string name = trustedDevices_[toRemove].name;
-            trustedDevices_.erase(trustedDevices_.begin() + toRemove);
-            showToast(name + " access revoked");
+            if (fontRegular_) ImGui::PushFont(fontRegular_);
+            ImGui::TextColored(c.mute, "No trusted devices yet. Connect a client using your 6-character sharing code.");
+            if (fontRegular_) ImGui::PopFont();
+        } else {
+            if (fontBold_) ImGui::PushFont(fontBold_);
+            ImGui::TextColored(c.ink, "Trusted Devices");
+            if (fontBold_) ImGui::PopFont();
+            ImGui::Spacing();
+
+            std::string toRevokeId;
+            for (size_t i = 0; i < trustedList.size(); ++i) {
+                ImGui::AlignTextToFramePadding();
+                if (fontBold_) ImGui::PushFont(fontBold_);
+                ImGui::TextColored(c.ink, "%s", trustedList[i].deviceName.c_str());
+                if (fontBold_) ImGui::PopFont();
+
+                std::string kbdId = "KbdSwitch_" + std::to_string(i);
+                bool kbdVal = trustedList[i].permissions.allowKeyboard;
+                if (renderM3Switch(kbdId.c_str(), "Mouse/Keys", &kbdVal, nullptr, 140.0f)) {
+                    auto p = trustedList[i].permissions;
+                    p.allowKeyboard = kbdVal;
+                    p.allowMouse = kbdVal;
+                    (void)pairingManager_.updateDevicePermissions(trustedList[i].deviceId, p);
+                    showToast("Permission updated");
+                }
+
+                ImGui::SameLine(0, 16.0f);
+                std::string padId = "PadSwitch_" + std::to_string(i);
+                bool padVal = trustedList[i].permissions.allowGamepad;
+                if (renderM3Switch(padId.c_str(), "Gamepad", &padVal, nullptr, 130.0f)) {
+                    auto p = trustedList[i].permissions;
+                    p.allowGamepad = padVal;
+                    (void)pairingManager_.updateDevicePermissions(trustedList[i].deviceId, p);
+                    showToast("Permission updated");
+                }
+
+                ImGui::SameLine(0, 16.0f);
+                std::string remId = "Revoke##" + std::to_string(i);
+                if (renderPillButton(remId.c_str(), false, true, ImVec2(80.0f, 32.0f))) {
+                    toRevokeId = trustedList[i].deviceId;
+                }
+                ImGui::Spacing();
+            }
+
+            if (!toRevokeId.empty()) {
+                (void)pairingManager_.revokeDevice(toRevokeId);
+                showToast("Device access revoked");
+            }
         }
     }
 
@@ -2750,15 +2832,45 @@ void DesktopApplication::renderGuiConnectScreen() {
             code.erase(std::remove_if(code.begin(), code.end(), ::isspace), code.end());
             std::transform(code.begin(), code.end(), code.begin(), ::toupper);
 
-            if (code.size() != 6) {
+            if (code.size() != 6 && code.size() != 7) {
                 showToast("Please enter a valid 6-character pairing code");
             } else {
-                isConnecting_ = true;
-                connectStep_ = 1;
-                connectStepTimer_ = 0.0f;
-                connectStatusMsg_ = "Connecting to host over Wi-Fi...";
-                if (launchClientProcess(code, connectSignalingServer_, connectHearAudio_, connectSendInput_)) {
-                    showToast("Connecting with code " + code);
+                std::string formattedCode = code;
+                if (code.size() == 6) {
+                    formattedCode = code.substr(0, 3) + "-" + code.substr(3, 3);
+                }
+                static const std::string validChars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ-";
+                bool validAlphabet = true;
+                for (char ch : formattedCode) {
+                    if (validChars.find(ch) == std::string::npos) {
+                        validAlphabet = false;
+                        break;
+                    }
+                }
+                if (!validAlphabet) {
+                    showToast("Code contains invalid characters (0, O, 1, I not permitted)");
+                    connectStatusMsg_ = "Invalid pairing code characters.";
+                } else {
+                    isConnecting_ = true;
+                    connectStep_ = 1;
+                    connectStepTimer_ = 0.0f;
+                    connectStatusMsg_ = "Connecting to host over Wi-Fi...";
+
+                    security::PairingRequest req;
+                    req.deviceId = "client-" + std::to_string(GetCurrentProcessId());
+                    req.deviceName = "Client Workstation (" + liveNetworkStatus_.adapterName + ")";
+                    req.pairingCode = formattedCode;
+                    auto subRes = pairingManager_.submitPairingRequest(req);
+                    if (!subRes.hasValue()) {
+                        isConnecting_ = false;
+                        connectStep_ = 0;
+                        connectStatusMsg_ = subRes.error().message();
+                        showToast(subRes.error().message());
+                    } else {
+                        if (launchClientProcess(formattedCode, connectSignalingServer_, connectHearAudio_, connectSendInput_)) {
+                            showToast("Connecting with code " + formattedCode);
+                        }
+                    }
                 }
             }
         }
@@ -2841,16 +2953,20 @@ void DesktopApplication::renderGuiDevicesScreen() {
     ImGui::Spacing();
 
     // 6 Large Digits in Rounded Pill Containers
+    std::string displayCode;
+    for (char ch : pairingCode_) {
+        if (ch != '-') displayCode += ch;
+    }
     float spanW = std::min(58.0f, (colW - 80.0f) / 6.0f);
     float spanH = 72.0f;
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    for (size_t i = 0; i < 6 && i < pairingCode_.size(); ++i) {
+    for (size_t i = 0; i < 6 && i < displayCode.size(); ++i) {
         if (i > 0) ImGui::SameLine(0, 8.0f);
         ImVec2 p = ImGui::GetCursorScreenPos();
         drawList->AddRectFilled(p, ImVec2(p.x + spanW, p.y + spanH), ImGui::ColorConvertFloat4ToU32(c.ct), 16.0f);
 
-        char digitStr[2] = { pairingCode_[i], '\0' };
+        char digitStr[2] = { displayCode[i], '\0' };
         if (fontCode_) ImGui::PushFont(fontCode_);
         ImVec2 ts = ImGui::CalcTextSize(digitStr);
         drawList->AddText(ImVec2(p.x + (spanW - ts.x) * 0.5f, p.y + (spanH - ts.y) * 0.5f), ImGui::ColorConvertFloat4ToU32(c.onCt), digitStr);
@@ -2867,28 +2983,39 @@ void DesktopApplication::renderGuiDevicesScreen() {
     ImGui::Spacing();
     if (renderPillButton("New code", true, false, ImVec2(130.0f, 42.0f))) {
         if (codeLockSeconds_ <= 0) {
-            pairingCode_ = generateRandomPairingCode();
-            wrongCodeFails_ = 0;
-            codeHintMsg_ = "Read this code to the person pairing. It works once.";
-            showToast("New code ready");
+            auto codeRes = pairingManager_.generatePairingCode(300);
+            if (codeRes.hasValue()) {
+                pairingCode_ = codeRes.value();
+                wrongCodeFails_ = 0;
+                codeHintMsg_ = "Read this code to the person pairing. It works once.";
+                showToast("New code ready: " + pairingCode_);
+            }
         }
     }
     ImGui::SameLine(0, 10.0f);
     if (renderPillButton("Try a wrong code", false, false, ImVec2(170.0f, 42.0f))) {
         if (codeLockSeconds_ <= 0) {
-            wrongCodeFails_++;
-            if (wrongCodeFails_ >= 5) {
-                codeLockSeconds_ = 60;
-                codeHintMsg_ = "Too many wrong codes. Try again in 60 seconds.";
-                triggerError("Device Pairing Security Lockout",
-                             "Too many incorrect pairing codes were submitted by remote devices.",
-                             "1. Wait 60 seconds for the lockout countdown to expire.\n"
-                             "2. Click 'New code' to generate a fresh 6-digit one-time code.\n"
-                             "3. Verify the client device is entering the matching code.",
-                             "ERR_AUTH_PAIRING_LOCKOUT",
-                             DesktopScreen::Devices);
-            } else {
-                codeHintMsg_ = "Wrong code. " + std::to_string(5 - wrongCodeFails_) + " attempts left before a 60-second pause.";
+            security::PairingRequest req;
+            req.deviceId = "test-bad-client";
+            req.deviceName = "Untrusted Test Device";
+            req.pairingCode = "BAD-999";
+            auto badRes = pairingManager_.submitPairingRequest(req);
+            if (!badRes.hasValue()) {
+                wrongCodeFails_++;
+                if (badRes.error().code() == common::ErrorCode::PermissionDenied || wrongCodeFails_ >= 5) {
+                    codeLockSeconds_ = 60;
+                    codeHintMsg_ = "Too many wrong codes. Try again in 60 seconds.";
+                    triggerError("Device Pairing Security Lockout",
+                                 badRes.error().message(),
+                                 "1. Wait 60 seconds for the lockout countdown to expire.\n"
+                                 "2. Click 'New code' to generate a fresh 6-digit one-time code.\n"
+                                 "3. Verify the client device is entering the matching code.",
+                                 "ERR_AUTH_PAIRING_LOCKOUT",
+                                 DesktopScreen::Devices);
+                } else {
+                    codeHintMsg_ = "Wrong code. " + std::to_string(std::max(0, 5 - wrongCodeFails_)) + " attempts left before a 60-second pause.";
+                    showToast(badRes.error().message());
+                }
             }
         }
     }
@@ -2903,9 +3030,13 @@ void DesktopApplication::renderGuiDevicesScreen() {
     if (fontTitle_) ImGui::PopFont();
     ImGui::Spacing();
 
-    if (isDeviceApprovalPending_) {
+    auto devPending = pairingManager_.getPendingRequests();
+    if (!devPending.empty() || isDeviceApprovalPending_) {
+        std::string pId = !devPending.empty() ? devPending[0].deviceId : "test-pending";
+        std::string pName = !devPending.empty() ? devPending[0].deviceName : "Aiden's Laptop";
+
         if (fontBold_) ImGui::PushFont(fontBold_);
-        ImGui::TextColored(c.ink, "Aiden's Laptop");
+        ImGui::TextColored(c.ink, "%s", pName.c_str());
         if (fontBold_) ImGui::PopFont();
         if (fontSmall_) ImGui::PushFont(fontSmall_);
         ImGui::TextColored(c.mute, "Used a code just now");
@@ -2913,12 +3044,18 @@ void DesktopApplication::renderGuiDevicesScreen() {
 
         ImGui::Spacing();
         if (renderPillButton("Approve", true, false, ImVec2(110.0f, 42.0f))) {
-            trustedDevices_.push_back({"Aiden's Laptop", "Paired just now", false, false});
+            security::DevicePermissions perms;
+            perms.allowAudio = true;
+            perms.allowKeyboard = false;
+            perms.allowMouse = false;
+            perms.allowGamepad = false;
+            (void)pairingManager_.approvePairingRequest(pId, perms);
             isDeviceApprovalPending_ = false;
-            showToast("Aiden's Laptop approved. Input is off.");
+            showToast(pName + " approved. Remote input is disabled.");
         }
         ImGui::SameLine(0, 10.0f);
         if (renderPillButton("Deny", false, false, ImVec2(90.0f, 42.0f))) {
+            (void)pairingManager_.rejectPairingRequest(pId);
             isDeviceApprovalPending_ = false;
             showToast("Request denied");
         }
@@ -2940,51 +3077,60 @@ void DesktopApplication::renderGuiDevicesScreen() {
     ImGui::Spacing();
 
     BeginCardContainer("TrustedDevicesCard", c, ImVec2(0, 0), 28.0f);
-    if (trustedDevices_.empty()) {
+    auto devTrusted = pairingManager_.getTrustedDevices();
+    if (devTrusted.empty()) {
         if (fontRegular_) ImGui::PushFont(fontRegular_);
         ImGui::TextColored(c.mute, "No trusted devices yet. Create a pairing code to add one.");
         if (fontRegular_) ImGui::PopFont();
     } else {
-        int toRemove = -1;
-        for (size_t i = 0; i < trustedDevices_.size(); ++i) {
+        std::string toRemoveId;
+        for (size_t i = 0; i < devTrusted.size(); ++i) {
             if (i > 0) {
                 ImGui::Separator();
                 ImGui::Spacing();
             }
             ImGui::BeginGroup();
             if (fontBold_) ImGui::PushFont(fontBold_);
-            ImGui::TextColored(c.ink, "%s", trustedDevices_[i].name.c_str());
+            ImGui::TextColored(c.ink, "%s", devTrusted[i].deviceName.c_str());
             if (fontBold_) ImGui::PopFont();
             if (fontSmall_) ImGui::PushFont(fontSmall_);
-            ImGui::TextColored(c.mute, "%s", trustedDevices_[i].lastSeen.c_str());
+            ImGui::TextColored(c.mute, "Device ID: %s", devTrusted[i].deviceId.substr(0, std::min(size_t{8}, devTrusted[i].deviceId.size())).c_str());
             if (fontSmall_) ImGui::PopFont();
             ImGui::EndGroup();
 
             float rowW = ImGui::GetContentRegionAvail().x;
             ImGui::SameLine(rowW - 380.0f);
-            std::string kbdId = "KbdSwitch_" + std::to_string(i);
-            if (renderM3Switch(kbdId.c_str(), "Mouse/Keys", &trustedDevices_[i].allowKbdMouse, nullptr, 140.0f)) {
+            std::string kbdId = "DevKbdSwitch_" + std::to_string(i);
+            bool kbdVal = devTrusted[i].permissions.allowKeyboard;
+            if (renderM3Switch(kbdId.c_str(), "Mouse/Keys", &kbdVal, nullptr, 140.0f)) {
+                auto p = devTrusted[i].permissions;
+                p.allowKeyboard = kbdVal;
+                p.allowMouse = kbdVal;
+                (void)pairingManager_.updateDevicePermissions(devTrusted[i].deviceId, p);
                 showToast("Permission updated");
             }
 
             ImGui::SameLine(0, 16.0f);
-            std::string padId = "PadSwitch_" + std::to_string(i);
-            if (renderM3Switch(padId.c_str(), "Gamepad", &trustedDevices_[i].allowController, nullptr, 130.0f)) {
+            std::string padId = "DevPadSwitch_" + std::to_string(i);
+            bool padVal = devTrusted[i].permissions.allowGamepad;
+            if (renderM3Switch(padId.c_str(), "Gamepad", &padVal, nullptr, 130.0f)) {
+                auto p = devTrusted[i].permissions;
+                p.allowGamepad = padVal;
+                (void)pairingManager_.updateDevicePermissions(devTrusted[i].deviceId, p);
                 showToast("Permission updated");
             }
 
             ImGui::SameLine(0, 16.0f);
             std::string remId = "Remove##" + std::to_string(i);
             if (renderPillButton(remId.c_str(), false, true, ImVec2(80.0f, 32.0f))) {
-                toRemove = static_cast<int>(i);
+                toRemoveId = devTrusted[i].deviceId;
             }
             ImGui::Spacing();
         }
 
-        if (toRemove >= 0 && toRemove < static_cast<int>(trustedDevices_.size())) {
-            std::string name = trustedDevices_[toRemove].name;
-            trustedDevices_.erase(trustedDevices_.begin() + toRemove);
-            showToast(name + " removed");
+        if (!toRemoveId.empty()) {
+            (void)pairingManager_.revokeDevice(toRemoveId);
+            showToast("Device removed");
         }
     }
     EndCardContainer();
@@ -3318,7 +3464,35 @@ void DesktopApplication::renderStreamingHud() {
                            networkBitrate_, networkRtt_, networkJitter_, networkLoss_);
         if (fontSmall_) ImGui::PopFont();
 
-        ImGui::SameLine(0, 20.0f);
+        ImGui::SameLine(0, 16.0f);
+
+        // Quality Profile pill button in HUD
+        const char* profName = "Adaptive";
+        auto curProf = qualityManager_.getProfile();
+        if (curProf == transport::qos::QualityProfile::Performance) profName = "Performance";
+        else if (curProf == transport::qos::QualityProfile::Balanced) profName = "Balanced";
+        else if (curProf == transport::qos::QualityProfile::Quality) profName = "Quality";
+
+        if (renderPillButton(profName, false, false, ImVec2(96.0f, 30.0f))) {
+            if (curProf == transport::qos::QualityProfile::Performance) {
+                qualityManager_.setProfile(transport::qos::QualityProfile::Balanced);
+                showToast("Profile set to Balanced (1080p60, 8 Mbps)");
+            } else if (curProf == transport::qos::QualityProfile::Balanced) {
+                qualityManager_.setProfile(transport::qos::QualityProfile::Quality);
+                showToast("Profile set to Quality (1080p60, 15 Mbps)");
+            } else if (curProf == transport::qos::QualityProfile::Quality) {
+                qualityManager_.setProfile(transport::qos::QualityProfile::Adaptive);
+                showToast("Profile set to Adaptive (Dynamic 2-20 Mbps)");
+            } else {
+                qualityManager_.setProfile(transport::qos::QualityProfile::Performance);
+                showToast("Profile set to Performance (720p60, 3.5 Mbps)");
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Switch Quality Profile (Performance -> Balanced -> Quality -> Adaptive)");
+        }
+
+        ImGui::SameLine(0, 8.0f);
 
         // Audio & Input badges
         renderChip("Audio 48k", 1);
@@ -3666,8 +3840,14 @@ void DesktopApplication::renderGuiSettingsDialog() {
         ImGui::Separator();
         ImGui::Spacing();
 
-        // 6. Maximum Video Bitrate Slider (M3)
-        renderM3Slider("MaxBitrateSlider", "Maximum video bitrate", &settingsMaxBitrateMbps_, 3, 40, "Mbps");
+        // 6. Maximum Video Bitrate Slider (M3: strictly 2 to 25 Mbps)
+        int prevBitrate = settingsMaxBitrateMbps_;
+        if (renderM3Slider("MaxBitrateSlider", "Maximum video bitrate", &settingsMaxBitrateMbps_, 2, 25, "Mbps")) {
+            if (settingsMaxBitrateMbps_ != prevBitrate) {
+                auto cfg = qualityManager_.getProfileConfig();
+                cfg.maxBitrateKbps = static_cast<uint32_t>(settingsMaxBitrateMbps_ * 1000);
+            }
+        }
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -3678,7 +3858,11 @@ void DesktopApplication::renderGuiSettingsDialog() {
         ImGui::TextColored(c.ink, "Frame rate");
         if (fontBold_) ImGui::PopFont();
         ImGui::Spacing();
-        renderM3SegmentedButton("FpsSeg", { "60 FPS (Ultra Smooth)", "30 FPS (Low Bandwidth)" }, &settingsFrameRate_);
+        if (renderM3SegmentedButton("FpsSeg", { "60 FPS (Ultra Smooth)", "30 FPS (Low Bandwidth)" }, &settingsFrameRate_)) {
+            auto cfg = qualityManager_.getProfileConfig();
+            cfg.targetFps = (settingsFrameRate_ == 0) ? 60 : 30;
+            showToast(settingsFrameRate_ == 0 ? "Target set to 60 FPS" : "Target set to 30 FPS");
+        }
 
         ImGui::Spacing();
         ImGui::Spacing();

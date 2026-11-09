@@ -130,6 +130,9 @@ public:
     // Direct3D 11 Win32 GUI
     [[nodiscard]] common::Result<void> runGuiLoop();
     void handleResize(uint32_t width, uint32_t height);
+    void toggleFullscreen();
+    [[nodiscard]] DesktopScreen getCurrentScreen() const noexcept { return currentScreen_; }
+    void navigateToScreen(DesktopScreen screen);
 #endif
 
 private:
@@ -158,7 +161,6 @@ private:
     void renderGuiSettingsDialog();
     void renderGuiToast();
 
-    void navigateToScreen(DesktopScreen screen);
     float getAnim(const std::string& key, float target, float speed = 12.0f);
 
     // GUI Visual Components
@@ -297,6 +299,9 @@ private:
     float streamSessionDuration_{0.0f};
     float hudHoverTimer_{0.0f};
     bool isStreamingFullscreen_{false};
+    WINDOWPLACEMENT prevWindowPlacement_{};
+    bool isFullscreenWindow_{false};
+    std::string clientConnectionError_;
 
     // Wi-Fi Screen Sharing & Pairing State
     bool isWifiSharingActive_{false};
