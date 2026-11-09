@@ -126,8 +126,8 @@ common::Result<void> CaptureEncodePipeline::initialize(
     colorConverter_ = std::make_unique<capture::ColorConverter>();
     (void)colorConverter_->initialize(sharedDevice, sharedContext, encConfig_.width, encConfig_.height);
 
-    // Initialize NVENC hardware encoder
-    auto encRes = encode::NvencVideoEncoder::create();
+    // Initialize video encoder (NVENC, AMF, QuickSync, or Software fallback)
+    auto encRes = encode::VideoEncoderFactory::createEncoder(encode::EncoderBackend::Auto, sharedDevice);
     if (!encRes) {
         return encRes.error();
     }

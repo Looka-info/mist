@@ -15,6 +15,10 @@ endif()
 
 add_library(mist_encode
     src/NvencVideoEncoder.cpp
+    src/AmfVideoEncoder.cpp
+    src/QsvVideoEncoder.cpp
+    src/SoftwareVideoEncoder.cpp
+    src/VideoEncoderFactory.cpp
 )
 
 target_include_directories(mist_encode PUBLIC

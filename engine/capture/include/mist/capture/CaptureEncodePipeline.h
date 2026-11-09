@@ -3,7 +3,7 @@
 #include "DxgiCaptureEngine.h"
 #include "SyntheticFrameGenerator.h"
 #include "ColorConverter.h"
-#include "mist/encode/NvencVideoEncoder.h"
+#include "mist/encode/VideoEncoderFactory.h"
 #include "mist/telemetry/Metrics.h"
 #include <functional>
 #include <thread>
@@ -80,7 +80,7 @@ private:
     std::unique_ptr<capture::DxgiCaptureEngine> captureEngine_;
     std::unique_ptr<capture::SyntheticFrameGenerator> syntheticGen_;
     std::unique_ptr<capture::ColorConverter> colorConverter_;
-    std::unique_ptr<encode::NvencVideoEncoder> encoder_;
+    std::unique_ptr<encode::IVideoEncoder> encoder_;
 
     std::atomic<bool> isRunning_{false};
     std::atomic<bool> stopRequested_{false};

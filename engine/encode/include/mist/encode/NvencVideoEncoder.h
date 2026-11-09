@@ -60,7 +60,7 @@ public:
         const EncodeConfig& config,
         Microsoft::WRL::ComPtr<ID3D11Device> device,
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> context = nullptr
-    );
+    ) override;
     void setDevice(
         Microsoft::WRL::ComPtr<ID3D11Device> device,
         Microsoft::WRL::ComPtr<ID3D11DeviceContext> context = nullptr

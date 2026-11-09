@@ -39,6 +39,7 @@ add_executable(mist_unit_tests
     TestPerGuestAdaptiveBitrate.cpp
     TestHostBandwidthBudget.cpp
     TestHevcCodec.cpp
+    TestEncoderFallbacks.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE
