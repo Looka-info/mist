@@ -68,7 +68,8 @@ class MistWebClient {
         this.sessionId = 'default-session';
         this.guestId = 'guest-' + Math.random().toString(36).substring(2, 9);
         this.renderFrameId = null;
-        this.statsInterval = null;
+        this.inputSequence = 0;
+        this.iceCandidateQueue = [];
 
         this.stats = {
             fps: 0,
@@ -108,6 +109,7 @@ class MistWebClient {
         window.addEventListener('mouseup', (e) => this.handleMouseButton(e, false));
         window.addEventListener('keydown', (e) => this.handleKeyboard(e, true));
         window.addEventListener('keyup', (e) => this.handleKeyboard(e, false));
+        window.addEventListener('wheel', (e) => this.handleMouseWheel(e), { passive: true });
     }
 
     showModal(show) {
@@ -147,6 +149,7 @@ class MistWebClient {
             { urls: 'stun:stun1.l.google.com:19302' }
         ];
 
+        this.iceCandidateQueue = [];
         this.pc = new RTCPeerConnection({ iceServers });
 
         this.pc.addTransceiver('video', { direction: 'recvonly' });
@@ -253,9 +256,29 @@ class MistWebClient {
                 this.updateStatus(msg.peer_connected ? 'Peer Ready' : 'Waiting for Host...', false);
                 break;
 
+            case 'peer_joined':
+                console.log('Peer joined session room:', msg.peer_role, msg.guest_id);
+                if (msg.peer_role === 'host') {
+                    this.updateStatus('Host Connected. Awaiting Offer...', false);
+                }
+                break;
+
             case 'offer':
                 console.log('Received SDP offer from host');
                 await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: msg.sdp }));
+
+                // Drain any queued ICE candidates received prior to setRemoteDescription
+                if (this.iceCandidateQueue && this.iceCandidateQueue.length > 0) {
+                    for (const cand of this.iceCandidateQueue) {
+                        try {
+                            await this.pc.addIceCandidate(cand);
+                        } catch (e) {
+                            console.warn('Failed to add queued ICE candidate:', e);
+                        }
+                    }
+                    this.iceCandidateQueue = [];
+                }
+
                 const answer = await this.pc.createAnswer();
                 await this.pc.setLocalDescription(answer);
 
@@ -270,10 +293,15 @@ class MistWebClient {
 
             case 'candidate':
                 if (msg.candidate && this.pc) {
-                    await this.pc.addIceCandidate(new RTCIceCandidate({
+                    const iceCandidate = new RTCIceCandidate({
                         candidate: msg.candidate,
                         sdpMid: msg.mid
-                    }));
+                    });
+                    if (!this.pc.remoteDescription || !this.pc.remoteDescription.type) {
+                        this.iceCandidateQueue.push(iceCandidate);
+                    } else {
+                        await this.pc.addIceCandidate(iceCandidate);
+                    }
                 }
                 break;
 
@@ -376,61 +404,131 @@ class MistWebClient {
         }, 1000);
     }
 
-    serializeInputPacket(type, payloadBuffer) {
-        const headerSize = 20;
+    serializeInputPacket(type, payloadBuffer, flags = 0) {
+        const headerSize = 48; // InputPacketHeader is exactly 48 bytes
         const totalSize = headerSize + payloadBuffer.byteLength;
         const buffer = new ArrayBuffer(totalSize);
         const view = new DataView(buffer);
 
-        view.setUint32(0, 0x4D495354, false); // "MIST" big-endian
-        view.setUint8(4, 1);                  // Version 1
-        view.setUint8(5, type);               // Event type
-        view.setUint16(6, 0, true);           // Reserved
-        view.setUint32(8, payloadBuffer.byteLength, true);
+        this.inputSequence = (this.inputSequence || 0) + 1;
 
-        const nowNs = BigInt(Math.round(performance.now() * 1000000));
-        view.setBigUint64(12, nowNs, true);
+        // Header (48 bytes, little-endian):
+        // uint16_t version (1)
+        view.setUint16(0, 1, true);
+        // uint8_t inputType
+        view.setUint8(2, type);
+        // uint8_t flags
+        view.setUint8(3, flags);
+        // uint32_t sequenceNumber
+        view.setUint32(4, this.inputSequence, true);
+
+        // uint64_t timestampNs
+        const perfNow = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const nowNs = BigInt(Math.round(perfNow * 1000000));
+        view.setBigUint64(8, nowNs, true);
+
+        // char sessionId[32] null-padded
+        const sessionBytes = new Uint8Array(buffer, 16, 32);
+        if (this.sessionId) {
+            const encoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+            if (encoder) {
+                const encoded = encoder.encode(this.sessionId);
+                sessionBytes.set(encoded.subarray(0, 31));
+            } else {
+                for (let i = 0; i < Math.min(this.sessionId.length, 31); i++) {
+                    sessionBytes[i] = this.sessionId.charCodeAt(i);
+                }
+            }
+        }
 
         new Uint8Array(buffer, headerSize).set(new Uint8Array(payloadBuffer));
         return buffer;
     }
 
-    sendInputPacket(type, payloadBuffer) {
+    sendInputPacket(type, payloadBuffer, flags = 0) {
         if (!this.inputChannel || this.inputChannel.readyState !== 'open') return;
-        const buffer = this.serializeInputPacket(type, payloadBuffer);
+        const buffer = this.serializeInputPacket(type, payloadBuffer, flags);
         this.inputChannel.send(buffer);
     }
 
     handleMouseMove(e) {
         if (!this.isConnected || !this.isPointerLocked) return;
-        const payload = new ArrayBuffer(8);
+        // MouseMovePayload (20 bytes)
+        const payload = new ArrayBuffer(20);
         const view = new DataView(payload);
-        view.setInt32(0, e.movementX, true);
-        view.setInt32(4, e.movementY, true);
-        this.sendInputPacket(1 /* MouseMove */, payload);
+        view.setInt32(0, e.movementX || 0, true);
+        view.setInt32(4, e.movementY || 0, true);
+        view.setUint8(8, 0); // isAbsolute = false (relative motion)
+        view.setUint8(9, 0); // reserved[0]
+        view.setUint8(10, 0); // reserved[1]
+        view.setUint8(11, 0); // reserved[2]
+
+        let normX = 0.0;
+        let normY = 0.0;
+        if (this.canvas && this.canvas.width > 0 && this.canvas.height > 0) {
+            const rect = this.canvas.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                normX = Math.max(0.0, Math.min(1.0, (e.clientX - rect.left) / rect.width));
+                normY = Math.max(0.0, Math.min(1.0, (e.clientY - rect.top) / rect.height));
+            }
+        }
+        view.setFloat32(12, normX, true);
+        view.setFloat32(16, normY, true);
+
+        this.sendInputPacket(2 /* InputType::MouseMoveEvent */, payload);
     }
 
     handleMouseButton(e, isDown) {
         if (!this.isConnected || !this.isPointerLocked) return;
-        const payload = new ArrayBuffer(2);
+        // MouseButtonPayload (4 bytes)
+        const payload = new ArrayBuffer(4);
         const view = new DataView(payload);
-        view.setUint8(0, e.button);
+
+        // Map DOM button (0=left, 1=middle, 2=right, 3=X1, 4=X2)
+        // to Mist MouseButton (1=Left, 2=Right, 3=Middle, 4=X1, 5=X2)
+        let btn = 1;
+        if (e.button === 0) btn = 1; // Left
+        else if (e.button === 1) btn = 3; // Middle
+        else if (e.button === 2) btn = 2; // Right
+        else if (e.button === 3) btn = 4; // X1
+        else if (e.button === 4) btn = 5; // X2
+
+        view.setUint8(0, btn);
         view.setUint8(1, isDown ? 1 : 0);
-        this.sendInputPacket(2 /* MouseButton */, payload);
+        view.setUint16(2, 0, true); // reserved
+
+        this.sendInputPacket(3 /* InputType::MouseButtonEvent */, payload);
     }
 
     handleKeyboard(e, isDown) {
         if (!this.isConnected || !this.isPointerLocked) return;
-        const payload = new ArrayBuffer(4);
+        // KeyPayload (12 bytes)
+        const payload = new ArrayBuffer(12);
         const view = new DataView(payload);
-        view.setUint16(0, e.keyCode || e.which, true);
-        view.setUint8(2, isDown ? 1 /* Press */ : 2 /* Release */);
-        view.setUint8(3, 0);
-        this.sendInputPacket(3 /* Keyboard */, payload);
+        const vk = e.keyCode || e.which || 0;
+        view.setUint32(0, vk, true);
+        view.setUint32(4, 0, true); // scanCode
+        view.setUint8(8, isDown ? 0 /* KeyAction::Press = 0 */ : 1 /* KeyAction::Release = 1 */);
+        view.setUint8(9, 0); // isExtended
+        view.setUint16(10, 0, true); // reserved
+
+        this.sendInputPacket(1 /* InputType::KeyEvent */, payload);
+    }
+
+    handleMouseWheel(e) {
+        if (!this.isConnected || !this.isPointerLocked) return;
+        // MouseWheelPayload (8 bytes)
+        const payload = new ArrayBuffer(8);
+        const view = new DataView(payload);
+        view.setInt32(0, Math.round(e.deltaX || 0), true);
+        view.setInt32(4, Math.round(e.deltaY || 0), true);
+
+        this.sendInputPacket(4 /* InputType::MouseWheelEvent */, payload);
     }
 
     disconnect() {
         this.isConnected = false;
+        this.iceCandidateQueue = [];
         if (this.renderFrameId) cancelAnimationFrame(this.renderFrameId);
         if (this.statsInterval) clearInterval(this.statsInterval);
 
