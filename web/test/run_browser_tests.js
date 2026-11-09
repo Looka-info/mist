@@ -59,5 +59,8 @@ WebCodecsCapabilityDetector.probeSupport().then(res => {
     assert.strictEqual(res.supported, false, 'Node environment correctly reports lack of browser window.VideoDecoder');
     assert.ok(res.reason.includes('WebCodecs API not available'), 'Reason matches expected secure context requirement');
     console.log('✓ Test 4 Passed: WebCodecs probe returns honest environment reporting.');
-    console.log('All WebRTC Browser Client unit tests passed cleanly.');
+    console.log('All WebRTC Browser Client unit tests passed cleanly.\n');
+
+    // Run WebRTC Integration Test Suite
+    require('./webrtc_integration_test.js');
 });
