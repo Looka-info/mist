@@ -19,17 +19,37 @@ target_link_libraries(mist_decode PUBLIC
     mist_encode
     mist_input
     mist_render
-    mist_platform_windows
     mist_telemetry
     mist_warnings
 )
 
 if (WIN32)
+    target_link_libraries(mist_decode PUBLIC
+        mist_platform_windows
+    )
     target_link_libraries(mist_decode PRIVATE
         d3d11
         dxgi
         mfplat
         mfuuid
         ole32
+    )
+elseif (APPLE)
+    target_link_libraries(mist_decode PRIVATE
+        "-framework VideoToolbox"
+        "-framework CoreMedia"
+        "-framework CoreVideo"
+        "-framework Foundation"
+    )
+elseif (ANDROID)
+    target_link_libraries(mist_decode PRIVATE
+        mediandk
+        android
+    )
+elseif (UNIX)
+    target_link_libraries(mist_decode PRIVATE
+        va
+        va-drm
+        drm
     )
 endif()
