@@ -100,7 +100,7 @@ fn test_host_approval_and_revocation() {
     let approved = pm.approve_request(req_id, DevicePermissions::all());
     assert!(approved.is_some());
     let (auth_token, name) = approved.unwrap();
-    assert!(auth_token.starts_with("auth-tok-"));
+    assert!(auth_token.starts_with("mist-auth-"));
     assert_eq!(name, "Trusted Laptop");
 
     // Device is now in trusted devices
@@ -152,19 +152,199 @@ fn test_remote_pairing_tcp_flow() {
 
     std::thread::sleep(Duration::from_millis(100));
 
-    let req = RemotePairingRequest {
-        client_device_id: "test-client-tcp".to_string(),
-        client_device_name: "TCP Client PC".to_string(),
-        pairing_code: code,
-        requested_permissions: 0x0F,
-    };
+    let req = RemotePairingRequest::new(
+        "test-client-tcp".to_string(),
+        "TCP Client PC".to_string(),
+        code,
+        0x0F,
+    );
 
     let resp = RemotePairingClient::submit_request("127.0.0.1", port, req, Duration::from_secs(5))
         .expect("Client should receive response");
 
     assert!(resp.success);
     assert_eq!(resp.status, "approved");
-    assert!(resp.auth_token.starts_with("auth-tok-"));
+    assert!(resp.auth_token.starts_with("mist-auth-"));
 
     server.stop();
+}
+
+#[test]
+fn test_temporary_invitation_tokens() {
+    let mut pm = PairingManager::new();
+    let session_id = "test-session-inv".to_string();
+
+    // 1. Generate single-use invitation token
+    let inv_token = pm.generate_invitation_token(
+        session_id.clone(),
+        10, // 10s TTL
+        true,
+        Some(DevicePermissions {
+            keyboard: false,
+            mouse: true,
+            gamepad: false,
+            audio: true,
+        }),
+    );
+    assert!(inv_token.starts_with("mist-inv-"));
+
+    // 2. Submit with invitation token
+    let req1 = RemotePairingRequest::new(
+        "guest-laptop".to_string(),
+        "Guest Laptop".to_string(),
+        inv_token.clone(),
+        0x0F, // Guest requests all, but invitation has preapproved
+    );
+    let req_id = pm.submit_pairing_request(&req1).expect("Invitation should be valid");
+    assert_eq!(pm.pending_requests().len(), 1);
+
+    // 3. Verify single-use consumption: submitting again fails
+    let req2 = RemotePairingRequest::new(
+        "guest-laptop-2".to_string(),
+        "Guest Laptop 2".to_string(),
+        inv_token.clone(),
+        0x0F,
+    );
+    let res2 = pm.submit_pairing_request(&req2);
+    assert!(res2.is_err(), "Single-use token should be consumed");
+
+    // 4. Host approves req_id
+    let approved = pm.approve_request(
+        req_id,
+        DevicePermissions {
+            keyboard: false,
+            mouse: true,
+            gamepad: false,
+            audio: true,
+        },
+    );
+    assert!(approved.is_some());
+}
+
+#[test]
+fn test_session_bound_authorization() {
+    let mut pm = PairingManager::new();
+    let session_id = "sess-alpha-77".to_string();
+    let code = pm.generate_pairing_code(session_id.clone());
+
+    let req_id = pm
+        .submit_request(
+            "client-valid".to_string(),
+            "Valid Guest PC".to_string(),
+            &code,
+            DevicePermissions::all(),
+        )
+        .expect("Submit should succeed");
+
+    let host_perms = DevicePermissions {
+        keyboard: true,
+        mouse: false,
+        gamepad: false,
+        audio: true,
+    };
+    let (auth_token, _) = pm.approve_request(req_id, host_perms.clone()).unwrap();
+
+    // 1. Valid authentication against bound session & bound client
+    let validated = pm.validate_session_auth(&session_id, "client-valid", &auth_token);
+    assert!(validated.is_ok());
+    assert_eq!(validated.unwrap(), host_perms);
+
+    // 2. Session mismatch fails
+    let wrong_session = pm.validate_session_auth("sess-beta-88", "client-valid", &auth_token);
+    assert!(wrong_session.is_err());
+    assert!(wrong_session.unwrap_err().to_string().contains("Session mismatch"));
+
+    // 3. Client identity mismatch fails
+    let wrong_client = pm.validate_session_auth(&session_id, "attacker-pc", &auth_token);
+    assert!(wrong_client.is_err());
+    assert!(wrong_client.unwrap_err().to_string().contains("Peer identity mismatch"));
+
+    // 4. Revocation invalidates token
+    assert!(pm.revoke_session_auth(&auth_token));
+    let after_revoke = pm.validate_session_auth(&session_id, "client-valid", &auth_token);
+    assert!(after_revoke.is_err());
+}
+
+#[test]
+fn test_replay_protection_nonce_and_timestamp() {
+    let mut pm = PairingManager::new();
+    let code = pm.generate_pairing_code("sess-replay-1".to_string());
+
+    let mut req = RemotePairingRequest::new(
+        "client-replay".to_string(),
+        "Replay Test PC".to_string(),
+        code.clone(),
+        0x0F,
+    );
+    let original_nonce = req.nonce.clone();
+
+    // 1. First submission succeeds
+    let res1 = pm.submit_pairing_request(&req);
+    assert!(res1.is_ok());
+
+    // 2. Same nonce submitted again triggers replay detection
+    req.pairing_code = pm.generate_pairing_code("sess-replay-2".to_string());
+    req.nonce = original_nonce; // Reused nonce
+    let res2 = pm.submit_pairing_request(&req);
+    assert!(res2.is_err());
+    assert!(res2.unwrap_err().to_string().contains("Replay attack detected"));
+
+    // 3. Expired timestamp (> 60s ago) triggers timestamp expiration
+    let mut stale_req = RemotePairingRequest::new(
+        "client-stale".to_string(),
+        "Stale PC".to_string(),
+        pm.generate_pairing_code("sess-replay-3".to_string()),
+        0x0F,
+    );
+    stale_req.timestamp = (chrono::Utc::now().timestamp() - 120) as u64; // 2 minutes ago
+    let res3 = pm.submit_pairing_request(&stale_req);
+    assert!(res3.is_err());
+    assert!(res3.unwrap_err().to_string().contains("expired"));
+}
+
+#[test]
+fn test_guest_identity_records_and_permissions() {
+    let mut pm = PairingManager::new();
+    let session_id = "sess-records-1".to_string();
+    let code = pm.generate_pairing_code(session_id.clone());
+
+    let req_id = pm
+        .submit_request(
+            "guest-record-pc".to_string(),
+            "Accounting Laptop".to_string(),
+            &code,
+            DevicePermissions::all(),
+        )
+        .unwrap();
+
+    let host_perms = DevicePermissions {
+        keyboard: false,
+        mouse: false,
+        gamepad: false,
+        audio: true, // View/Listen only
+    };
+    let (auth_tok, _) = pm.approve_request(req_id, host_perms.clone()).unwrap();
+
+    // Verify guest identity record created
+    let identities = pm.guest_identities();
+    let guest = identities
+        .iter()
+        .find(|g| g.device_id.0 == "guest-record-pc")
+        .expect("Guest record should exist");
+    assert_eq!(guest.device_name, "Accounting Laptop");
+    assert_eq!(guest.permissions, host_perms);
+    assert_eq!(guest.connection_count, 0);
+
+    // Authenticate session and check connection count increments
+    let perms = pm
+        .validate_session_auth(&session_id, "guest-record-pc", &auth_tok)
+        .expect("Session auth should succeed");
+    assert_eq!(perms, host_perms);
+
+    let updated_identities = pm.guest_identities();
+    let updated_guest = updated_identities
+        .iter()
+        .find(|g| g.device_id.0 == "guest-record-pc")
+        .unwrap();
+    assert_eq!(updated_guest.connection_count, 1);
 }

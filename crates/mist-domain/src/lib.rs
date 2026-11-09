@@ -77,6 +77,30 @@ pub struct DeviceEntry {
     pub is_trusted: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GuestIdentityRecord {
+    pub device_id: DeviceId,
+    pub device_name: String,
+    pub first_seen: String,
+    pub last_authenticated: String,
+    pub connection_count: u64,
+    pub permissions: DevicePermissions,
+    pub is_trusted: bool,
+    pub auth_token_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorizedSessionTicket {
+    pub auth_token_hash: String,
+    pub session_id: String,
+    pub client_device_id: String,
+    pub client_device_name: String,
+    pub issued_at: String,
+    pub expires_at: String,
+    pub permissions: DevicePermissions,
+    pub consumed: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConnectionState {
     Idle,

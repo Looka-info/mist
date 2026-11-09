@@ -205,12 +205,12 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             let win_thread = win_weak.clone();
 
             std::thread::spawn(move || {
-                let req = RemotePairingRequest {
-                    client_device_id: format!("client-{}", std::process::id()),
-                    client_device_name: "Mist Client PC".to_string(),
-                    pairing_code: code_str,
-                    requested_permissions: 0x0F,
-                };
+                let req = RemotePairingRequest::new(
+                    format!("client-{}", std::process::id()),
+                    "Mist Client PC".to_string(),
+                    code_str,
+                    0x0F,
+                );
 
                 let resp = RemotePairingClient::submit_request(
                     &host_str,
