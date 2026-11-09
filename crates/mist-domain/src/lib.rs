@@ -26,6 +26,8 @@ pub struct DevicePermissions {
     pub mouse: bool,
     pub gamepad: bool,
     pub audio: bool,
+    #[serde(default)]
+    pub clipboard: bool,
 }
 
 impl Default for DevicePermissions {
@@ -35,17 +37,49 @@ impl Default for DevicePermissions {
             mouse: false,
             gamepad: false,
             audio: true,
+            clipboard: false,
         }
     }
 }
 
 impl DevicePermissions {
+    pub fn view_only() -> Self {
+        Self {
+            keyboard: false,
+            mouse: false,
+            gamepad: false,
+            audio: true,
+            clipboard: false,
+        }
+    }
+
+    pub fn keyboard_and_mouse() -> Self {
+        Self {
+            keyboard: true,
+            mouse: true,
+            gamepad: false,
+            audio: true,
+            clipboard: false,
+        }
+    }
+
+    pub fn gamepad_only() -> Self {
+        Self {
+            keyboard: false,
+            mouse: false,
+            gamepad: true,
+            audio: true,
+            clipboard: false,
+        }
+    }
+
     pub fn all() -> Self {
         Self {
             keyboard: true,
             mouse: true,
             gamepad: true,
             audio: true,
+            clipboard: true,
         }
     }
 
@@ -55,6 +89,7 @@ impl DevicePermissions {
         if self.mouse { mask |= 0x02; }
         if self.gamepad { mask |= 0x04; }
         if self.audio { mask |= 0x08; }
+        if self.clipboard { mask |= 0x10; }
         mask
     }
 
@@ -64,7 +99,12 @@ impl DevicePermissions {
             mouse: (mask & 0x02) != 0,
             gamepad: (mask & 0x04) != 0,
             audio: (mask & 0x08) != 0,
+            clipboard: (mask & 0x10) != 0,
         }
+    }
+
+    pub fn is_view_only(&self) -> bool {
+        !self.keyboard && !self.mouse && !self.gamepad && !self.clipboard
     }
 }
 
@@ -117,6 +157,15 @@ pub struct ConnectedGuest {
     pub authenticated_at: String,
     pub permissions: DevicePermissions,
     pub token_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PermissionAuditEvent {
+    pub timestamp: String,
+    pub device_id: DeviceId,
+    pub action: String,
+    pub allowed: bool,
+    pub detail: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -191,4 +191,19 @@ impl DesktopController {
     pub fn get_active_connected_guests(&self) -> Vec<mist_domain::ConnectedGuest> {
         self.pairing_manager.lock().unwrap().active_connected_guests()
     }
+
+    #[allow(dead_code)]
+    pub fn update_guest_permissions(&self, device_id: &str, perms: DevicePermissions) -> bool {
+        self.pairing_manager.lock().unwrap().update_device_permissions(device_id, perms)
+    }
+
+    #[allow(dead_code)]
+    pub fn revoke_guest_permissions(&self, device_id: &str) -> bool {
+        self.pairing_manager.lock().unwrap().revoke_guest_permissions(device_id)
+    }
+
+    #[allow(dead_code)]
+    pub fn get_permission_audit_log(&self) -> Vec<mist_domain::PermissionAuditEvent> {
+        self.pairing_manager.lock().unwrap().permission_audit_log().to_vec()
+    }
 }

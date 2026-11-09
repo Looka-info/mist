@@ -6,7 +6,7 @@ use chrono::Utc;
 use mist_core::{MistError, Result};
 use mist_domain::{
     AuthorizedSessionTicket, BannedDeviceRecord, ConnectedGuest, DeviceEntry, DeviceId,
-    DevicePermissions, GuestIdentityRecord,
+    DevicePermissions, GuestIdentityRecord, PermissionAuditEvent,
 };
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -120,6 +120,7 @@ pub struct PairingManager {
     authorized_tickets: HashMap<String, AuthorizedSessionTicket>,
     seen_nonces: HashMap<String, Instant>,
     pending_requests: Vec<PendingRequest>,
+    permission_audit_log: Vec<PermissionAuditEvent>,
     next_request_id: u64,
 }
 
@@ -136,6 +137,7 @@ impl Default for PairingManager {
             authorized_tickets: HashMap::new(),
             seen_nonces: HashMap::new(),
             pending_requests: Vec::new(),
+            permission_audit_log: Vec::new(),
             next_request_id: 1,
         };
         mgr.load_trusted_devices();
@@ -769,14 +771,114 @@ impl PairingManager {
             updated = true;
         }
         if let Some(record) = self.guest_identities.get_mut(device_id) {
-            record.permissions = perms;
+            record.permissions = perms.clone();
             updated = true;
         }
+        // Update active in-flight session tickets immediately
+        for ticket in self.authorized_tickets.values_mut() {
+            if ticket.client_device_id == device_id {
+                ticket.permissions = perms.clone();
+                updated = true;
+            }
+        }
         if updated {
+            self.permission_audit_log.push(PermissionAuditEvent {
+                timestamp: Utc::now().to_rfc3339(),
+                device_id: DeviceId::new(device_id),
+                action: "updated".to_string(),
+                allowed: true,
+                detail: format!(
+                    "Permissions updated: K:{}, M:{}, G:{}, C:{}",
+                    perms.keyboard, perms.mouse, perms.gamepad, perms.clipboard
+                ),
+            });
             self.save_trusted_devices();
             self.save_guest_identities();
         }
         updated
+    }
+
+    /// Immediately revokes input privileges for a connected guest, resetting them to View-Only.
+    pub fn revoke_guest_permissions(&mut self, device_id: &str) -> bool {
+        let view_only = DevicePermissions::view_only();
+        let res = self.update_device_permissions(device_id, view_only);
+        if res {
+            self.permission_audit_log.push(PermissionAuditEvent {
+                timestamp: Utc::now().to_rfc3339(),
+                device_id: DeviceId::new(device_id),
+                action: "revoked_to_view_only".to_string(),
+                allowed: true,
+                detail: "Immediate revocation executed: set to view-only.".to_string(),
+            });
+        }
+        res
+    }
+
+    /// Host input boundary verification: independently verifies every incoming action
+    /// against the authoritative host permission state for that guest.
+    pub fn verify_guest_action(&mut self, device_id: &str, action: &str) -> bool {
+        if self.is_device_banned(device_id) {
+            self.permission_audit_log.push(PermissionAuditEvent {
+                timestamp: Utc::now().to_rfc3339(),
+                device_id: DeviceId::new(device_id),
+                action: format!("action_{}", action),
+                allowed: false,
+                detail: "Action denied: device is banned.".to_string(),
+            });
+            return false;
+        }
+
+        // Retrieve current active permissions for guest
+        let perms = self
+            .authorized_tickets
+            .values()
+            .find(|t| t.client_device_id == device_id)
+            .map(|t| t.permissions.clone())
+            .or_else(|| self.guest_identities.get(device_id).map(|g| g.permissions.clone()))
+            .or_else(|| self.trusted_devices.get(device_id).map(|d| d.permissions.clone()));
+
+        let perms = match perms {
+            Some(p) => p,
+            None => {
+                self.permission_audit_log.push(PermissionAuditEvent {
+                    timestamp: Utc::now().to_rfc3339(),
+                    device_id: DeviceId::new(device_id),
+                    action: format!("action_{}", action),
+                    allowed: false,
+                    detail: "Action denied: device identity not found in active sessions or ledger.".to_string(),
+                });
+                return false;
+            }
+        };
+
+        let allowed = match action {
+            "keyboard" | "key" => perms.keyboard,
+            "mouse" | "mouse_move" | "mouse_button" | "mouse_wheel" => perms.mouse,
+            "gamepad" => perms.gamepad,
+            "clipboard" => perms.clipboard,
+            "audio" => perms.audio,
+            _ => false,
+        };
+
+        if !allowed {
+            self.permission_audit_log.push(PermissionAuditEvent {
+                timestamp: Utc::now().to_rfc3339(),
+                device_id: DeviceId::new(device_id),
+                action: format!("action_{}", action),
+                allowed: false,
+                detail: format!("Action denied: host permission bit for '{}' is disabled.", action),
+            });
+        }
+
+        allowed
+    }
+
+    pub fn permission_audit_log(&self) -> &[PermissionAuditEvent] {
+        &self.permission_audit_log
+    }
+
+    pub fn clear_permission_audit_log(&mut self) {
+        self.permission_audit_log.clear();
     }
 }
 

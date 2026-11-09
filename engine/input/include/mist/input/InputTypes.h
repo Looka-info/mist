@@ -22,7 +22,8 @@ enum class InputType : uint8_t {
     PermissionRequest = 7,
     PermissionGrant = 8,
     PermissionRevoke = 9,
-    ResetState = 10
+    ResetState = 10,
+    ClipboardEvent = 11
 };
 
 [[nodiscard]] constexpr std::string_view inputTypeToString(InputType type) noexcept {
@@ -37,6 +38,7 @@ enum class InputType : uint8_t {
         case InputType::PermissionGrant:    return "PermissionGrant";
         case InputType::PermissionRevoke:   return "PermissionRevoke";
         case InputType::ResetState:         return "ResetState";
+        case InputType::ClipboardEvent:     return "ClipboardEvent";
         default:                            return "Unknown";
     }
 }

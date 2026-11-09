@@ -184,6 +184,7 @@ fn test_temporary_invitation_tokens() {
             mouse: true,
             gamepad: false,
             audio: true,
+            clipboard: false,
         }),
     );
     assert!(inv_token.starts_with("mist-inv-"));
@@ -216,6 +217,7 @@ fn test_temporary_invitation_tokens() {
             mouse: true,
             gamepad: false,
             audio: true,
+            clipboard: false,
         },
     );
     assert!(approved.is_some());
@@ -241,6 +243,7 @@ fn test_session_bound_authorization() {
         mouse: false,
         gamepad: false,
         audio: true,
+        clipboard: false,
     };
     let (auth_token, _) = pm.approve_request(req_id, host_perms.clone()).unwrap();
 
@@ -322,6 +325,7 @@ fn test_guest_identity_records_and_permissions() {
         mouse: false,
         gamepad: false,
         audio: true, // View/Listen only
+        clipboard: false,
     };
     let (auth_tok, _) = pm.approve_request(req_id, host_perms.clone()).unwrap();
 
@@ -452,6 +456,7 @@ fn test_active_connected_guests_inspection() {
                 mouse: false,
                 gamepad: true,
                 audio: true,
+                clipboard: false,
             },
         )
         .unwrap();
@@ -464,6 +469,7 @@ fn test_active_connected_guests_inspection() {
                 mouse: false,
                 gamepad: true,
                 audio: true,
+                clipboard: false,
             },
         )
         .unwrap();
@@ -480,4 +486,86 @@ fn test_active_connected_guests_inspection() {
     let remaining = pm.active_connected_guests();
     assert_eq!(remaining.len(), 1);
     assert_eq!(remaining[0].device_id.0, "guest-dev-beta");
+}
+
+#[test]
+fn test_per_guest_permission_models_and_clipboard() {
+    let view_only = DevicePermissions::view_only();
+    assert!(view_only.is_view_only());
+    assert_eq!(view_only.to_mask(), 0x08); // Audio enabled, 0 input features
+
+    let km = DevicePermissions::keyboard_and_mouse();
+    assert!(!km.is_view_only());
+    assert!(km.keyboard);
+    assert!(km.mouse);
+    assert!(!km.gamepad);
+    assert!(!km.clipboard);
+    assert_eq!(km.to_mask(), 0x01 | 0x02 | 0x08); // 0x0B
+
+    let gp = DevicePermissions::gamepad_only();
+    assert!(!gp.is_view_only());
+    assert!(!gp.keyboard);
+    assert!(!gp.mouse);
+    assert!(gp.gamepad);
+    assert_eq!(gp.to_mask(), 0x04 | 0x08); // 0x0C
+
+    let all = DevicePermissions::all();
+    assert_eq!(all.to_mask(), 0x01 | 0x02 | 0x04 | 0x08 | 0x10); // 0x1F
+
+    let roundtrip = DevicePermissions::from_mask(0x1F);
+    assert!(roundtrip.keyboard);
+    assert!(roundtrip.mouse);
+    assert!(roundtrip.gamepad);
+    assert!(roundtrip.audio);
+    assert!(roundtrip.clipboard);
+}
+
+#[test]
+fn test_runtime_permission_changes_and_immediate_revocation() {
+    let mut pm = PairingManager::new();
+    let session_id = "sess-perm-rt".to_string();
+
+    let code = pm.generate_pairing_code(session_id.clone());
+    let req_id = pm
+        .submit_request(
+            "guest-perm-client".to_string(),
+            "Perm Client".to_string(),
+            &code,
+            DevicePermissions::all(),
+        )
+        .unwrap();
+
+    // 1. Host grants all permissions initially
+    let (_auth_tok, _) = pm.approve_request(req_id, DevicePermissions::all()).unwrap();
+
+    // Host input layer verification
+    assert!(pm.verify_guest_action("guest-perm-client", "keyboard"));
+    assert!(pm.verify_guest_action("guest-perm-client", "mouse"));
+    assert!(pm.verify_guest_action("guest-perm-client", "gamepad"));
+    assert!(pm.verify_guest_action("guest-perm-client", "clipboard"));
+
+    // 2. Runtime permission change: switch guest to Gamepad-only
+    let gp_perms = DevicePermissions::gamepad_only();
+    assert!(pm.update_device_permissions("guest-perm-client", gp_perms));
+
+    // Keyboard, mouse, and clipboard immediately rejected
+    assert!(!pm.verify_guest_action("guest-perm-client", "keyboard"));
+    assert!(!pm.verify_guest_action("guest-perm-client", "mouse"));
+    assert!(!pm.verify_guest_action("guest-perm-client", "clipboard"));
+    // Gamepad remains allowed
+    assert!(pm.verify_guest_action("guest-perm-client", "gamepad"));
+
+    // 3. Immediate revocation to View-Only
+    assert!(pm.revoke_guest_permissions("guest-perm-client"));
+    assert!(!pm.verify_guest_action("guest-perm-client", "gamepad"));
+    assert!(!pm.verify_guest_action("guest-perm-client", "keyboard"));
+    assert!(!pm.verify_guest_action("guest-perm-client", "mouse"));
+    assert!(!pm.verify_guest_action("guest-perm-client", "clipboard"));
+
+    // 4. Permission audit log contains records
+    let log = pm.permission_audit_log();
+    assert!(!log.is_empty());
+    assert!(log.iter().any(|e| e.action == "updated"));
+    assert!(log.iter().any(|e| e.action == "revoked_to_view_only"));
+    assert!(log.iter().any(|e| !e.allowed));
 }

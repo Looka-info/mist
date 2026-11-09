@@ -81,3 +81,70 @@ TEST_F(InputPermissionTest, RateLimiter) {
     // 2001st event within 1 sec is rejected
     EXPECT_FALSE(pm.checkRateLimit());
 }
+
+TEST_F(InputPermissionTest, PerGuestPermissionsAndClipboard) {
+    InputPermissionManager pm("session-host");
+
+    // Guest 1: Keyboard and Mouse
+    pm.setGuestPermission("guest-km", InputPermissionManager::FEATURE_KEYBOARD | InputPermissionManager::FEATURE_MOUSE);
+
+    // Guest 2: Gamepad only (Player 2)
+    pm.setGuestPermission("guest-gamepad", InputPermissionManager::FEATURE_GAMEPAD);
+
+    // Guest 3: Clipboard only
+    pm.setGuestPermission("guest-clip", InputPermissionManager::FEATURE_CLIPBOARD);
+
+    // Guest 4: View-Only
+    pm.setGuestPermission("guest-view", InputPermissionManager::FEATURE_VIEW_ONLY);
+
+    // Verify Guest 1
+    EXPECT_TRUE(pm.isGuestInputAllowed("guest-km", InputType::KeyEvent));
+    EXPECT_TRUE(pm.isGuestInputAllowed("guest-km", InputType::MouseMoveEvent));
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-km", InputType::GamepadState));
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-km", InputType::ClipboardEvent));
+
+    // Verify Guest 2 (Gamepad only)
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-gamepad", InputType::KeyEvent));
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-gamepad", InputType::MouseMoveEvent));
+    EXPECT_TRUE(pm.isGuestInputAllowed("guest-gamepad", InputType::GamepadState));
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-gamepad", InputType::ClipboardEvent));
+
+    // Verify Guest 3 (Clipboard)
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-clip", InputType::KeyEvent));
+    EXPECT_TRUE(pm.isGuestInputAllowed("guest-clip", InputType::ClipboardEvent));
+
+    // Verify Guest 4 (View only)
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-view", InputType::KeyEvent));
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-view", InputType::MouseMoveEvent));
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-view", InputType::GamepadState));
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-view", InputType::ClipboardEvent));
+}
+
+TEST_F(InputPermissionTest, RuntimeRevocationAndAuditLog) {
+    InputPermissionManager pm("session-host");
+
+    pm.setGuestPermission("guest-active", InputPermissionManager::FEATURE_KEYBOARD | InputPermissionManager::FEATURE_MOUSE);
+    EXPECT_TRUE(pm.isGuestInputAllowed("guest-active", InputType::KeyEvent));
+
+    // Disallowed event triggers audit log
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-active", InputType::GamepadState));
+
+    // Runtime immediate revocation
+    pm.revokeGuest("guest-active");
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-active", InputType::KeyEvent));
+    EXPECT_FALSE(pm.isGuestInputAllowed("guest-active", InputType::MouseMoveEvent));
+
+    auto log = pm.getAuditLog();
+    EXPECT_GE(log.size(), 3u);
+    EXPECT_FALSE(log.empty());
+
+    // Audit record contains details
+    bool foundRevoked = false;
+    for (const auto& entry : log) {
+        if (entry.guestId == "guest-active" && entry.detail.find("Revoked") != std::string::npos) {
+            foundRevoked = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundRevoked);
+}
