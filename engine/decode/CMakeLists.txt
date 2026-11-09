@@ -4,6 +4,8 @@ add_library(mist_decode STATIC
     src/Av1Parser.cpp
     src/AnnexBReader.cpp
     src/D3D11VideoDecoder.cpp
+    src/CrossPlatformDecoders.cpp
+    src/GuestClientSession.cpp
     src/DecodePresentPipeline.cpp
 )
 
@@ -15,6 +17,7 @@ target_include_directories(mist_decode PUBLIC
 target_link_libraries(mist_decode PUBLIC
     mist_common
     mist_encode
+    mist_input
     mist_render
     mist_platform_windows
     mist_telemetry
