@@ -1,5 +1,8 @@
 add_library(mist_session
     src/SessionStateMachine.cpp
+    src/ReconnectionManager.cpp
+    src/SessionResumeManager.cpp
+    src/PowerStateManager.cpp
 )
 
 target_include_directories(mist_session PUBLIC

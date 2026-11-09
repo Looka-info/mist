@@ -46,6 +46,7 @@ add_executable(mist_unit_tests
     TestMultiGuestGamepad.cpp
     TestRelativeMouseAndClipboard.cpp
     TestWgcCapture.cpp
+    TestReconnectionAndRecovery.cpp
 )
 
 target_include_directories(mist_unit_tests PRIVATE
