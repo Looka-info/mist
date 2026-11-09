@@ -119,7 +119,6 @@ fn test_host_approval_and_revocation() {
 
 #[test]
 fn test_remote_pairing_tcp_flow() {
-    let port = 8099;
     let pm = Arc::new(Mutex::new(PairingManager::new()));
     let code = pm
         .lock()
@@ -131,9 +130,9 @@ fn test_remote_pairing_tcp_flow() {
     let pm_clone = pm.clone();
 
     let mut server = RemotePairingServer::new();
-    server
+    let bound_port = server
         .start(
-            port,
+            0,
             pm.clone(),
             Arc::new(move |req_id, _client_id, _client_name, _perms| {
                 // Simulate host approving the request
@@ -168,7 +167,7 @@ fn test_remote_pairing_tcp_flow() {
         0x0F,
     );
 
-    let resp = RemotePairingClient::submit_request("127.0.0.1", port, req, Duration::from_secs(5))
+    let resp = RemotePairingClient::submit_request("127.0.0.1", bound_port, req, Duration::from_secs(5))
         .expect("Client should receive response");
 
     assert!(resp.success);

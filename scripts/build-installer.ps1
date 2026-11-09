@@ -19,20 +19,31 @@ Write-Host "=======================================================" -Foreground
 Write-Host "   MIST - PRODUCTION INSTALLER AND RELEASE PACKAGING" -ForegroundColor Cyan
 Write-Host "=======================================================" -ForegroundColor Cyan
 
-# 1. Ensure build outputs exist
-$binaries = @(
-    "build\apps\host\mist_host.exe",
-    "build\apps\client\mist_client.exe",
-    "build\apps\desktop\mist_desktop.exe",
-    "bin\mist-signaling.exe"
+# 1. Ensure build outputs exist (supporting both single-config Ninja/GCC and multi-config MSVC layouts)
+function Resolve-CandidateBinary {
+    param([string]$Name, [string[]]$Candidates)
+    foreach ($c in $Candidates) {
+        if (Test-Path $c) {
+            return (Resolve-Path $c).Path
+        }
+    }
+    Write-Error "Required binary missing: $Name. Checked: $($Candidates -join ', '). Please build before packaging."
+    exit 1
+}
+
+$resolvedBinaries = @(
+    (Resolve-CandidateBinary -Name "mist_host.exe" -Candidates @("build\apps\host\mist_host.exe", "build\apps\host\Release\mist_host.exe")),
+    (Resolve-CandidateBinary -Name "mist_client.exe" -Candidates @("build\apps\client\mist_client.exe", "build\apps\client\Release\mist_client.exe")),
+    (Resolve-CandidateBinary -Name "mist_desktop.exe" -Candidates @("build\apps\desktop\mist_desktop.exe", "build\apps\desktop\Release\mist_desktop.exe", "target\release\mist-desktop.exe", "bin\mist_desktop.exe")),
+    (Resolve-CandidateBinary -Name "mist-signaling.exe" -Candidates @("bin\mist-signaling.exe", "target\release\mist-signaling.exe"))
 )
 
-$installerBinary = "build\apps\installer\MistSetup.exe"
-
-foreach ($b in $binaries) {
-    if (-not (Test-Path $b)) {
-        Write-Error "Required binary missing: $b. Please build before packaging."
-        exit 1
+$installerCandidates = @("build\apps\installer\MistSetup.exe", "build\apps\installer\Release\MistSetup.exe")
+$installerBinary = $null
+foreach ($c in $installerCandidates) {
+    if (Test-Path $c) {
+        $installerBinary = (Resolve-Path $c).Path
+        break
     }
 }
 
@@ -44,7 +55,7 @@ New-Item -ItemType Directory -Path "$DistDir\bin" -Force | Out-Null
 New-Item -ItemType Directory -Path "$DistDir\config" -Force | Out-Null
 
 Write-Host "Staging release binaries..." -ForegroundColor Green
-foreach ($b in $binaries) {
+foreach ($b in $resolvedBinaries) {
     Copy-Item -Path $b -Destination "$DistDir\bin" -Force
     Write-Host "  -> Staged: $(Split-Path $b -Leaf)" -ForegroundColor Gray
 }

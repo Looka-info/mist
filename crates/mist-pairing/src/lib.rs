@@ -1012,11 +1012,12 @@ impl RemotePairingServer {
         manager: Arc<Mutex<PairingManager>>,
         approval_cb: Arc<dyn Fn(u64, String, String, DevicePermissions) + Send + Sync>,
         decision_receiver: Arc<Mutex<HashMap<u64, Option<RemotePairingResponse>>>>,
-    ) -> Result<()> {
+    ) -> Result<u16> {
         let addr = format!("0.0.0.0:{}", port);
         let listener = TcpListener::bind(&addr).map_err(|e| {
             MistError::Io(format!("Failed to bind pairing server on {}: {}", addr, e))
         })?;
+        let bound_port = listener.local_addr().map(|a| a.port()).unwrap_or(port);
         listener
             .set_nonblocking(true)
             .map_err(|e| MistError::Io(e.to_string()))?;
@@ -1025,7 +1026,7 @@ impl RemotePairingServer {
         let is_running = self.is_running.clone();
 
         std::thread::spawn(move || {
-            tracing::info!("Remote pairing server listening on {}", addr);
+            tracing::info!("Remote pairing server listening on 0.0.0.0:{}", bound_port);
             while *is_running.lock().unwrap() {
                 match listener.accept() {
                     Ok((mut stream, _client_addr)) => {
@@ -1133,7 +1134,7 @@ impl RemotePairingServer {
             }
         });
 
-        Ok(())
+        Ok(bound_port)
     }
 
     pub fn stop(&mut self) {

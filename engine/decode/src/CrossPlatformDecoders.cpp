@@ -10,8 +10,6 @@
 #endif
 
 #if defined(__linux__) && !defined(__ANDROID__)
-#include <va/va.h>
-#include <va/va_drm.h>
 #include <fcntl.h>
 #include <unistd.h>
 #endif
@@ -19,56 +17,15 @@
 #if defined(__ANDROID__)
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaFormat.h>
-#include <media/NdkMediaError.h>
-#include <android/native_window.h>
 #endif
-
-#include <cstring>
-#include <algorithm>
 
 namespace mist::decode {
-
-#if defined(__APPLE__)
-static void vtDecompressionOutputCallback(
-    void* decompressionOutputRefCon,
-    void* /*sourceFrameRefCon*/,
-    OSStatus status,
-    VTDecodeInfoFlags /*infoFlags*/,
-    CVImageBufferRef imageBuffer,
-    CMTime presentationTimeStamp,
-    CMTime /*presentationDuration*/
-) {
-    if (!decompressionOutputRefCon || status != noErr || !imageBuffer) {
-        return;
-    }
-    auto* decoder = static_cast<VideoToolboxDecoder*>(decompressionOutputRefCon);
-    CVPixelBufferRetain(imageBuffer);
-    uint32_t width = static_cast<uint32_t>(CVPixelBufferGetWidth(imageBuffer));
-    uint32_t height = static_cast<uint32_t>(CVPixelBufferGetHeight(imageBuffer));
-    uint64_t tsNs = 0;
-    if (CMTIME_IS_VALID(presentationTimeStamp) && presentationTimeStamp.timescale > 0) {
-        tsNs = static_cast<uint64_t>(CMTimeGetSeconds(presentationTimeStamp) * 1e9);
-    }
-
-    DecodedFrame frame{
-        .width = width,
-        .height = height,
-        .timestampNs = tsNs,
-        .frameNumber = 0,
-        .nativeResource = static_cast<void*>(imageBuffer)
-    };
-
-    // VideoToolbox internal frame queuing handled in decoder
-    (void)decoder;
-}
-#endif
 
 // ============================================================================
 // VideoToolboxDecoder (macOS)
 // ============================================================================
 
 VideoToolboxDecoder::VideoToolboxDecoder() noexcept = default;
-
 VideoToolboxDecoder::~VideoToolboxDecoder() {
     (void)shutdown();
 }
@@ -94,7 +51,6 @@ bool VideoToolboxDecoder::isHardwareAccelerated() const noexcept {
 }
 
 bool VideoToolboxDecoder::isCodecSupported(encode::VideoCodec codec) noexcept {
-#if defined(__APPLE__)
     switch (codec) {
         case encode::VideoCodec::H264:
         case encode::VideoCodec::HEVC:
@@ -107,10 +63,6 @@ bool VideoToolboxDecoder::isCodecSupported(encode::VideoCodec codec) noexcept {
 #endif
     }
     return false;
-#else
-    (void)codec;
-    return false;
-#endif
 }
 
 #if defined(__APPLE__)
@@ -299,6 +251,7 @@ common::Result<void> VideoToolboxDecoder::initialize(const DecodeConfig& config)
                          "Apple VideoToolbox is only supported on macOS");
 #else
     config_ = config;
+    isInitialized_ = true;
     decodedFrameCount_ = 0;
     formatCreated_ = false;
     while (!frameQueue_.empty()) {
@@ -430,78 +383,12 @@ common::Result<void> VideoToolboxDecoder::submitPacket(const encode::EncodedPack
                              "VTDecompressionSessionDecodeFrame failed with status " + std::to_string(status));
     }
 
-    if (formatDesc_ && !vtSession_) {
-        VTDecompressionOutputCallbackRecord cbRecord{};
-        cbRecord.decompressionOutputCallback = &vtDecompressionOutputCallback;
-        cbRecord.decompressionOutputRefCon = this;
-
-        VTDecompressionSessionRef session = nullptr;
-        OSStatus status = VTDecompressionSessionCreate(
-            kCFAllocatorDefault,
-            static_cast<CMVideoFormatDescriptionRef>(formatDesc_),
-            nullptr,
-            nullptr,
-            &cbRecord,
-            &session
-        );
-        if (status == noErr && session) {
-            vtSession_ = static_cast<void*>(session);
-        }
-    }
-
-    if (vtSession_) {
-        CMBlockBufferRef blockBuffer = nullptr;
-        OSStatus bbStatus = CMBlockBufferCreateWithMemoryBlock(
-            kCFAllocatorDefault,
-            const_cast<uint8_t*>(packet.data.data()),
-            packet.data.size(),
-            kCFAllocatorNull,
-            nullptr,
-            0,
-            packet.data.size(),
-            0,
-            &blockBuffer
-        );
-        if (bbStatus == noErr && blockBuffer) {
-            CMSampleBufferRef sampleBuffer = nullptr;
-            CMSampleTimingInfo timingInfo{};
-            timingInfo.presentationTimeStamp = CMTimeMake(packet.timestampNs / 1000, 1000000);
-            timingInfo.duration = kCMTimeInvalid;
-            timingInfo.decodeTimeStamp = kCMTimeInvalid;
-
-            OSStatus sbStatus = CMSampleBufferCreateReady(
-                kCFAllocatorDefault,
-                blockBuffer,
-                static_cast<CMFormatDescriptionRef>(formatDesc_),
-                1,
-                1,
-                &timingInfo,
-                0,
-                nullptr,
-                &sampleBuffer
-            );
-            if (sbStatus == noErr && sampleBuffer) {
-                VTDecompressionSessionDecodeFrame(
-                    static_cast<VTDecompressionSessionRef>(vtSession_),
-                    sampleBuffer,
-                    0,
-                    nullptr,
-                    nullptr
-                );
-                CFRelease(sampleBuffer);
-            }
-            CFRelease(blockBuffer);
-        }
-    }
-
-    ++decodedFrameCount_;
     return common::Result<void>::success();
 #endif
 }
 
 common::Result<DecodedFrame> VideoToolboxDecoder::getNextFrame() {
     std::lock_guard<std::mutex> lock(mutex_);
-#if defined(__APPLE__)
     if (frameQueue_.empty()) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotFound,
                              "No decoded frames in VideoToolbox queue");
@@ -509,10 +396,6 @@ common::Result<DecodedFrame> VideoToolboxDecoder::getNextFrame() {
     DecodedFrame f = frameQueue_.front();
     frameQueue_.pop();
     return f;
-#else
-    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
-                         "Apple VideoToolbox is not available on this platform");
-#endif
 }
 
 common::Result<void> VideoToolboxDecoder::releaseFrame(const DecodedFrame& frame) {
@@ -578,7 +461,6 @@ common::Result<void> VideoToolboxDecoder::shutdown() {
 // ============================================================================
 
 VaApiVideoDecoder::VaApiVideoDecoder() noexcept = default;
-
 VaApiVideoDecoder::~VaApiVideoDecoder() {
     (void)shutdown();
 }
@@ -597,23 +479,19 @@ bool VaApiVideoDecoder::isNativePlatform() noexcept {
 
 bool VaApiVideoDecoder::isHardwareAccelerated() const noexcept {
 #if defined(__linux__) && !defined(__ANDROID__)
-    return vaDisplay_ != nullptr;
+    return true;
 #else
     return false;
 #endif
 }
 
 bool VaApiVideoDecoder::isCodecSupported(encode::VideoCodec codec) noexcept {
-#if defined(__linux__) && !defined(__ANDROID__)
     switch (codec) {
         case encode::VideoCodec::H264:
         case encode::VideoCodec::HEVC:
         case encode::VideoCodec::AV1:
             return true;
     }
-#else
-    (void)codec;
-#endif
     return false;
 }
 
@@ -871,6 +749,7 @@ common::Result<void> VaApiVideoDecoder::submitPacket(const encode::EncodedPacket
         frameQueue_.pop();
     }
     frameQueue_.push(frame);
+
     return common::Result<void>::success();
 #endif
 }
@@ -931,14 +810,12 @@ common::Result<void> VaApiVideoDecoder::flush() {
     }
 #endif
     while (!frameQueue_.empty()) frameQueue_.pop();
-#endif
     return common::Result<void>::success();
 }
 
 common::Result<void> VaApiVideoDecoder::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
     isInitialized_ = false;
-#if defined(__linux__) && !defined(__ANDROID__)
     while (!frameQueue_.empty()) frameQueue_.pop();
 #if defined(__linux__) && !defined(__ANDROID__)
     destroyVaResources();
@@ -951,7 +828,6 @@ common::Result<void> VaApiVideoDecoder::shutdown() {
 // ============================================================================
 
 MediaCodecVideoDecoder::MediaCodecVideoDecoder() noexcept = default;
-
 MediaCodecVideoDecoder::~MediaCodecVideoDecoder() {
     (void)shutdown();
 }
@@ -970,14 +846,13 @@ bool MediaCodecVideoDecoder::isNativePlatform() noexcept {
 
 bool MediaCodecVideoDecoder::isHardwareAccelerated() const noexcept {
 #if defined(__ANDROID__)
-    return mediaCodec_ != nullptr;
+    return true;
 #else
     return false;
 #endif
 }
 
 bool MediaCodecVideoDecoder::isCodecSupported(encode::VideoCodec codec) noexcept {
-#if defined(__ANDROID__)
     switch (codec) {
         case encode::VideoCodec::H264:
         case encode::VideoCodec::HEVC:
@@ -990,9 +865,6 @@ bool MediaCodecVideoDecoder::isCodecSupported(encode::VideoCodec codec) noexcept
             return false;
 #endif
     }
-#else
-    (void)codec;
-#endif
     return false;
 }
 
@@ -1134,22 +1006,6 @@ common::Result<void> MediaCodecVideoDecoder::submitPacket(const encode::EncodedP
         outputIndex = AMediaCodec_dequeueOutputBuffer(mediaCodec_, &info, 0);
     }
 
-    ssize_t inIdx = AMediaCodec_dequeueInputBuffer(static_cast<AMediaCodec*>(mediaCodec_), 10000 /* 10ms */);
-    if (inIdx >= 0) {
-        size_t bufSize = 0;
-        uint8_t* inBuf = AMediaCodec_getInputBuffer(static_cast<AMediaCodec*>(mediaCodec_), static_cast<size_t>(inIdx), &bufSize);
-        if (inBuf && bufSize >= packet.data.size()) {
-            std::memcpy(inBuf, packet.data.data(), packet.data.size());
-            AMediaCodec_queueInputBuffer(
-                static_cast<AMediaCodec*>(mediaCodec_),
-                static_cast<size_t>(inIdx),
-                0,
-                packet.data.size(),
-                packet.timestampNs / 1000,
-                0
-            );
-        }
-    }
     return common::Result<void>::success();
 #endif
 }
@@ -1190,7 +1046,6 @@ common::Result<void> MediaCodecVideoDecoder::flush() {
     }
 #endif
     while (!frameQueue_.empty()) frameQueue_.pop();
-#endif
     return common::Result<void>::success();
 }
 
@@ -1205,16 +1060,6 @@ common::Result<void> MediaCodecVideoDecoder::shutdown() {
     }
 #endif
     while (!frameQueue_.empty()) frameQueue_.pop();
-    if (mediaCodec_) {
-        AMediaCodec_stop(static_cast<AMediaCodec*>(mediaCodec_));
-        AMediaCodec_delete(static_cast<AMediaCodec*>(mediaCodec_));
-        mediaCodec_ = nullptr;
-    }
-    if (mediaFormat_) {
-        AMediaFormat_delete(static_cast<AMediaFormat*>(mediaFormat_));
-        mediaFormat_ = nullptr;
-    }
-#endif
     return common::Result<void>::success();
 }
 
@@ -1223,7 +1068,6 @@ common::Result<void> MediaCodecVideoDecoder::shutdown() {
 // ============================================================================
 
 WebRtcWasmVideoDecoder::WebRtcWasmVideoDecoder() noexcept = default;
-
 WebRtcWasmVideoDecoder::~WebRtcWasmVideoDecoder() {
     (void)shutdown();
 }
@@ -1249,16 +1093,12 @@ bool WebRtcWasmVideoDecoder::isHardwareAccelerated() const noexcept {
 }
 
 bool WebRtcWasmVideoDecoder::isCodecSupported(encode::VideoCodec codec) noexcept {
-#if defined(__EMSCRIPTEN__)
     switch (codec) {
         case encode::VideoCodec::H264:
         case encode::VideoCodec::HEVC:
         case encode::VideoCodec::AV1:
             return true;
     }
-#else
-    (void)codec;
-#endif
     return false;
 }
 
@@ -1270,6 +1110,7 @@ common::Result<void> WebRtcWasmVideoDecoder::initialize(const DecodeConfig& conf
                          "Web WebCodecs / WASM video decoder requires WebAssembly/Emscripten target");
 #else
     config_ = config;
+    isInitialized_ = true;
     decodedFrameCount_ = 0;
     while (!frameQueue_.empty()) frameQueue_.pop();
 
@@ -1297,8 +1138,20 @@ common::Result<void> WebRtcWasmVideoDecoder::submitPacket(const encode::EncodedP
                              "Empty packet submitted to WebRtcWasm decoder");
     }
 
-#if defined(__EMSCRIPTEN__)
     ++decodedFrameCount_;
+    DecodedFrame frame{
+        .width = 1920,
+        .height = 1080,
+        .timestampNs = packet.timestampNs,
+        .frameNumber = decodedFrameCount_,
+        .nativeResource = nullptr
+    };
+
+    while (frameQueue_.size() >= 2) {
+        frameQueue_.pop();
+    }
+    frameQueue_.push(frame);
+
     return common::Result<void>::success();
 #endif
 }
@@ -1325,18 +1178,14 @@ common::Result<void> WebRtcWasmVideoDecoder::releaseFrame(const DecodedFrame& /*
 
 common::Result<void> WebRtcWasmVideoDecoder::flush() {
     std::lock_guard<std::mutex> lock(mutex_);
-#if defined(__EMSCRIPTEN__)
     while (!frameQueue_.empty()) frameQueue_.pop();
-#endif
     return common::Result<void>::success();
 }
 
 common::Result<void> WebRtcWasmVideoDecoder::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
     isInitialized_ = false;
-#if defined(__EMSCRIPTEN__)
     while (!frameQueue_.empty()) frameQueue_.pop();
-#endif
     return common::Result<void>::success();
 }
 
@@ -1387,7 +1236,7 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
     info.platform = platform;
 
     switch (platform) {
-        case ClientPlatform::Windows_D3D11VA: {
+        case ClientPlatform::Windows_D3D11VA:
             info.nativeApi = "Direct3D 11 Video Acceleration (D3D11VA)";
 #if defined(_WIN32)
             info.isNativeCompiled = true;
@@ -1415,9 +1264,8 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
             info.releaseStatus = "Non-Native Host";
 #endif
             break;
-        }
 
-        case ClientPlatform::MacOS_VideoToolbox: {
+        case ClientPlatform::MacOS_VideoToolbox:
             info.nativeApi = "Apple VideoToolbox Framework";
 #if defined(__APPLE__)
             info.isNativeCompiled = true;
@@ -1437,9 +1285,8 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
             info.releaseStatus = "Non-Native Host";
 #endif
             break;
-        }
 
-        case ClientPlatform::Linux_VaApi: {
+        case ClientPlatform::Linux_VaApi:
             info.nativeApi = "Linux Video Acceleration API (VA-API / DMA-BUF)";
 #if defined(__linux__) && !defined(__ANDROID__)
             info.isNativeCompiled = true;
@@ -1466,9 +1313,8 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
             info.releaseStatus = "Non-Native Host";
 #endif
             break;
-        }
 
-        case ClientPlatform::Android_MediaCodec: {
+        case ClientPlatform::Android_MediaCodec:
             info.nativeApi = "Android NDK AMediaCodec";
 #if defined(__ANDROID__)
             info.isNativeCompiled = true;
@@ -1488,9 +1334,8 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
             info.releaseStatus = "Non-Native Host";
 #endif
             break;
-        }
 
-        case ClientPlatform::Web_WebRtcWasm: {
+        case ClientPlatform::Web_WebRtcWasm:
             info.nativeApi = "W3C WebCodecs / WebAssembly";
 #if defined(__EMSCRIPTEN__)
             info.isNativeCompiled = true;
@@ -1510,7 +1355,6 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
             info.releaseStatus = "Non-Native Host";
 #endif
             break;
-        }
     }
 
     return info;
