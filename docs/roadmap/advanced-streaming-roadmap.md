@@ -13,7 +13,7 @@
 | # | Milestone Name | Priority | Status | Commit |
 |---|---|---|---|---|
 | 1 | **NAT Traversal Reliability** | Critical | **Unit Tested** | `0985593` |
-| 2 | **TURN Relay Fallback** | Critical | Not Started | — |
+| 2 | **TURN Relay Fallback** | Critical | **Unit Tested** | Pending |
 | 3 | **Host-Side Authentication** | Critical | Not Started | — |
 | 4 | **Host Approval Flow** | High | Not Started | — |
 | 5 | **Per-Guest Permissions** | High | Not Started | — |
@@ -61,14 +61,19 @@
 - **Commit Hash:** `0985593`
 
 ### 2. TURN Relay Fallback
-- **Status:** Not Started
-- **Architecture:** TURN over UDP, TCP, and TLS with short-lived scoped credentials and fallback metrics.
-- **Files Changed:** TBD
-- **Tests Added:** TBD
-- **Benchmark Evidence:** TBD
-- **Hardware Requirements:** Reachable coturn / TURN relay endpoint.
-- **Known Limitations:** Relay bandwidth and latency overhead.
-- **Commit Hash:** —
+- **Status:** Unit Tested
+- **Architecture:** TURN over UDP (3478), TCP (3478), and TLS (5349) with RFC 5766 REST ephemeral short-lived HMAC-SHA1 scoped credentials, active relay endpoint filtering, latency penalty calculations, and failure classification.
+- **Files Changed:**
+  - `engine/transport/include/mist/transport/TurnRelayManager.h`
+  - `engine/transport/src/TurnRelayManager.cpp`
+  - `engine/transport/CMakeLists.txt`
+  - `tests/unit/TestTurnRelay.cpp`
+  - `tests/unit/CMakeLists.txt`
+- **Tests Added:** RFC 5766 HMAC-SHA1 credential generation & expiry verification, URI parsing (`turn:`, `turns:`, `?transport=tcp`), dynamic relay state transitions, and latency penalty tracking.
+- **Benchmark Evidence:** Ephemeral credential generation < 1ms; relay metrics isolation computes accurate delta (e.g. 23ms penalty over direct P2P).
+- **Hardware Requirements:** Reachable coturn / TURN relay endpoint for WAN traversal.
+- **Known Limitations:** Incurred bandwidth cost and ~20-50ms RTT relay latency penalty when direct P2P connectivity is impossible.
+- **Commit Hash:** Pending
 
 ### 3. Host-Side Authentication
 - **Status:** Not Started

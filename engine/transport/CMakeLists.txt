@@ -74,6 +74,7 @@ add_library(mist_transport STATIC
     src/TransportStatistics.cpp
     src/WebRtcTransport.cpp
     src/NatTraversal.cpp
+    src/TurnRelayManager.cpp
     src/qos/NetworkQualityEstimator.cpp
     src/qos/CongestionController.cpp
     src/qos/QualityAdaptationManager.cpp
@@ -83,6 +84,9 @@ add_library(mist_transport STATIC
 target_include_directories(mist_transport PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
+)
+target_include_directories(mist_transport PRIVATE
+    ${mbedtls_SOURCE_DIR}/include
 )
 
 add_library(mist_transport_warning_overrides INTERFACE)
