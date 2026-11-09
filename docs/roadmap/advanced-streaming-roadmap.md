@@ -13,7 +13,7 @@
 | # | Milestone Name | Priority | Status | Commit |
 |---|---|---|---|---|
 | 1 | **NAT Traversal Reliability** | Critical | **Unit Tested** | `0985593` |
-| 2 | **TURN Relay Fallback** | Critical | **Unit Tested** | Pending |
+| 2 | **TURN Relay Fallback** | Critical | **Unit Tested** | `1b6b2bd` |
 | 3 | **Host-Side Authentication** | Critical | Not Started | — |
 | 4 | **Host Approval Flow** | High | Not Started | — |
 | 5 | **Per-Guest Permissions** | High | Not Started | — |
@@ -73,7 +73,7 @@
 - **Benchmark Evidence:** Ephemeral credential generation < 1ms; relay metrics isolation computes accurate delta (e.g. 23ms penalty over direct P2P).
 - **Hardware Requirements:** Reachable coturn / TURN relay endpoint for WAN traversal.
 - **Known Limitations:** Incurred bandwidth cost and ~20-50ms RTT relay latency penalty when direct P2P connectivity is impossible.
-- **Commit Hash:** Pending
+- **Commit Hash:** `1b6b2bd`
 
 ### 3. Host-Side Authentication
 - **Status:** Not Started
