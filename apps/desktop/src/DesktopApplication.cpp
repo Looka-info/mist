@@ -227,7 +227,13 @@ static void BeginCardContainer(const char* id, const mist::desktop::tokens::Them
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, rounding);
     ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 22.0f));
-    ImGui::BeginChild(id, size, true);
+
+    ImGuiChildFlags childFlags = ImGuiChildFlags_Borders;
+    if (size.y <= 0.0f) {
+        childFlags |= ImGuiChildFlags_AutoResizeY;
+    }
+    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+    ImGui::BeginChild(id, size, childFlags, windowFlags);
 }
 
 static void EndCardContainer() {
@@ -2216,7 +2222,7 @@ void DesktopApplication::renderGuiHomeScreen() {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 22.0f));
 
         std::string tileId = "Tile" + std::to_string(i);
-        ImGui::BeginChild(tileId.c_str(), ImVec2(tileW, 152.0f), true);
+        ImGui::BeginChild(tileId.c_str(), ImVec2(tileW, 152.0f), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
         // 52x52 rounded 16px mint icon box
         ImVec2 curPos = ImGui::GetCursorScreenPos();
@@ -3108,7 +3114,7 @@ void DesktopApplication::renderGuiErrorScreen() {
     if (!activeError_.suggestion.empty()) {
         ImGui::PushStyleColor(ImGuiCol_ChildBg, c.ct2);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 16.0f);
-        ImGui::BeginChild("RecoveryBox", ImVec2(0, 110.0f), false);
+        ImGui::BeginChild("RecoveryBox", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
         ImGui::Spacing();
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 16.0f);
         if (fontBold_) ImGui::PushFont(fontBold_);
