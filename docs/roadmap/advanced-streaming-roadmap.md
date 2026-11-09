@@ -12,7 +12,7 @@
 
 | # | Milestone Name | Priority | Status | Commit |
 |---|---|---|---|---|
-| 1 | **NAT Traversal Reliability** | Critical | **Unit Tested** | Pending |
+| 1 | **NAT Traversal Reliability** | Critical | **Unit Tested** | `0985593` |
 | 2 | **TURN Relay Fallback** | Critical | Not Started | — |
 | 3 | **Host-Side Authentication** | Critical | Not Started | — |
 | 4 | **Host Approval Flow** | High | Not Started | — |
@@ -58,7 +58,7 @@
 - **Benchmark Evidence:** Direct P2P RTT <= 3.5ms on 5GHz 802.11ax; direct UDP socket establishment without router relay.
 - **Hardware Requirements:** IPv4/IPv6 dual-stack or single-stack network adapter; UPnP/NAT-PMP enabled gateway (optional).
 - **Known Limitations:** Symmetric NATs (e.g. mobile hotspot carrier-grade NAT) require TURN relay fallback (addressed in Milestone 2).
-- **Commit Hash:** Pending
+- **Commit Hash:** `0985593`
 
 ### 2. TURN Relay Fallback
 - **Status:** Not Started
