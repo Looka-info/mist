@@ -1104,27 +1104,31 @@ bool WebRtcWasmVideoDecoder::isCodecSupported(encode::VideoCodec codec) noexcept
 
 common::Result<void> WebRtcWasmVideoDecoder::initialize(const DecodeConfig& config) {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__EMSCRIPTEN__)
+    (void)config;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Web WebCodecs / WASM video decoder requires WebAssembly/Emscripten target");
+#else
     config_ = config;
     isInitialized_ = true;
     decodedFrameCount_ = 0;
     while (!frameQueue_.empty()) frameQueue_.pop();
 
-#if defined(__EMSCRIPTEN__)
     MIST_LOG_INFO(common::SubsystemId::Decode,
                   "Browser WebCodecs hardware video decoder initialized for " +
                   std::string(config_.codec == encode::VideoCodec::AV1 ? "av01" :
                               config_.codec == encode::VideoCodec::HEVC ? "hvc1" : "avc1"));
-#else
-    MIST_LOG_INFO(common::SubsystemId::Decode,
-                  "Web WebCodecs / WebAssembly video decoder initialized (software test harness) for " +
-                  std::string(config_.codec == encode::VideoCodec::AV1 ? "av01" :
-                              config_.codec == encode::VideoCodec::HEVC ? "hvc1" : "avc1"));
-#endif
     return common::Result<void>::success();
+#endif
 }
 
 common::Result<void> WebRtcWasmVideoDecoder::submitPacket(const encode::EncodedPacket& packet) {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__EMSCRIPTEN__)
+    (void)packet;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Web WebCodecs / WASM video decoder requires WebAssembly/Emscripten target");
+#else
     if (!isInitialized_) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotInitialized,
                              "WebRtcWasm decoder not initialized");
@@ -1149,10 +1153,15 @@ common::Result<void> WebRtcWasmVideoDecoder::submitPacket(const encode::EncodedP
     frameQueue_.push(frame);
 
     return common::Result<void>::success();
+#endif
 }
 
 common::Result<DecodedFrame> WebRtcWasmVideoDecoder::getNextFrame() {
     std::lock_guard<std::mutex> lock(mutex_);
+#if !defined(__EMSCRIPTEN__)
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Web WebCodecs / WASM video decoder requires WebAssembly/Emscripten target");
+#else
     if (frameQueue_.empty()) {
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotFound,
                              "No decoded frames in WebRtcWasm queue");
@@ -1160,6 +1169,7 @@ common::Result<DecodedFrame> WebRtcWasmVideoDecoder::getNextFrame() {
     DecodedFrame f = frameQueue_.front();
     frameQueue_.pop();
     return f;
+#endif
 }
 
 common::Result<void> WebRtcWasmVideoDecoder::releaseFrame(const DecodedFrame& /*frame*/) {
@@ -1230,16 +1240,29 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
             info.nativeApi = "Direct3D 11 Video Acceleration (D3D11VA)";
 #if defined(_WIN32)
             info.isNativeCompiled = true;
-            info.isHardwareAccelerated = true;
-            info.releaseStatus = "Production Qualified";
+            {
+                auto cap = D3D11VideoDecoder::queryCapabilities();
+                info.isHardwareAccelerated = cap.isHardwareAccelerated;
+                info.supportsH264 = cap.supportsH264;
+                info.supportsHevc = cap.supportsHevc;
+                info.supportsAv1 = cap.supportsAv1;
+                if (cap.isHardwareAccelerated) {
+                    info.qualificationState = DecoderQualificationState::HardwareAvailable;
+                    info.releaseStatus = "Hardware Available (" + cap.deviceName + ")";
+                } else {
+                    info.qualificationState = DecoderQualificationState::NativeApiAvailable;
+                    info.releaseStatus = "Native API Available (Software Fallback)";
+                }
+            }
 #else
             info.isNativeCompiled = false;
             info.isHardwareAccelerated = false;
-            info.releaseStatus = "Cross-Platform Stub";
-#endif
             info.supportsH264 = true;
             info.supportsHevc = true;
             info.supportsAv1 = true;
+            info.qualificationState = DecoderQualificationState::NotBuilt;
+            info.releaseStatus = "Non-Native Host";
+#endif
             break;
 
         case ClientPlatform::MacOS_VideoToolbox:
@@ -1247,31 +1270,48 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
 #if defined(__APPLE__)
             info.isNativeCompiled = true;
             info.isHardwareAccelerated = true;
-            info.releaseStatus = "Production Qualified";
-#else
-            info.isNativeCompiled = false;
-            info.isHardwareAccelerated = false;
-            info.releaseStatus = "Compile Verified / CI Qualified";
-#endif
             info.supportsH264 = true;
             info.supportsHevc = true;
             info.supportsAv1 = true;
+            info.qualificationState = DecoderQualificationState::NativeApiAvailable;
+            info.releaseStatus = "Native API Available (Apple VideoToolbox)";
+#else
+            info.isNativeCompiled = false;
+            info.isHardwareAccelerated = false;
+            info.supportsH264 = true;
+            info.supportsHevc = true;
+            info.supportsAv1 = true;
+            info.qualificationState = DecoderQualificationState::NotBuilt;
+            info.releaseStatus = "Non-Native Host";
+#endif
             break;
 
         case ClientPlatform::Linux_VaApi:
             info.nativeApi = "Linux Video Acceleration API (VA-API / DMA-BUF)";
 #if defined(__linux__) && !defined(__ANDROID__)
             info.isNativeCompiled = true;
-            info.isHardwareAccelerated = true;
-            info.releaseStatus = "Production Qualified";
-#else
-            info.isNativeCompiled = false;
-            info.isHardwareAccelerated = false;
-            info.releaseStatus = "Compile Verified / CI Qualified";
-#endif
             info.supportsH264 = true;
             info.supportsHevc = true;
             info.supportsAv1 = true;
+            // Probe DRM render node
+            if (access("/dev/dri/renderD128", R_OK | W_OK) == 0 || access("/dev/dri/card0", R_OK | W_OK) == 0) {
+                info.isHardwareAccelerated = true;
+                info.qualificationState = DecoderQualificationState::HardwareAvailable;
+                info.releaseStatus = "DRM Render Node Accessible";
+            } else {
+                info.isHardwareAccelerated = false;
+                info.qualificationState = DecoderQualificationState::NativeApiAvailable;
+                info.releaseStatus = "DRM Node Unavailable";
+            }
+#else
+            info.isNativeCompiled = false;
+            info.isHardwareAccelerated = false;
+            info.supportsH264 = true;
+            info.supportsHevc = true;
+            info.supportsAv1 = true;
+            info.qualificationState = DecoderQualificationState::NotBuilt;
+            info.releaseStatus = "Non-Native Host";
+#endif
             break;
 
         case ClientPlatform::Android_MediaCodec:
@@ -1279,15 +1319,20 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
 #if defined(__ANDROID__)
             info.isNativeCompiled = true;
             info.isHardwareAccelerated = true;
-            info.releaseStatus = "Production Qualified";
-#else
-            info.isNativeCompiled = false;
-            info.isHardwareAccelerated = false;
-            info.releaseStatus = "NDK Integration Verified";
-#endif
             info.supportsH264 = true;
             info.supportsHevc = true;
             info.supportsAv1 = true;
+            info.qualificationState = DecoderQualificationState::NativeApiAvailable;
+            info.releaseStatus = "Native NDK AMediaCodec Available";
+#else
+            info.isNativeCompiled = false;
+            info.isHardwareAccelerated = false;
+            info.supportsH264 = true;
+            info.supportsHevc = true;
+            info.supportsAv1 = true;
+            info.qualificationState = DecoderQualificationState::NotBuilt;
+            info.releaseStatus = "Non-Native Host";
+#endif
             break;
 
         case ClientPlatform::Web_WebRtcWasm:
@@ -1295,15 +1340,20 @@ PlatformCapabilityInfo VideoDecoderFactory::getPlatformCapability(ClientPlatform
 #if defined(__EMSCRIPTEN__)
             info.isNativeCompiled = true;
             info.isHardwareAccelerated = true;
-            info.releaseStatus = "Production Qualified";
-#else
-            info.isNativeCompiled = false;
-            info.isHardwareAccelerated = false;
-            info.releaseStatus = "WebCodecs Interop Qualified";
-#endif
             info.supportsH264 = true;
             info.supportsHevc = true;
             info.supportsAv1 = true;
+            info.qualificationState = DecoderQualificationState::NativeApiAvailable;
+            info.releaseStatus = "W3C WebCodecs WASM Available";
+#else
+            info.isNativeCompiled = false;
+            info.isHardwareAccelerated = false;
+            info.supportsH264 = true;
+            info.supportsHevc = true;
+            info.supportsAv1 = true;
+            info.qualificationState = DecoderQualificationState::NotBuilt;
+            info.releaseStatus = "Non-Native Host";
+#endif
             break;
     }
 

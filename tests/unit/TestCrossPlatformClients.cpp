@@ -146,18 +146,25 @@ TEST(WebRtcWasmTest, WebCodecsPipeline) {
         .preferHardwareDecoding = true,
         .lowLatencyTuning = true
     };
-    EXPECT_TRUE(decoder->initialize(cfg).hasValue());
 
-    EncodedPacket pkt{};
-    pkt.data = {0x0A, 0x08, 0x00, 0x00};
-    pkt.timestampNs = 9999ULL;
-    EXPECT_TRUE(decoder->submitPacket(pkt).hasValue());
-
-    auto frameRes = decoder->getNextFrame();
-    ASSERT_TRUE(frameRes.hasValue());
-    EXPECT_TRUE(decoder->flush().hasValue());
-    EXPECT_TRUE(decoder->shutdown().hasValue());
+    if (WebRtcWasmVideoDecoder::isNativePlatform()) {
+        auto initRes = decoder->initialize(cfg);
+        if (initRes.hasValue()) {
+            EXPECT_TRUE(decoder->isInitialized());
+            EncodedPacket emptyPkt{};
+            EXPECT_FALSE(decoder->submitPacket(emptyPkt).hasValue());
+            EXPECT_TRUE(decoder->flush().hasValue());
+            EXPECT_TRUE(decoder->shutdown().hasValue());
+        }
+    } else {
+        auto initRes = decoder->initialize(cfg);
+        EXPECT_FALSE(initRes.hasValue());
+        EXPECT_EQ(initRes.error().code(), common::ErrorCode::NotImplemented);
+        EXPECT_FALSE(decoder->isInitialized());
+        EXPECT_TRUE(decoder->shutdown().hasValue());
+    }
 }
+
 
 TEST(GuestClientSessionTest, LifecycleAndVideoIngestion) {
     GuestClientConfig config{
@@ -318,41 +325,66 @@ TEST(PlatformCapabilityMatrixTest, CapabilityDiscoveryAcrossAllPlatforms) {
     EXPECT_EQ(win.nativeApi, "Direct3D 11 Video Acceleration (D3D11VA)");
 #if defined(_WIN32)
     EXPECT_TRUE(win.isNativeCompiled);
-    EXPECT_TRUE(win.isHardwareAccelerated);
-    EXPECT_EQ(win.releaseStatus, "Production Qualified");
+    EXPECT_GE(static_cast<uint8_t>(win.qualificationState),
+              static_cast<uint8_t>(DecoderQualificationState::NativeApiAvailable));
+#else
+    EXPECT_FALSE(win.isNativeCompiled);
+    EXPECT_EQ(win.qualificationState, DecoderQualificationState::NotBuilt);
 #endif
-    EXPECT_TRUE(win.supportsH264);
-    EXPECT_TRUE(win.supportsHevc);
-    EXPECT_TRUE(win.supportsAv1);
 
     // 2. macOS VideoToolbox
     auto mac = matrix[1];
     EXPECT_EQ(mac.platform, ClientPlatform::MacOS_VideoToolbox);
     EXPECT_EQ(mac.nativeApi, "Apple VideoToolbox Framework");
-    EXPECT_TRUE(mac.supportsH264);
-    EXPECT_TRUE(mac.supportsHevc);
-    EXPECT_TRUE(mac.supportsAv1);
+#if defined(__APPLE__)
+    EXPECT_TRUE(mac.isNativeCompiled);
+    EXPECT_GE(static_cast<uint8_t>(mac.qualificationState),
+              static_cast<uint8_t>(DecoderQualificationState::NativeApiAvailable));
+#else
+    EXPECT_FALSE(mac.isNativeCompiled);
+    EXPECT_EQ(mac.qualificationState, DecoderQualificationState::NotBuilt);
+#endif
 
     // 3. Linux VA-API
     auto linuxCap = matrix[2];
     EXPECT_EQ(linuxCap.platform, ClientPlatform::Linux_VaApi);
     EXPECT_EQ(linuxCap.nativeApi, "Linux Video Acceleration API (VA-API / DMA-BUF)");
-    EXPECT_TRUE(linuxCap.supportsH264);
-    EXPECT_TRUE(linuxCap.supportsHevc);
-    EXPECT_TRUE(linuxCap.supportsAv1);
+#if defined(__linux__) && !defined(__ANDROID__)
+    EXPECT_TRUE(linuxCap.isNativeCompiled);
+    EXPECT_GE(static_cast<uint8_t>(linuxCap.qualificationState),
+              static_cast<uint8_t>(DecoderQualificationState::NativeApiAvailable));
+#else
+    EXPECT_FALSE(linuxCap.isNativeCompiled);
+    EXPECT_EQ(linuxCap.qualificationState, DecoderQualificationState::NotBuilt);
+#endif
 
     // 4. Android AMediaCodec
     auto androidCap = matrix[3];
     EXPECT_EQ(androidCap.platform, ClientPlatform::Android_MediaCodec);
     EXPECT_EQ(androidCap.nativeApi, "Android NDK AMediaCodec");
-    EXPECT_TRUE(androidCap.supportsH264);
+#if defined(__ANDROID__)
+    EXPECT_TRUE(androidCap.isNativeCompiled);
+    EXPECT_GE(static_cast<uint8_t>(androidCap.qualificationState),
+              static_cast<uint8_t>(DecoderQualificationState::NativeApiAvailable));
+#else
+    EXPECT_FALSE(androidCap.isNativeCompiled);
+    EXPECT_EQ(androidCap.qualificationState, DecoderQualificationState::NotBuilt);
+#endif
 
     // 5. Web WebCodecs
     auto webCap = matrix[4];
     EXPECT_EQ(webCap.platform, ClientPlatform::Web_WebRtcWasm);
     EXPECT_EQ(webCap.nativeApi, "W3C WebCodecs / WebAssembly");
-    EXPECT_TRUE(webCap.supportsH264);
+#if defined(__EMSCRIPTEN__)
+    EXPECT_TRUE(webCap.isNativeCompiled);
+    EXPECT_GE(static_cast<uint8_t>(webCap.qualificationState),
+              static_cast<uint8_t>(DecoderQualificationState::NativeApiAvailable));
+#else
+    EXPECT_FALSE(webCap.isNativeCompiled);
+    EXPECT_EQ(webCap.qualificationState, DecoderQualificationState::NotBuilt);
+#endif
 }
+
 
 TEST(GuestClientSessionLifecycleTest, CompleteStateTransitionsAndRestrictions) {
     GuestClientConfig config{

@@ -36,6 +36,31 @@ enum class ClientPlatform : uint8_t {
     return "Unknown";
 }
 
+enum class DecoderQualificationState : uint8_t {
+    NotSupported = 0,
+    NotBuilt,
+    Built,
+    NativeApiAvailable,
+    HardwareAvailable,
+    DecoderInitialized,
+    SmokeTestPassed,
+    HardwareVerified
+};
+
+[[nodiscard]] constexpr std::string_view decoderQualificationStateToString(DecoderQualificationState state) noexcept {
+    switch (state) {
+        case DecoderQualificationState::NotSupported: return "NotSupported";
+        case DecoderQualificationState::NotBuilt: return "NotBuilt";
+        case DecoderQualificationState::Built: return "Built";
+        case DecoderQualificationState::NativeApiAvailable: return "NativeApiAvailable";
+        case DecoderQualificationState::HardwareAvailable: return "HardwareAvailable";
+        case DecoderQualificationState::DecoderInitialized: return "DecoderInitialized";
+        case DecoderQualificationState::SmokeTestPassed: return "SmokeTestPassed";
+        case DecoderQualificationState::HardwareVerified: return "HardwareVerified";
+    }
+    return "Unknown";
+}
+
 struct PlatformCapabilityInfo {
     ClientPlatform platform{ClientPlatform::Windows_D3D11VA};
     std::string nativeApi;
@@ -44,6 +69,7 @@ struct PlatformCapabilityInfo {
     bool supportsH264{false};
     bool supportsHevc{false};
     bool supportsAv1{false};
+    DecoderQualificationState qualificationState{DecoderQualificationState::NotBuilt};
     std::string releaseStatus{"Pending"};
 };
 
