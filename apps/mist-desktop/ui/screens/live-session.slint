@@ -1,5 +1,6 @@
 import { Theme } from "../theme.slint";
 import { StreamingHud } from "../components/streaming-hud.slint";
+import { StatsOverlay } from "../components/stats-overlay.slint";
 import { SecondaryButton } from "../components/secondary-button.slint";
 import { PrimaryButton } from "../components/primary-button.slint";
 
@@ -15,9 +16,23 @@ export component LiveSessionScreen {
     in property <bool> input-active: true;
     in property <string> quality-profile: "Balanced (12 Mbps)";
 
+    // Overlay state
+    in-out property <bool> overlay-visible: true;
+    in-out property <bool> overlay-detailed: false;
+    in property <string> capture-latency-text: "850 µs";
+    in property <string> encode-latency-text: "1.2 ms";
+    in property <string> decode-latency-text: "1.8 ms";
+    in property <string> present-latency-text: "0.5 ms";
+    in property <string> total-latency-text: "12.3 ms";
+    in property <string> codec-text: "HEVC / H.265";
+    in property <string> backend-text: "NVIDIA NVENC → D3D11VA";
+    in property <int> fec-recovered: 0;
+    in property <int> audio-plc: 0;
+
     callback disconnect-clicked();
     callback fullscreen-clicked();
     callback change-profile(string);
+    callback toggle-overlay();
 
     VerticalLayout {
         padding: Theme.space-md;
@@ -127,11 +142,53 @@ export component LiveSessionScreen {
                             alignment: center;
 
                             SecondaryButton {
+                                text: root.overlay-visible ? "Hide HUD (F8)" : "Show HUD (F8)";
+                                min-width: 110px;
+                                clicked => {
+                                    root.overlay-visible = !root.overlay-visible;
+                                    root.toggle-overlay();
+                                }
+                            }
+
+                            SecondaryButton {
                                 text: "Toggle Fullscreen (F11)";
                                 min-width: 150px;
                                 clicked => { root.fullscreen-clicked(); }
                             }
                         }
+                    }
+                }
+            }
+
+            // Top-right floating stats HUD overlay
+            if root.is-active && root.overlay-visible : HorizontalLayout {
+                alignment: end;
+                padding-top: Theme.space-md;
+                padding-right: Theme.space-md;
+
+                VerticalLayout {
+                    alignment: start;
+
+                    StatsOverlay {
+                        is-visible: root.overlay-visible;
+                        is-detailed: root.overlay-detailed;
+                        fps-text: root.fps-text;
+                        bitrate-text: root.bitrate-text;
+                        rtt-text: root.rtt-text;
+                        jitter-text: root.jitter-text;
+                        loss-text: root.loss-text;
+                        capture-latency-text: root.capture-latency-text;
+                        encode-latency-text: root.encode-latency-text;
+                        decode-latency-text: root.decode-latency-text;
+                        present-latency-text: root.present-latency-text;
+                        total-latency-text: root.total-latency-text;
+                        codec-text: root.codec-text;
+                        backend-text: root.backend-text;
+                        resolution-text: root.resolution-text;
+                        fec-recovered: root.fec-recovered;
+                        audio-plc: root.audio-plc;
+                        close-clicked => { root.overlay-visible = false; }
+                        toggle-detailed-clicked => { root.overlay-detailed = !root.overlay-detailed; }
                     }
                 }
             }

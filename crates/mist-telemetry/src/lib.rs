@@ -157,3 +157,143 @@ impl Default for NatDiagnostics {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuestTelemetrySummary {
+    pub guest_id: String,
+    pub client_name: String,
+    pub rtt_ms: f32,
+    pub bitrate_kbps: u32,
+    pub loss_percent: f32,
+    pub quality_tier: String,
+    pub is_active_player: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamOverlayStats {
+    pub is_visible: bool,
+    pub is_detailed: bool,
+    pub fps: f32,
+    pub bitrate_kbps: u32,
+    pub rtt_ms: f32,
+    pub jitter_ms: f32,
+    pub packet_loss_percent: f32,
+    pub capture_latency_us: f32,
+    pub encode_latency_us: f32,
+    pub decode_latency_us: f32,
+    pub present_latency_us: f32,
+    pub total_pipeline_latency_ms: f32,
+    pub video_codec: String,
+    pub hardware_backend: String,
+    pub resolution: String,
+    pub fec_recovered_packets: u64,
+    pub audio_plc_count: u64,
+    pub is_host: bool,
+    pub connected_guests: Vec<GuestTelemetrySummary>,
+}
+
+impl Default for StreamOverlayStats {
+    fn default() -> Self {
+        Self {
+            is_visible: true,
+            is_detailed: false,
+            fps: 60.0,
+            bitrate_kbps: 15000,
+            rtt_ms: 8.5,
+            jitter_ms: 1.0,
+            packet_loss_percent: 0.0,
+            capture_latency_us: 850.0,
+            encode_latency_us: 1200.0,
+            decode_latency_us: 1800.0,
+            present_latency_us: 500.0,
+            total_pipeline_latency_ms: 12.5,
+            video_codec: "HEVC / H.265".to_string(),
+            hardware_backend: "NVIDIA NVENC → D3D11VA".to_string(),
+            resolution: "1920 × 1080 @ 60 Hz".to_string(),
+            fec_recovered_packets: 0,
+            audio_plc_count: 0,
+            is_host: false,
+            connected_guests: Vec::new(),
+        }
+    }
+}
+
+impl StreamOverlayStats {
+    pub fn formatted_fps(&self) -> String {
+        format!("{:.0} FPS", self.fps)
+    }
+
+    pub fn formatted_bitrate(&self) -> String {
+        format!("{:.1} Mbps", self.bitrate_kbps as f32 / 1000.0)
+    }
+
+    pub fn formatted_rtt(&self) -> String {
+        format!("{:.1} ms", self.rtt_ms)
+    }
+
+    pub fn formatted_jitter(&self) -> String {
+        format!("{:.1} ms", self.jitter_ms)
+    }
+
+    pub fn formatted_loss(&self) -> String {
+        format!("{:.1}%", self.packet_loss_percent)
+    }
+
+    pub fn formatted_total_latency(&self) -> String {
+        format!("{:.1} ms", self.total_pipeline_latency_ms)
+    }
+
+    pub fn health_status(&self) -> &'static str {
+        if self.rtt_ms > 80.0 || self.packet_loss_percent > 3.0 {
+            "Poor"
+        } else if self.rtt_ms > 40.0 || self.packet_loss_percent > 1.0 {
+            "Fair"
+        } else {
+            "Optimal"
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stream_overlay_stats_defaults_and_formatting() {
+        let stats = StreamOverlayStats::default();
+        assert!(stats.is_visible);
+        assert_eq!(stats.formatted_fps(), "60 FPS");
+        assert_eq!(stats.formatted_bitrate(), "15.0 Mbps");
+        assert_eq!(stats.formatted_rtt(), "8.5 ms");
+        assert_eq!(stats.formatted_loss(), "0.0%");
+        assert_eq!(stats.formatted_total_latency(), "12.5 ms");
+        assert_eq!(stats.health_status(), "Optimal");
+    }
+
+    #[test]
+    fn test_stream_overlay_health_degradation() {
+        let mut stats = StreamOverlayStats::default();
+        stats.rtt_ms = 45.0;
+        assert_eq!(stats.health_status(), "Fair");
+
+        stats.packet_loss_percent = 5.0;
+        assert_eq!(stats.health_status(), "Poor");
+    }
+
+    #[test]
+    fn test_guest_telemetry_serialization() {
+        let guest = GuestTelemetrySummary {
+            guest_id: "guest-1".to_string(),
+            client_name: "SteamDeck".to_string(),
+            rtt_ms: 12.4,
+            bitrate_kbps: 10000,
+            loss_percent: 0.1,
+            quality_tier: "Quality".to_string(),
+            is_active_player: true,
+        };
+
+        let json = serde_json::to_string(&guest).expect("Serialization failed");
+        assert!(json.contains("SteamDeck"));
+        assert!(json.contains("Quality"));
+    }
+}

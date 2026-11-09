@@ -1,0 +1,242 @@
+import { Theme } from "../theme.slint";
+import { SecondaryButton } from "secondary-button.slint";
+
+export component StatsOverlay {
+    in property <bool> is-visible: true;
+    in-out property <bool> is-detailed: true;
+
+    // Metrics
+    in property <string> fps-text: "60 FPS";
+    in property <string> bitrate-text: "15.0 Mbps";
+    in property <string> rtt-text: "8.2 ms";
+    in property <string> jitter-text: "0.9 ms";
+    in property <string> loss-text: "0.0%";
+    in property <string> capture-latency-text: "850 µs";
+    in property <string> encode-latency-text: "1.2 ms";
+    in property <string> decode-latency-text: "1.8 ms";
+    in property <string> present-latency-text: "0.5 ms";
+    in property <string> total-latency-text: "12.3 ms";
+    in property <string> codec-text: "HEVC / H.265";
+    in property <string> backend-text: "NVIDIA NVENC → D3D11VA";
+    in property <string> resolution-text: "1920 × 1080 @ 60 Hz";
+    in property <int> fec-recovered: 0;
+    in property <int> audio-plc: 0;
+    in property <bool> is-host: false;
+    in property <int> connected-guests: 1;
+
+    callback close-clicked();
+    callback toggle-detailed-clicked();
+
+    if root.is-visible : Rectangle {
+        width: root.is-detailed ? 340px : 260px;
+        background: #0B130FED;
+        border-radius: Theme.radius-medium;
+        border-width: 1px;
+        border-color: Theme.surface-border;
+        clip: true;
+
+        VerticalLayout {
+            padding: Theme.space-md;
+            spacing: Theme.space-sm;
+
+            // Header Bar
+            HorizontalLayout {
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: Theme.space-sm;
+                    alignment: center;
+
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: Theme.accent;
+                    }
+
+                    Text {
+                        text: root.is-host ? "HOST TELEMETRY HUD" : "STREAM PERFORMANCE HUD";
+                        color: Theme.text-primary;
+                        font-size: 11px;
+                        font-weight: 700;
+                        letter-spacing: 0.5px;
+                        vertical-alignment: center;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: Theme.space-xs;
+
+                    Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: detail-touch.has-hover ? #25382D : #16241D;
+
+                        Text {
+                            text: root.is-detailed ? "−" : "+";
+                            color: Theme.text-secondary;
+                            font-size: 13px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        detail-touch := TouchArea {
+                            clicked => {
+                                root.is-detailed = !root.is-detailed;
+                                root.toggle-detailed-clicked();
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: close-touch.has-hover ? #3B1F22 : #16241D;
+
+                        Text {
+                            text: "×";
+                            color: Theme.text-secondary;
+                            font-size: 14px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        close-touch := TouchArea {
+                            clicked => { root.close-clicked(); }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.surface-border;
+            }
+
+            // Quick Stats Row (Always visible)
+            HorizontalLayout {
+                spacing: Theme.space-md;
+                alignment: space-between;
+
+                VerticalLayout {
+                    spacing: 2px;
+                    Text { text: "FPS"; color: Theme.text-disabled; font-size: 10px; }
+                    Text { text: root.fps-text; color: Theme.accent; font-size: 14px; font-weight: 700; }
+                }
+
+                VerticalLayout {
+                    spacing: 2px;
+                    Text { text: "BITRATE"; color: Theme.text-disabled; font-size: 10px; }
+                    Text { text: root.bitrate-text; color: Theme.text-primary; font-size: 14px; font-weight: 700; }
+                }
+
+                VerticalLayout {
+                    spacing: 2px;
+                    Text { text: "RTT"; color: Theme.text-disabled; font-size: 10px; }
+                    Text { text: root.rtt-text; color: Theme.pixel-mint; font-size: 14px; font-weight: 700; }
+                }
+
+                VerticalLayout {
+                    spacing: 2px;
+                    Text { text: "LOSS"; color: Theme.text-disabled; font-size: 10px; }
+                    Text { text: root.loss-text; color: Theme.text-primary; font-size: 14px; font-weight: 700; }
+                }
+            }
+
+            // In-depth details section (Shown when expanded)
+            if root.is-detailed : VerticalLayout {
+                spacing: Theme.space-sm;
+
+                Rectangle { height: 1px; background: Theme.surface-border; }
+
+                // Latency Pipeline Breakdown
+                Text {
+                    text: "PIPELINE LATENCY";
+                    color: Theme.text-disabled;
+                    font-size: 10px;
+                    font-weight: 600;
+                    letter-spacing: 0.5px;
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Capture / Color NV12:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.capture-latency-text; color: Theme.text-primary; font-size: 11px; font-weight: 600; }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Hardware Encode:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.encode-latency-text; color: Theme.text-primary; font-size: 11px; font-weight: 600; }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Hardware Decode:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.decode-latency-text; color: Theme.text-primary; font-size: 11px; font-weight: 600; }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Zero-Copy Present:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.present-latency-text; color: Theme.text-primary; font-size: 11px; font-weight: 600; }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Total Glass-to-Glass:"; color: Theme.text-secondary; font-size: 11px; font-weight: 700; }
+                    Text { text: root.total-latency-text; color: Theme.accent; font-size: 12px; font-weight: 700; }
+                }
+
+                Rectangle { height: 1px; background: Theme.surface-border; }
+
+                // Hardware & Codec Information
+                Text {
+                    text: "MEDIA ENGINE";
+                    color: Theme.text-disabled;
+                    font-size: 10px;
+                    font-weight: 600;
+                    letter-spacing: 0.5px;
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Codec:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.codec-text; color: Theme.text-primary; font-size: 11px; font-weight: 600; }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Resolution:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.resolution-text; color: Theme.text-primary; font-size: 11px; }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Engine / Pipeline:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.backend-text; color: Theme.text-primary; font-size: 11px; }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "FEC Recoveries:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.fec-recovered + " pkts"; color: Theme.accent; font-size: 11px; }
+                }
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Audio PLC Concealed:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.audio-plc + " frames"; color: Theme.text-primary; font-size: 11px; }
+                }
+
+                if root.is-host : HorizontalLayout {
+                    alignment: space-between;
+                    Text { text: "Connected Guests:"; color: Theme.text-secondary; font-size: 11px; }
+                    Text { text: root.connected-guests + " active"; color: Theme.accent; font-size: 11px; font-weight: 700; }
+                }
+            }
+        }
+    }
+}
