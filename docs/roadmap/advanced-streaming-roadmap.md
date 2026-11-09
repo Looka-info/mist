@@ -12,38 +12,38 @@
 
 | # | Milestone Name | Priority | Status | Commit |
 |---|---|---|---|---|
-| 1 | **NAT Traversal Reliability** | Critical | **Unit Tested** | `0985593` |
-| 2 | **TURN Relay Fallback** | Critical | **Unit Tested** | `1b6b2bd` |
-| 3 | **Host-Side Authentication** | Critical | **Unit Tested** | `87697fc` |
-| 4 | **Host Approval Flow** | High | **Unit Tested** | `2c09677` |
-| 5 | **Per-Guest Permissions** | High | **Unit Tested** | `c1d604e` |
-| 6 | **Encryption Verification & Peer Identity** | High | Not Started | — |
-| 7 | **Encode-Once, Send-to-Many** | High | Not Started | — |
-| 8 | **Per-Guest Adaptive Bitrate & Resolution** | Medium | Not Started | — |
-| 9 | **Host Upload Bandwidth Limits** | Medium | Not Started | — |
-| 10 | **H.265 / HEVC Encoding & Decoding** | High | Not Started | — |
-| 11 | **AMD AMF, Intel Quick Sync & x264 Fallback** | High | Not Started | — |
-| 12 | **WebRTC Low-Latency Tuning** | High | Not Started | — |
-| 13 | **FEC & Fast Keyframe Recovery** | Medium | Not Started | — |
-| 14 | **Direct D3D11VA Hardware Decoding on Guest** | High | Not Started | — |
-| 15 | **Host & Guest Statistics Overlay** | Medium | Not Started | — |
-| 16 | **Virtual Gamepad Support for Each Guest** | Medium | Not Started | — |
-| 17 | **Relative Mouse Mode & Clipboard Sync** | Medium | Not Started | — |
-| 18 | **Windows Graphics Capture Fallback** | Medium | Not Started | — |
-| 19 | **Reconnection & Host Crash/Sleep Recovery** | High | Not Started | — |
-| 20 | **Signaling Server Hardening** | High | Not Started | — |
-| 21 | **Virtual Display Driver for Headless Hosts** | Medium | Not Started | — |
-| 22 | **Host Service, Tray Application & Wake-on-LAN** | Medium | Not Started | — |
-| 23 | **AV1, 10-Bit and HDR** | Low | Not Started | — |
-| 24 | **Finish & Polish the Slint UI** | High | Not Started | — |
-| 25 | **Cross-Platform Guest Clients** | High | Not Started | — |
+| 1 | **NAT Traversal Reliability** | Critical | Completed | `0985593` |
+| 2 | **TURN Relay Fallback** | Critical | Completed | `1b6b2bd` |
+| 3 | **Host-Side Authentication** | Critical | Completed | `87697fc` |
+| 4 | **Host Approval Flow** | High | Completed | `2c09677` |
+| 5 | **Per-Guest Permissions** | High | Completed | `c1d604e` |
+| 6 | **Encryption Verification & Peer Identity** | High | Completed | `e0e7794` |
+| 7 | **Encode-Once, Send-to-Many** | High | Completed | `00c0d8d` |
+| 8 | **Per-Guest Adaptive Bitrate & Resolution** | Medium | Completed | `8c46c8d` |
+| 9 | **Host Upload Bandwidth Limits** | Medium | Completed | `d8c70ac` |
+| 10 | **H.265 / HEVC Encoding & Decoding** | High | Completed | `66e67b2` |
+| 11 | **AMD AMF, Intel Quick Sync & x264 Fallback** | High | Completed | `66c32e5` |
+| 12 | **WebRTC Low-Latency Tuning** | High | Completed | `098aad1` |
+| 13 | **FEC & Fast Keyframe Recovery** | Medium | Completed | `5852f7d` |
+| 14 | **Direct D3D11VA Hardware Decoding on Guest** | High | Completed | `32c0400` |
+| 15 | **Host & Guest Statistics Overlay** | Medium | Completed | `f05a4b2` |
+| 16 | **Virtual Gamepad Support for Each Guest** | Medium | Completed | `e38c091` |
+| 17 | **Relative Mouse Mode & Clipboard Sync** | Medium | Completed | `1ebb990` |
+| 18 | **Windows Graphics Capture Fallback** | Medium | Completed | `ac31b3e` |
+| 19 | **Reconnection & Host Crash/Sleep Recovery** | High | Completed | `570745a` |
+| 20 | **Signaling Server Hardening** | High | Completed | `38ff8d5` |
+| 21 | **Virtual Display Driver for Headless Hosts** | Medium | Completed | `997d157` |
+| 22 | **Host Service, Tray Application & Wake-on-LAN** | Medium | Completed | `c786c30` |
+| 23 | **AV1, 10-Bit and HDR** | Low | Completed | `f30e27b` |
+| 24 | **Finish & Polish the Slint UI** | High | Completed | `116b580` |
+| 25 | **Cross-Platform Guest Clients** | High | Completed | `a12e46f` |
 
 ---
 
 ## Detailed Milestone Specifications
 
 ### 1. NAT Traversal Reliability
-- **Status:** In Progress
+- **Status:** Completed
 - **Architecture:** STUN server configuration, dual IPv4/IPv6 candidate gathering, candidate prioritization engine, deterministic NAT behavior analysis (Full Cone, Restricted Cone, Port Restricted, Symmetric), connection failure classification, ICE restart triggering, and user-consented dynamic UPnP IGD / NAT-PMP port mapping leases.
 - **Files Changed:**
   - `crates/mist-config/src/lib.rs`
@@ -61,7 +61,7 @@
 - **Commit Hash:** `0985593`
 
 ### 2. TURN Relay Fallback
-- **Status:** Unit Tested
+- **Status:** Completed
 - **Architecture:** TURN over UDP (3478), TCP (3478), and TLS (5349) with RFC 5766 REST ephemeral short-lived HMAC-SHA1 scoped credentials, active relay endpoint filtering, latency penalty calculations, and failure classification.
 - **Files Changed:**
   - `engine/transport/include/mist/transport/TurnRelayManager.h`
@@ -76,7 +76,7 @@
 - **Commit Hash:** `1b6b2bd`
 
 ### 3. Host-Side Authentication
-- **Status:** Unit Tested
+- **Status:** Completed
 - **Architecture:** Cryptographic 256-bit authorization tokens (`mist-auth-`), FIPS 180-4 standard SHA-256 token hashing, session-bound and peer-identity-bound session tickets, temporary invitation tokens (`mist-inv-`), nonce/timestamp replay protection (±60s window), persistent guest identity records, and single-use consumption behind 6-character human-readable pairing codes.
 - **Files Changed:**
   - `crates/mist-pairing/src/crypto.rs`
@@ -91,7 +91,7 @@
 - **Commit Hash:** `87697fc`
 
 ### 4. Host Approval Flow
-- **Status:** Unit Tested
+- **Status:** Completed
 - **Architecture:** Complete host-controlled guest lifecycle strictly differentiating Deny (reject single request), Kick (immediate session termination), and Ban (persistent identity blocking in `banned_devices.json`), plus active connected guest inspection and unban operations.
 - **Files Changed:**
   - `crates/mist-pairing/src/lib.rs`
@@ -105,7 +105,7 @@
 - **Commit Hash:** `2c09677`
 
 ### 5. Per-Guest Permissions
-- **Status:** Unit Tested
+- **Status:** Completed
 - **Architecture:** Independent granular permission levels (View-Only, Keyboard & Mouse, Gamepad, Clipboard, Audio), host-side input layer enforcement, in-flight runtime permission changes with immediate session propagation, and structured permission audit event logging across Rust and C++ media engines.
 - **Files Changed:**
   - `engine/input/include/mist/input/InputTypes.h`
@@ -123,7 +123,7 @@
 - **Commit Hash:** `c1d604e`
 
 ### 6. Encryption Verification and Peer Identity
-- **Status:** Unit Tested
+- **Status:** Completed
 - **Architecture:** DTLS certificate fingerprint extraction and verification from SDP descriptions, constant-time comparison preventing timing attacks, 6-digit Short Authentication String (SAS, `XXX-YYY`) derivation for visual out-of-band verification, in-flight identity change detection (`IdentityChanged`), and binding of DTLS fingerprints to session tickets and authentication validations. Complete trust model documentation in `docs/security/trust-model.md`.
 - **Files Changed:**
   - `engine/security/include/mist/security/PeerIdentityVerifier.h`
@@ -148,7 +148,7 @@
 - **Commit Hash:** `e0e7794`
 
 ### 7. Encode-Once, Send-to-Many
-- **Status:** Unit Tested
+- **Status:** Completed
 - **Architecture:** Shared GPU NVENC/AMF single-encode bitstream fanout to N independent WebRTC PeerConnections and custom endpoints (`MultiGuestFanout`), with slow-client isolation, bounded queue latency protection, per-guest delivery statistics, and debounced global keyframe coordination across guests.
 - **Files Changed:**
   - `engine/transport/include/mist/transport/MultiGuestFanout.h`
@@ -164,7 +164,7 @@
 - **Commit Hash:** `00c0d8d`
 
 ### 8. Per-Guest Adaptive Bitrate and Resolution
-- **Status:** Unit Tested
+- **Status:** Completed
 - **Architecture:** Per-guest QoS evaluation and multi-rendition coordination pipeline (`PerGuestAdaptiveBitrateManager`). Evaluates individual guest REMB, RTT, packet loss, and jitter, dynamically allocating guests into optimal resolution/bitrate rendition tiers (1080p Quality, 1080p Balanced, 720p Performance) with smooth hysteresis, migration callbacks, and aggregate host bandwidth computation.
 - **Files Changed:**
   - `engine/transport/include/mist/transport/qos/PerGuestAdaptiveBitrate.h`
@@ -180,7 +180,7 @@
 - **Commit Hash:** `8c46c8d`
 
 ### 9. Host Upload Bandwidth Limits
-- **Status:** Unit Tested
+- **Status:** Completed
 - **Architecture:** Aggregate host upload bandwidth budget manager (`HostBandwidthBudgetManager`) with priority reservation for high-importance audio (128 kbps/guest) and control/input channels (64 kbps/guest), dynamic transport headroom buffer (5-10%), and multiple fair allocation policies (`EqualShare`, `PriorityWeighted`, `ProportionalDemand`). Guarantees aggregate network transmission never breaches host physical uplink.
 - **Files Changed:**
   - `engine/transport/include/mist/transport/qos/HostBandwidthBudgetManager.h`
