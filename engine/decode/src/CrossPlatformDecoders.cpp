@@ -748,22 +748,82 @@ common::Result<void> VaApiVideoDecoder::submitPacket(const encode::EncodedPacket
     VAContextID ctx = static_cast<VAContextID>(vaContext_);
     VASurfaceID surf = static_cast<VASurfaceID>(targetSlot->surfaceId);
 
+    std::vector<VABufferID> vaBuffers;
+    vaBuffers.reserve(4);
+
+    // Sequence & Picture parameter buffers for H.264
+    if (config_.codec == encode::VideoCodec::H264) {
+        VAPictureParameterBufferH264 picParam{};
+        picParam.picture_width_in_mbs_minus1 = (1920 / 16) - 1;
+        picParam.picture_height_in_mbs_minus1 = (1080 / 16) - 1;
+        picParam.bit_depth_luma_minus8 = 0;
+        picParam.bit_depth_chroma_minus8 = 0;
+        picParam.num_ref_frames = 1;
+        picParam.seq_fields.bits.chroma_format_idc = 1; // 4:2:0
+        picParam.seq_fields.bits.frame_mbs_only_flag = 1;
+        picParam.pic_fields.bits.entropy_coding_mode_flag = 1; // CABAC
+        picParam.pic_fields.bits.weighted_pred_flag = 0;
+        picParam.pic_fields.bits.weighted_bipred_idc = 0;
+        picParam.pic_fields.bits.transform_8x8_mode_flag = 1;
+        picParam.CurrPic.picture_id = surf;
+        picParam.CurrPic.flags = packet.isKeyframe ? 0 : VA_PICTURE_H264_SHORT_TERM_REFERENCE;
+
+        VABufferID picBuffer = 0;
+        VAStatus st = vaCreateBuffer(dpy, ctx, VAPictureParameterBufferType,
+                                     sizeof(VAPictureParameterBufferH264), 1,
+                                     &picParam, &picBuffer);
+        if (st == VA_STATUS_SUCCESS) {
+            vaBuffers.push_back(picBuffer);
+        }
+
+        VAIQMatrixBufferH264 iqMatrix{};
+        std::memset(&iqMatrix, 16, sizeof(iqMatrix));
+        VABufferID iqBuffer = 0;
+        st = vaCreateBuffer(dpy, ctx, VAIQMatrixBufferType,
+                            sizeof(VAIQMatrixBufferH264), 1,
+                            &iqMatrix, &iqBuffer);
+        if (st == VA_STATUS_SUCCESS) {
+            vaBuffers.push_back(iqBuffer);
+        }
+
+        VASliceParameterBufferH264 sliceParam{};
+        sliceParam.slice_data_size = static_cast<uint32_t>(packet.data.size());
+        sliceParam.slice_data_offset = 0;
+        sliceParam.slice_data_flag = VA_SLICE_DATA_FLAG_ALL;
+        sliceParam.slice_type = packet.isKeyframe ? 2 /* I */ : 0 /* P */;
+        sliceParam.CurrPic.picture_id = surf;
+
+        VABufferID sliceParamBuf = 0;
+        st = vaCreateBuffer(dpy, ctx, VASliceParameterBufferType,
+                            sizeof(VASliceParameterBufferH264), 1,
+                            &sliceParam, &sliceParamBuf);
+        if (st == VA_STATUS_SUCCESS) {
+            vaBuffers.push_back(sliceParamBuf);
+        }
+    }
+
     VABufferID sliceBuffer = 0;
     VAStatus status = vaCreateBuffer(dpy, ctx, VASliceDataBufferType,
                                      static_cast<unsigned int>(packet.data.size()), 1,
                                      const_cast<uint8_t*>(packet.data.data()), &sliceBuffer);
     if (status != VA_STATUS_SUCCESS) {
+        for (auto b : vaBuffers) {
+            vaDestroyBuffer(dpy, b);
+        }
         targetSlot->state = VaSurfaceState::Available;
         return common::Error(common::SubsystemId::Decode, common::ErrorCode::InternalError,
-                             "vaCreateBuffer failed with status " + std::to_string(status));
+                             "vaCreateBuffer for slice data failed with status " + std::to_string(status));
     }
+    vaBuffers.push_back(sliceBuffer);
 
     status = vaBeginPicture(dpy, ctx, surf);
     if (status == VA_STATUS_SUCCESS) {
-        (void)vaRenderPicture(dpy, ctx, &sliceBuffer, 1);
+        (void)vaRenderPicture(dpy, ctx, vaBuffers.data(), static_cast<int>(vaBuffers.size()));
         (void)vaEndPicture(dpy, ctx);
     }
-    (void)vaDestroyBuffer(dpy, sliceBuffer);
+    for (auto b : vaBuffers) {
+        (void)vaDestroyBuffer(dpy, b);
+    }
 
     ++decodedFrameCount_;
     targetSlot->state = VaSurfaceState::Decoded;
@@ -846,6 +906,47 @@ common::Result<void> VaApiVideoDecoder::flush() {
 #endif
     while (!frameQueue_.empty()) frameQueue_.pop();
     return common::Result<void>::success();
+}
+
+
+size_t VaApiVideoDecoder::getActiveSurfaceCount() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    size_t active = 0;
+    for (const auto& slot : surfacePool_) {
+        if (slot.state == VaSurfaceState::Decoding || slot.state == VaSurfaceState::Decoded ||
+            slot.state == VaSurfaceState::InUse) {
+            ++active;
+        }
+    }
+    return active;
+}
+
+common::Result<int> VaApiVideoDecoder::exportDmaBuf(uint32_t surfaceId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+#if defined(__linux__) && !defined(__ANDROID__)
+    if (!vaDisplay_) {
+        return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotInitialized,
+                             "VA-API display not initialized");
+    }
+    VADisplay dpy = static_cast<VADisplay>(vaDisplay_);
+    VADRMPRIMESurfaceDescriptor desc{};
+    VAStatus status = vaExportSurfaceHandle(
+        dpy,
+        static_cast<VASurfaceID>(surfaceId),
+        VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2,
+        VA_EXPORT_SURFACE_READ_ONLY,
+        &desc
+    );
+    if (status == VA_STATUS_SUCCESS && desc.num_objects > 0 && desc.objects[0].fd >= 0) {
+        return desc.objects[0].fd;
+    }
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotSupported,
+                         "DMA-BUF surface export not supported by current VA-API driver");
+#else
+    (void)surfaceId;
+    return common::Error(common::SubsystemId::Decode, common::ErrorCode::NotImplemented,
+                         "Linux VA-API is only supported on Linux");
+#endif
 }
 
 common::Result<void> VaApiVideoDecoder::shutdown() {

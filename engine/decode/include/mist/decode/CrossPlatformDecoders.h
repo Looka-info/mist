@@ -164,6 +164,8 @@ public:
     [[nodiscard]] bool isHardwareAccelerated() const noexcept;
     [[nodiscard]] static bool isNativePlatform() noexcept;
     [[nodiscard]] static bool isCodecSupported(encode::VideoCodec codec) noexcept;
+    [[nodiscard]] size_t getActiveSurfaceCount() const noexcept;
+    [[nodiscard]] common::Result<int> exportDmaBuf(uint32_t surfaceId);
 
 private:
     mutable std::mutex mutex_;
@@ -171,13 +173,13 @@ private:
     bool isInitialized_{false};
     uint32_t decodedFrameCount_{0};
     std::queue<DecodedFrame> frameQueue_;
+    std::vector<VaSurfaceSlot> surfacePool_;
+    static constexpr size_t kMaxVaSurfaces = 8;
 #if defined(__linux__) && !defined(__ANDROID__)
     int drmFd_{-1};
     void* vaDisplay_{nullptr};
     uint32_t vaConfig_{0};
     uint32_t vaContext_{0};
-    std::vector<VaSurfaceSlot> surfacePool_;
-    static constexpr size_t kMaxVaSurfaces = 8;
     bool initVaDisplay();
     bool createVaContext(uint32_t width, uint32_t height);
     void destroyVaResources();

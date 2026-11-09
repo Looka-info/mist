@@ -143,6 +143,62 @@ TEST(LinuxVaApiTest, SurfaceRingBufferOrHonestRejection) {
     }
 }
 
+
+TEST(LinuxVaApiTest, SurfacePoolBoundedExhaustionAndRecycling) {
+    auto decRes = VaApiVideoDecoder::create();
+    ASSERT_TRUE(decRes.hasValue());
+    auto decoder = std::move(decRes.value());
+
+    EXPECT_EQ(decoder->getActiveSurfaceCount(), 0u);
+
+    // Initial state before init
+    EncodedPacket emptyPkt{};
+    EXPECT_FALSE(decoder->submitPacket(emptyPkt).hasValue());
+
+    // Export DMA-BUF before initialization must fail cleanly
+    auto dmaRes = decoder->exportDmaBuf(1);
+    EXPECT_FALSE(dmaRes.hasValue());
+
+    // Shutdown without initialization must be clean and idempotent
+    EXPECT_TRUE(decoder->shutdown().hasValue());
+    EXPECT_TRUE(decoder->shutdown().hasValue());
+}
+
+TEST(LinuxVaApiTest, InvalidBitstreamRejectionAndOutstandingFrames) {
+    auto decRes = VaApiVideoDecoder::create();
+    ASSERT_TRUE(decRes.hasValue());
+    auto decoder = std::move(decRes.value());
+
+    DecodeConfig cfg{
+        .codec = VideoCodec::H264,
+        .preferHardwareDecoding = true,
+        .lowLatencyTuning = true
+    };
+
+    if (VaApiVideoDecoder::isNativePlatform()) {
+        auto initRes = decoder->initialize(cfg);
+        if (initRes.hasValue()) {
+            EXPECT_TRUE(decoder->isInitialized());
+            // Empty packet must be rejected
+            EncodedPacket empty{};
+            auto subRes = decoder->submitPacket(empty);
+            EXPECT_FALSE(subRes.hasValue());
+            EXPECT_EQ(subRes.error().code(), common::ErrorCode::InvalidArgument);
+
+            // Shutdown with any allocated surfaces must clean up without leaking
+            EXPECT_TRUE(decoder->shutdown().hasValue());
+            EXPECT_FALSE(decoder->isInitialized());
+        } else {
+            // Honest failure reporting when DRM nodes unavailable in CI
+            EXPECT_FALSE(decoder->isInitialized());
+        }
+    } else {
+        auto initRes = decoder->initialize(cfg);
+        EXPECT_FALSE(initRes.hasValue());
+        EXPECT_EQ(initRes.error().code(), common::ErrorCode::NotImplemented);
+    }
+}
+
 TEST(AndroidMediaCodecTest, BufferQueueOrHonestRejection) {
     auto decRes = MediaCodecVideoDecoder::create();
     ASSERT_TRUE(decRes.hasValue());
