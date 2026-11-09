@@ -39,6 +39,8 @@
 | 25 | **Cross-Platform Guest Clients** | High | Completed | `a12e46f` |
 | 26 | **Cross-Platform Qualification & v0.3.0 Release** | Critical | Completed | `e988451` |
 | 27 | **Native Decoder Implementation, Real WebRTC & CI Repair** | Critical | Completed | `v0.3.0-rc2` |
+| 28 | **Cross-Platform Qualification & Native Integration** | Critical | Completed | `c83c207` |
+| 29 | **Windows-Only Release Qualification & CI Repair** | Critical | Completed | `v0.3.0-rc3` |
 
 ---
 
@@ -603,3 +605,31 @@
 - **Hardware Requirements:** Direct3D 11 GPU (Windows), Apple Silicon / Intel Mac with VideoToolbox (macOS), VA-API compatible GPU with DRM render node (Linux), Android 12+ device with MediaCodec (Android), Modern WebRTC browser (Web).
 - **Known Limitations:** Headless CI virtual machines without real GPU hardware cannot verify level L5 hardware decode; physical hardware devices remain required for final device certification.
 - **Commit Hash:** `feature/milestone-28-release-qualification` (Target: `v0.3.0-rc3`)
+
+### 29. Windows-Only Release Qualification & CI Repair
+- **Status:** Completed
+- **Qualification Level:** Implemented: Yes | Unit Tested: Yes (235 C++ tests, 32 Rust tests) | Integration Tested: Yes (Loopback WebRTC) | Windows MSVC Compiled: Clean (`/W4 /WX`) | Native Verified: Windows 11 x64 (Physical Hardware) | Hardware Verified: Windows D3D11VA + NVIDIA NVENC 13.1 | Release Ready: v0.3.0-rc3
+- **Architecture:** Pivot strictly to a Windows-only release qualification cadence. Decoupled and deferred macOS, Linux, and Android from release-blocking pipelines. Resolved MSVC Visual Studio multi-config path discrepancies in `installer.rc.in` via `file(GENERATE ...)` generator expressions, removed invalid `OBJECT_DEPENDS` single-config path evaluations, added `/wd4201`, `/wd4100`, `_CRT_SECURE_NO_WARNINGS`, `NOMINMAX`, and `WIN32_LEAN_AND_MEAN` to MSVC compiler options, standardized Cargo release artifact staging via `cmake/stage_desktop.cmake`, eliminated unjoined `telemetryThread` crash in `ClientApplication.cpp`, reconciled all version identifiers to `0.3.0-rc3`, and executed live physical WebRTC streaming loopback and installer lifecycle validations.
+- **Files Changed:**
+  - `docs/roadmap/milestone-29-baseline-audit.md`
+  - `docs/roadmap/milestone-29-qualification-report.md`
+  - `docs/testing/windows-release-test-matrix.md`
+  - `docs/releases/v0.3.0-rc3-readiness.md`
+  - `.github/workflows/ci.yml`
+  - `CMakeLists.txt`
+  - `apps/desktop/CMakeLists.txt`
+  - `apps/installer/CMakeLists.txt`
+  - `apps/installer/resources/installer.rc.in`
+  - `apps/client/src/ClientApplication.cpp`
+  - `apps/host/src/HostApplication.cpp`
+  - `apps/installer/src/main.cpp`
+  - `scripts/build-installer.ps1`
+  - `scripts/test-loopback-streaming.ps1`
+  - `cmake/stage_desktop.cmake`
+  - `README.md`
+  - `docs/roadmap/advanced-streaming-roadmap.md`
+- **Tests Added:** Windows loopback streaming integration script (`scripts/test-loopback-streaming.ps1`), installer automated install/uninstall lifecycle validation (`scripts/build-installer.ps1 -TestInstallUninstall`), and multi-configuration staging script (`cmake/stage_desktop.cmake`).
+- **Benchmark Evidence:** 235 CTest tests (233 passed, 2 skipped in headless, 0 failed in 38.19s); 32 Rust tests passed (100%); zero formatting violations (`cargo fmt --check`); zero clippy warnings (`cargo clippy --workspace --all-targets -- -D warnings`); Host/Client `--self-test` passed on physical hardware (NVIDIA NVENC 13.1 + D3D11VA); Live WebRTC loopback stream: 426 host frames sent, 244 client frames received, 208 decoded with 0 errors and 0 drops; Installer package generated (`dist/mist-v0.3.0-rc3-windows-x64.zip`, 46.93 MB; `dist/MistSetup-v0.3.0-rc3.exe`) with 100% install/uninstall lifecycle pass.
+- **Hardware Requirements:** Direct3D 11 GPU (Windows 11 x64), NVIDIA NVENC compatible GPU or software fallback, WASAPI audio device.
+- **Known Limitations:** Non-Windows platforms (macOS, Linux, Android) are deferred and marked experimental; two-machine physical WAN streaming is scheduled for production deployment qualification.
+- **Commit Hash:** `feature/milestone-29-windows-release` (Target: `v0.3.0-rc3`)
