@@ -1,34 +1,59 @@
 import { Theme } from "../theme.slint";
+import { MaterialIcon } from "material-icon.slint";
 
 export component PrimaryButton {
     in property <string> text: "Button";
+    in property <string> icon-name: "";
     in property <bool> enabled: true;
     in property <length> btn-width: 120px;
     callback clicked();
 
     min-width: btn-width;
-    height: 40px;
+    height: 42px;
 
     rect := Rectangle {
         background: !root.enabled ? Theme.surface-variant :
-                    touch.pressed ? Theme.forest-green :
+                    touch.pressed ? Theme.primary-pressed :
                     touch.has-hover ? Theme.primary-hover : Theme.primary;
         border-radius: Theme.radius-pill;
+        clip: true;
 
-        animate background { duration: 150ms; easing: ease-out; }
+        animate background { duration: 180ms; easing: cubic-bezier(0.2, 0.0, 0, 1.0); }
+        animate y { duration: 100ms; easing: ease-out; }
 
-        Text {
-            text: root.text;
-            color: !root.enabled ? Theme.text-disabled : Theme.on-primary;
-            font-size: 14px;
-            font-weight: 600;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+        y: touch.pressed && root.enabled ? 1px : 0px;
+
+        HorizontalLayout {
+            padding-left: Theme.space-lg;
+            padding-right: Theme.space-lg;
+            spacing: Theme.space-sm;
+            alignment: center;
+
+            if root.icon-name != "" : VerticalLayout {
+                alignment: center;
+                MaterialIcon {
+                    name: root.icon-name;
+                    icon-size: 18px;
+                    icon-color: !root.enabled ? Theme.text-disabled : Theme.on-primary;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: root.text;
+                    color: !root.enabled ? Theme.text-disabled : Theme.on-primary;
+                    font-size: 14px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+            }
         }
     }
 
     touch := TouchArea {
         enabled: root.enabled;
+        mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
 }

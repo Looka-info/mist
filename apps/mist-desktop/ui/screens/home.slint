@@ -1,86 +1,324 @@
 import { Theme } from "../theme.slint";
-import { PrimaryButton } from "../components/primary-button.slint";
-import { SecondaryButton } from "../components/secondary-button.slint";
-import { MetricCard } from "../components/metric-card.slint";
-import { StatusIndicator } from "../components/status-indicator.slint";
+import { MaterialIcon } from "../components/material-icon.slint";
 
-export component HomeScreen {
-    in property <string> wifi-ssid: "Unavailable";
-    in property <int> wifi-signal: 0;
-    in property <string> gpu-name: "Direct3D 11 Display Adapter";
-    in property <bool> nvenc-ready: false;
-    in property <int> trusted-device-count: 0;
-    in property <bool> is-streaming: false;
+export struct RecentSessionItem {
+    tag: string,
+    date-time: string,
+    stats-summary: string,
+}
 
-    callback share-clicked();
-    callback connect-clicked();
+component ActionTile inherits Rectangle {
+    in property <string> icon-name: "cast";
+    in property <string> title: "Host this PC";
+    in property <string> subtitle: "Let friends you choose watch and play on your desktop.";
+    in property <string> badge-text: "";
+    in property <color> icon-bg: Theme.mint;
+    in property <color> icon-fg: Theme.on-mint;
+    callback clicked();
 
-    Flickable {
-        VerticalLayout {
-            padding: Theme.space-xl;
-            spacing: Theme.space-xl;
-            alignment: start;
+    horizontal-stretch: 1;
+    min-width: 160px;
+    background: touch.has-hover ? Theme.item-hover : Theme.surface;
+    border-radius: Theme.radius-tile;
+    border-width: 1px;
+    border-color: touch.has-hover ? Theme.mint : Theme.border-line;
+    drop-shadow-blur: touch.has-hover ? 14px : 4px;
+    drop-shadow-color: Theme.shadow-color;
+    clip: true;
+    animate background { duration: 150ms; }
+    animate border-color { duration: 150ms; }
+    animate drop-shadow-blur { duration: 150ms; }
 
-            // Welcome Section
+    VerticalLayout {
+        padding: Theme.compact-view ? 18px : 22px;
+        spacing: 14px;
+        alignment: space-between;
+
+        // Header row with Icon and optional Action cue / Badge
+        HorizontalLayout {
+            alignment: space-between;
+
+            // Icon Container
             Rectangle {
-                height: 140px;
-                background: Theme.surface;
-                border-radius: Theme.radius-large;
-                border-width: 1px;
-                border-color: Theme.surface-border;
+                width: 48px;
+                height: 48px;
+                border-radius: 14px;
+                background: root.icon-bg;
 
-                HorizontalLayout {
-                    padding: Theme.space-xl;
-                    alignment: space-between;
+                MaterialIcon {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    name: root.icon-name;
+                    icon-size: 24px;
+                    icon-color: root.icon-fg;
+                }
+            }
 
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: Theme.space-xs;
+            // Right Action Cue / Status Badge
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
 
-                        Text {
-                            text: "Welcome to Mist";
-                            color: Theme.text-primary;
-                            font-size: 24px;
-                            font-weight: 700;
-                        }
-
-                        Text {
-                            text: "Ultra-low latency peer-to-peer game streaming on your local Wi-Fi.";
-                            color: Theme.text-secondary;
-                            font-size: 14px;
-                        }
+                if root.badge-text != "" : VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 24px;
+                        border-radius: 12px;
+                        background: Theme.container-subtle;
 
                         HorizontalLayout {
-                            spacing: Theme.space-md;
-                            padding-top: Theme.space-xs;
-
-                            StatusIndicator {
-                                is-active: root.wifi-ssid != "Unavailable";
-                                active-text: "Wi-Fi: " + root.wifi-ssid;
-                                inactive-text: "Wi-Fi: Disconnected";
-                            }
-
-                            StatusIndicator {
-                                is-active: root.nvenc-ready;
-                                active-text: "NVENC: Ready";
-                                inactive-text: "NVENC: Software Fallback";
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            alignment: center;
+                            Text {
+                                text: root.badge-text;
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: Theme.accent;
+                                vertical-alignment: center;
                             }
                         }
                     }
+                }
 
-                    VerticalLayout {
+                // Interactive Chevron / Arrow Indicator
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 16px;
+                        background: touch.has-hover ? Theme.container-subtle : #00000000;
+                        animate background { duration: 120ms; }
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: "arrow_forward";
+                            icon-size: 16px;
+                            icon-color: touch.has-hover ? Theme.text-ink : Theme.text-mute;
+                            animate icon-color { duration: 120ms; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Title and Subtitle Block
+        VerticalLayout {
+            spacing: 5px;
+            Text {
+                text: root.title;
+                font-size: 17px;
+                font-weight: 600;
+                color: Theme.text-ink;
+                overflow: elide;
+            }
+            Text {
+                text: root.subtitle;
+                font-size: 13px;
+                color: Theme.text-mute;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component SystemCheckRow inherits Rectangle {
+    in property <string> icon-name: "speed";
+    in property <string> label: "Video encoder";
+    in property <string> description: "Hardware H.264/HEVC capture pipeline";
+    in property <string> status-text: "NVENC · Ready";
+    in property <bool> is-ok: true;
+    in property <bool> is-warn: false;
+    in property <bool> show-divider: true;
+
+    VerticalLayout {
+        HorizontalLayout {
+            padding-top: 12px;
+            padding-bottom: 12px;
+            spacing: 16px;
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 14px;
+                alignment: start;
+
+                // Left Hardware Icon
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 12px;
+                        background: root.is-warn ? (Theme.dark-mode ? #382810 : #fff8e1) : Theme.container-subtle;
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: root.icon-name;
+                            icon-size: 20px;
+                            icon-color: root.is-warn ? Theme.color-warn : (root.is-ok ? Theme.accent : Theme.text-mute);
+                        }
+                    }
+                }
+
+                // Label and description
+                VerticalLayout {
+                    spacing: 2px;
+                    alignment: center;
+
+                    Text {
+                        text: root.label;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: Theme.text-ink;
+                    }
+                    Text {
+                        text: root.description;
+                        font-size: 12px;
+                        color: Theme.text-mute;
+                    }
+                }
+            }
+
+            // Right Status Badge with icon
+            VerticalLayout {
+                alignment: center;
+
+                Rectangle {
+                    height: 32px;
+                    border-radius: Theme.radius-pill;
+                    background: root.is-warn ? (Theme.dark-mode ? #382810 : #fff8e1) :
+                                root.is-ok ? Theme.ok-container : Theme.container-subtle;
+                    border-width: 1px;
+                    border-color: root.is-warn ? Theme.color-warn :
+                                  root.is-ok ? Theme.mint : Theme.border-line;
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 6px;
                         alignment: center;
 
-                        Rectangle {
-                            width: 56px;
-                            height: 56px;
-                            border-radius: 28px;
-                            background: Theme.surface-variant;
+                        VerticalLayout {
+                            alignment: center;
+                            MaterialIcon {
+                                name: root.is-warn ? "warning" : (root.is-ok ? "check_circle" : "circle");
+                                icon-size: 14px;
+                                icon-color: root.is-warn ? Theme.color-warn :
+                                            root.is-ok ? Theme.color-ok : Theme.text-mute;
+                            }
+                        }
+
+                        Text {
+                            text: root.status-text;
+                            font-size: 12px;
+                            font-weight: 600;
+                            color: root.is-warn ? Theme.color-warn :
+                                   root.is-ok ? Theme.color-ok : Theme.text-mute;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.show-divider : Rectangle {
+            height: 1px;
+            background: Theme.border-line;
+        }
+    }
+}
+
+export component HomeScreen inherits Rectangle {
+    in property <[RecentSessionItem]> recent-sessions: [];
+    in property <string> gpu-name: "GTX 1660 SUPER";
+    in property <string> driver-version: "617.14";
+    in property <bool> nvenc-ready: true;
+    in property <string> display-status: "Attached to a monitor";
+    in property <string> audio-status: "Default device";
+    in property <string> controller-status: "ViGEmBus missing · using fallback";
+    in property <bool> controller-ok: false;
+
+    callback host-clicked();
+    callback connect-clicked();
+    callback friends-clicked();
+    callback network-clicked();
+
+    property <bool> is-narrow: root.width < 760px;
+
+    Flickable {
+        width: 100%;
+        height: 100%;
+        content-width: self.width;
+
+        content := VerticalLayout {
+            width: parent.width;
+            padding-left: Theme.compact-view ? 16px : 28px;
+            padding-right: Theme.compact-view ? 16px : 28px;
+            padding-top: Theme.compact-view ? 10px : 16px;
+            padding-bottom: 60px;
+            spacing: Theme.compact-view ? 18px : 26px;
+            alignment: start;
+
+            // Page Header with Title and System Readiness Badge
+            HorizontalLayout {
+                alignment: space-between;
+                spacing: 16px;
+
+                VerticalLayout {
+                    spacing: 4px;
+                    alignment: center;
+                    Text {
+                        text: "Game streaming, no lag";
+                        font-size: Theme.compact-view ? 24px : 28px;
+                        font-weight: 700;
+                        color: Theme.text-ink;
+                    }
+                    Text {
+                        text: "Host this PC or join a friend. Direct peer-to-peer, zero configuration.";
+                        font-size: 14px;
+                        color: Theme.text-mute;
+                    }
+                }
+
+                // Quick Readiness Pill
+                if !root.is-narrow : VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 36px;
+                        border-radius: Theme.radius-pill;
+                        background: Theme.ok-container;
+                        border-width: 1px;
+                        border-color: Theme.mint;
+
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            spacing: 8px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                MaterialIcon {
+                                    name: "check_circle";
+                                    icon-size: 16px;
+                                    icon-color: Theme.color-ok;
+                                }
+                            }
 
                             Text {
-                                text: "🎮";
-                                font-size: 28px;
-                                horizontal-alignment: center;
+                                text: root.nvenc-ready ? "System Ready to Stream" : "Software Streaming Ready";
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: Theme.color-ok;
                                 vertical-alignment: center;
                             }
                         }
@@ -88,115 +326,265 @@ export component HomeScreen {
                 }
             }
 
-            // Quick Actions Cards
-            HorizontalLayout {
-                spacing: Theme.space-lg;
+            // Section: Latest sessions (only shown when real past sessions exist)
+            if root.recent-sessions.length > 0 : VerticalLayout {
+                spacing: 12px;
 
-                // Share Card
-                Rectangle {
-                    height: 160px;
-                    background: Theme.surface;
-                    border-radius: Theme.radius-medium;
-                    border-width: 1px;
-                    border-color: Theme.surface-border;
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
 
                     VerticalLayout {
-                        padding: Theme.space-lg;
-                        alignment: space-between;
-
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-
-                            Text {
-                                text: "📡 Wi-Fi Screen Share";
-                                color: Theme.text-primary;
-                                font-size: 16px;
-                                font-weight: 700;
-                            }
-
-                            Text {
-                                text: "Stream this PC's screen and games to another device using a 6-character code.";
-                                color: Theme.text-secondary;
-                                font-size: 13px;
-                                wrap: word-wrap;
-                            }
+                        alignment: center;
+                        MaterialIcon {
+                            name: "schedule";
+                            icon-size: 20px;
+                            icon-color: Theme.accent;
                         }
+                    }
 
-                        PrimaryButton {
-                            text: "Start Sharing";
-                            clicked => { root.share-clicked(); }
-                        }
+                    Text {
+                        text: "Recent sessions";
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: Theme.text-ink;
+                        vertical-alignment: center;
                     }
                 }
 
-                // Connect Card
-                Rectangle {
-                    height: 160px;
-                    background: Theme.surface;
-                    border-radius: Theme.radius-medium;
-                    border-width: 1px;
-                    border-color: Theme.surface-border;
+                HorizontalLayout {
+                    spacing: 14px;
 
-                    VerticalLayout {
-                        padding: Theme.space-lg;
-                        alignment: space-between;
+                    for s in root.recent-sessions : Rectangle {
+                        horizontal-stretch: 1;
+                        min-width: 160px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.border-line;
+                        border-radius: Theme.radius-large;
+                        drop-shadow-blur: 8px;
+                        drop-shadow-color: Theme.shadow-color;
 
                         VerticalLayout {
-                            spacing: Theme.space-xs;
+                            padding: 16px;
+                            spacing: 6px;
+                            alignment: space-between;
 
-                            Text {
-                                text: "🔗 Connect with Code";
-                                color: Theme.text-primary;
-                                font-size: 16px;
-                                font-weight: 700;
+                            VerticalLayout {
+                                spacing: 2px;
+                                Text { text: s.tag; font-size: 15px; font-weight: 600; color: Theme.text-ink; overflow: elide; }
+                                if s.date-time != "" : Text { text: s.date-time; font-size: 12px; color: Theme.text-mute; }
                             }
+                            Text { text: s.stats-summary; font-size: 13px; font-weight: 600; color: Theme.accent; }
+                        }
+                    }
+                }
+            }
 
-                            Text {
-                                text: "Connect to a remote host by entering its 6-character pairing code.";
-                                color: Theme.text-secondary;
-                                font-size: 13px;
-                                wrap: word-wrap;
-                            }
+            // Section: What would you like to do?
+            VerticalLayout {
+                spacing: 14px;
+
+                Text {
+                    text: "What would you like to do?";
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: Theme.text-ink;
+                }
+
+                // Wide & Medium Screens: Balanced 2x2 Grid (Equal proportions, zero awkward blank spaces)
+                if !root.is-narrow : VerticalLayout {
+                    spacing: 14px;
+
+                    // Row 1: Primary Streaming Actions
+                    HorizontalLayout {
+                        spacing: 14px;
+
+                        ActionTile {
+                            icon-name: "cast";
+                            icon-bg: Theme.mint;
+                            icon-fg: Theme.on-mint;
+                            badge-text: "Direct Host";
+                            title: "Host this PC";
+                            subtitle: "Stream your desktop or gameplay to selected friends with ultra-low latency.";
+                            clicked => { root.host-clicked(); }
                         }
 
-                        SecondaryButton {
-                            text: "Enter Code";
+                        ActionTile {
+                            icon-name: "sports_esports";
+                            icon-bg: Theme.container;
+                            icon-fg: Theme.on-container;
+                            badge-text: "Gamepad Ready";
+                            title: "Connect to a PC";
+                            subtitle: "Join a friend who is hosting and play together with low latency.";
                             clicked => { root.connect-clicked(); }
                         }
                     }
+
+                    // Row 2: Secondary Tools (Friends & Network Telemetry)
+                    HorizontalLayout {
+                        spacing: 14px;
+
+                        ActionTile {
+                            icon-name: "group";
+                            icon-bg: Theme.container-subtle;
+                            icon-fg: Theme.accent;
+                            badge-text: "Tags & Invites";
+                            title: "Friends & Access";
+                            subtitle: "Add friends by username#1234 and manage streaming access permissions.";
+                            clicked => { root.friends-clicked(); }
+                        }
+
+                        ActionTile {
+                            icon-name: "network_check";
+                            icon-bg: Theme.container-subtle;
+                            icon-fg: Theme.accent;
+                            badge-text: "Diagnostics";
+                            title: "Network & Telemetry";
+                            subtitle: "Check connection quality, round-trip ping, and bitrate adaptation.";
+                            clicked => { root.network-clicked(); }
+                        }
+                    }
+                }
+
+                // Narrow Screens: Clean 1-Column Stack
+                if root.is-narrow : VerticalLayout {
+                    spacing: 12px;
+
+                    ActionTile {
+                        icon-name: "cast";
+                        icon-bg: Theme.mint;
+                        icon-fg: Theme.on-mint;
+                        badge-text: "Direct Host";
+                        title: "Host this PC";
+                        subtitle: "Stream your desktop or gameplay to selected friends.";
+                        clicked => { root.host-clicked(); }
+                    }
+
+                    ActionTile {
+                        icon-name: "sports_esports";
+                        icon-bg: Theme.container;
+                        icon-fg: Theme.on-container;
+                        badge-text: "Gamepad Ready";
+                        title: "Connect to a PC";
+                        subtitle: "Join a friend who is hosting and play together.";
+                        clicked => { root.connect-clicked(); }
+                    }
+
+                    ActionTile {
+                        icon-name: "group";
+                        icon-bg: Theme.container-subtle;
+                        icon-fg: Theme.accent;
+                        badge-text: "Tags & Invites";
+                        title: "Friends & Access";
+                        subtitle: "Add friends by username#1234 and manage permissions.";
+                        clicked => { root.friends-clicked(); }
+                    }
+
+                    ActionTile {
+                        icon-name: "network_check";
+                        icon-bg: Theme.container-subtle;
+                        icon-fg: Theme.accent;
+                        badge-text: "Diagnostics";
+                        title: "Network & Telemetry";
+                        subtitle: "Check ping, network quality, and adaptive bitrate.";
+                        clicked => { root.network-clicked(); }
+                    }
                 }
             }
 
-            // Hardware & Platform Status
-            Text {
-                text: "System Readiness";
-                color: Theme.text-primary;
-                font-size: 16px;
-                font-weight: 700;
-            }
+            // Section: System check
+            VerticalLayout {
+                spacing: 12px;
 
-            HorizontalLayout {
-                spacing: Theme.space-md;
+                HorizontalLayout {
+                    alignment: space-between;
 
-                MetricCard {
-                    title: "Graphics Hardware";
-                    value: root.nvenc-ready ? "NVIDIA NVENC" : "Hardware D3D11";
-                    subtitle: root.gpu-name;
-                    accent-color: root.nvenc-ready ? Theme.accent : Theme.text-secondary;
+                    Text {
+                        text: "System check";
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: Theme.text-ink;
+                    }
+
+                    Text {
+                        text: "Hardware & Platform Readiness";
+                        font-size: 13px;
+                        color: Theme.text-mute;
+                        vertical-alignment: center;
+                    }
                 }
 
-                MetricCard {
-                    title: "Audio Capture & Playback";
-                    value: "WASAPI 48 kHz";
-                    subtitle: "Direct Loopback + Opus Audio";
-                    accent-color: Theme.accent;
-                }
+                Rectangle {
+                    background: Theme.surface;
+                    border-width: 1px;
+                    border-color: Theme.border-line;
+                    border-radius: Theme.radius-card;
+                    drop-shadow-blur: 10px;
+                    drop-shadow-color: Theme.shadow-color;
 
-                MetricCard {
-                    title: "Paired Devices";
-                    value: root.trusted-device-count > 0 ? (root.trusted-device-count + " Devices") : "None";
-                    subtitle: "Secure authorization active";
-                    accent-color: root.trusted-device-count > 0 ? Theme.accent : Theme.text-disabled;
+                    VerticalLayout {
+                        padding-left: Theme.card-padding;
+                        padding-right: Theme.card-padding;
+                        padding-top: 10px;
+                        padding-bottom: 10px;
+                        spacing: 0px;
+
+                        // Row 1: Video encoder
+                        SystemCheckRow {
+                            icon-name: "speed";
+                            label: "Video encoder";
+                            description: "Hardware NVENC / D3D11 video encoder pipeline";
+                            status-text: (root.nvenc-ready ? "NVENC · " : "Software · ") + root.gpu-name;
+                            is-ok: root.nvenc-ready;
+                            is-warn: !root.nvenc-ready;
+                            show-divider: true;
+                        }
+
+                        // Row 2: Graphics driver
+                        SystemCheckRow {
+                            icon-name: "tune";
+                            label: "Graphics driver";
+                            description: "DirectX 11 / D3D11VA runtime pipeline";
+                            status-text: root.driver-version;
+                            is-ok: true;
+                            is-warn: false;
+                            show-divider: true;
+                        }
+
+                        // Row 3: Display session
+                        SystemCheckRow {
+                            icon-name: "monitor";
+                            label: "Display session";
+                            description: "Primary desktop monitor capture session";
+                            status-text: root.display-status;
+                            is-ok: true;
+                            is-warn: false;
+                            show-divider: true;
+                        }
+
+                        // Row 4: Audio output
+                        SystemCheckRow {
+                            icon-name: "wifi_tethering";
+                            label: "Audio output";
+                            description: "WASAPI 48 kHz stereo loopback capture";
+                            status-text: root.audio-status;
+                            is-ok: true;
+                            is-warn: false;
+                            show-divider: true;
+                        }
+
+                        // Row 5: Controller driver
+                        SystemCheckRow {
+                            icon-name: "sports_esports";
+                            label: "Controller driver";
+                            description: "Virtual Xbox 360 controller emulation";
+                            status-text: root.controller-status;
+                            is-ok: root.controller-ok;
+                            is-warn: !root.controller-ok;
+                            show-divider: false;
+                        }
+                    }
                 }
             }
         }

@@ -1,153 +1,245 @@
 import { Theme } from "../theme.slint";
+import { MaterialIcon } from "material-icon.slint";
 
 export component NavItem {
-    in property <string> icon: "🏠";
+    in property <string> icon-name: "home";
     in property <string> label: "Home";
     in property <bool> is-active: false;
+    in property <int> badge-count: 0;
+    in property <bool> is-collapsed: false;
     callback clicked();
 
-    height: 52px;
+    height: Theme.compact-view ? 46px : 52px;
 
     rect := Rectangle {
-        background: touch.has-hover && !root.is-active ? Theme.surface-variant : #00000000;
-        border-radius: Theme.radius-medium;
+        background: root.is-active ? Theme.container :
+                    touch.has-hover ? Theme.item-hover : #00000000;
+        border-radius: Theme.radius-pill;
+        clip: true;
 
-        animate background { duration: 120ms; }
+        animate background { duration: 150ms; }
 
-        HorizontalLayout {
-            padding-left: Theme.space-md;
-            padding-right: Theme.space-md;
-            spacing: Theme.space-md;
-            alignment: start;
+        if !root.is-collapsed : HorizontalLayout {
+            padding-left: 18px;
+            padding-right: 18px;
+            spacing: 14px;
+            alignment: space-between;
 
-            indicator := Rectangle {
-                width: 4px;
-                height: 24px;
-                y: (parent.height - self.height) / 2;
-                border-radius: 2px;
-                background: root.is-active ? Theme.primary : #00000000;
+            HorizontalLayout {
+                spacing: 14px;
+                alignment: start;
 
-                animate background { duration: 150ms; }
+                VerticalLayout {
+                    alignment: center;
+                    width: 24px;
+
+                    MaterialIcon {
+                        name: root.icon-name;
+                        icon-size: 22px;
+                        icon-color: root.is-active ? Theme.on-container :
+                                    touch.has-hover ? Theme.text-ink : Theme.text-mute;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+
+                    Text {
+                        text: root.label;
+                        color: root.is-active ? Theme.on-container :
+                                touch.has-hover ? Theme.text-ink : Theme.text-mute;
+                        font-size: 15px;
+                        font-weight: root.is-active ? 600 : 500;
+                        vertical-alignment: center;
+                    }
+                }
             }
 
-            Text {
-                text: root.icon;
-                font-size: 18px;
-                vertical-alignment: center;
-            }
+            if root.badge-count > 0 : VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    background: Theme.mint;
+                    border-radius: Theme.radius-pill;
+                    height: 20px;
+                    min-width: 20px;
 
-            Text {
-                text: root.label;
-                color: root.is-active ? Theme.primary :
-                       touch.has-hover ? Theme.text-primary : Theme.text-secondary;
-                font-size: 14px;
-                font-weight: root.is-active ? 600 : 500;
-                vertical-alignment: center;
+                    HorizontalLayout {
+                        padding-left: 7px;
+                        padding-right: 7px;
+                        alignment: center;
 
-                animate color { duration: 120ms; }
+                        Text {
+                            text: root.badge-count;
+                            color: Theme.on-mint;
+                            font-size: 11px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
             }
+        }
+
+        if root.is-collapsed : MaterialIcon {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            name: root.icon-name;
+            icon-size: 22px;
+            icon-color: root.is-active ? Theme.on-container :
+                        touch.has-hover ? Theme.text-ink : Theme.text-mute;
         }
     }
 
+    if root.is-collapsed && root.badge-count > 0 : Rectangle {
+        x: parent.width - 20px;
+        y: 6px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: Theme.mint;
+    }
+
     touch := TouchArea {
+        mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
 }
 
 export component NavigationRail {
     in property <int> active-tab: 0;
+    in property <int> requests-count: 1;
+    in property <string> system-caption: "v0.3.0\nWindows 11 · GTX 1660 SUPER";
+    in-out property <bool> is-collapsed: false;
     callback tab-selected(int);
+    callback toggle-collapsed();
 
-    width: 220px;
+    width: root.is-collapsed ? 68px : (Theme.compact-view ? 220px : 250px);
+    animate width { duration: 180ms; easing: ease-out; }
 
     Rectangle {
-        background: Theme.surface;
-        border-width: 1px;
-        border-color: Theme.surface-border;
+        background: Theme.background;
+        border-width: 0px;
+        border-color: Theme.border-line;
+        clip: true;
 
         VerticalLayout {
-            padding: Theme.space-lg;
-            spacing: Theme.space-sm;
-            alignment: start;
+            padding-top: 8px;
+            padding-bottom: 20px;
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 4px;
+            alignment: space-between;
 
-            // Brand Header
-            HorizontalLayout {
-                spacing: Theme.space-sm;
-                padding-bottom: Theme.space-lg;
+            VerticalLayout {
+                spacing: 4px;
 
-                Rectangle {
-                    width: 28px;
-                    height: 28px;
-                    border-radius: 8px;
-                    background: Theme.primary;
+                // Application Brand Title + Collapse/Expand Toggle
+                HorizontalLayout {
+                    padding-left: root.is-collapsed ? 8px : 14px;
+                    padding-right: root.is-collapsed ? 6px : 8px;
+                    padding-top: 10px;
+                    padding-bottom: 12px;
+                    alignment: space-between;
 
-                    Text {
-                        text: "M";
-                        color: Theme.on-primary;
-                        font-size: 16px;
-                        font-weight: 800;
-                        horizontal-alignment: center;
+                    if !root.is-collapsed : Text {
+                        text: "Mist";
+                        font-size: 24px;
+                        font-weight: 700;
+                        color: Theme.text-ink;
                         vertical-alignment: center;
+                    }
+
+                    if root.is-collapsed : Text {
+                        text: "M";
+                        font-size: 22px;
+                        font-weight: 800;
+                        color: Theme.mint;
+                        vertical-alignment: center;
+                    }
+
+                    // Toggle Button
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 16px;
+                        background: col-touch.has-hover ? Theme.item-hover : #00000000;
+                        animate background { duration: 120ms; }
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: root.is-collapsed ? "chevron_right" : "chevron_left";
+                            icon-size: 20px;
+                            icon-color: Theme.text-mute;
+                        }
+
+                        col-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.is-collapsed = !root.is-collapsed;
+                                root.toggle-collapsed();
+                            }
+                        }
                     }
                 }
 
-                Text {
-                    text: "MIST";
-                    color: Theme.text-primary;
-                    font-size: 18px;
-                    font-weight: 800;
-                    letter-spacing: 2px;
-                    vertical-alignment: center;
+                // 5 Main Navigation Items
+                NavItem {
+                    icon-name: "home";
+                    label: "Home";
+                    is-active: root.active-tab == 0;
+                    is-collapsed: root.is-collapsed;
+                    clicked => { root.tab-selected(0); }
+                }
+
+                NavItem {
+                    icon-name: "cast";
+                    label: "Host";
+                    is-active: root.active-tab == 1;
+                    is-collapsed: root.is-collapsed;
+                    clicked => { root.tab-selected(1); }
+                }
+
+                NavItem {
+                    icon-name: "sports_esports";
+                    label: "Connect";
+                    is-active: root.active-tab == 2;
+                    is-collapsed: root.is-collapsed;
+                    clicked => { root.tab-selected(2); }
+                }
+
+                NavItem {
+                    icon-name: "group";
+                    label: "Friends";
+                    is-active: root.active-tab == 3;
+                    badge-count: root.requests-count;
+                    is-collapsed: root.is-collapsed;
+                    clicked => { root.tab-selected(3); }
+                }
+
+                NavItem {
+                    icon-name: "network_check";
+                    label: "Network";
+                    is-active: root.active-tab == 4;
+                    is-collapsed: root.is-collapsed;
+                    clicked => { root.tab-selected(4); }
                 }
             }
 
-            NavItem {
-                icon: "🏠";
-                label: "Home";
-                is-active: root.active-tab == 0;
-                clicked => { root.tab-selected(0); }
-            }
+            // Bottom System & Version Information
+            HorizontalLayout {
+                padding-left: root.is-collapsed ? 4px : 14px;
+                padding-right: root.is-collapsed ? 4px : 14px;
+                padding-top: 16px;
+                alignment: root.is-collapsed ? center : start;
 
-            NavItem {
-                icon: "📡";
-                label: "Wi-Fi Share";
-                is-active: root.active-tab == 1;
-                clicked => { root.tab-selected(1); }
-            }
-
-            NavItem {
-                icon: "🔗";
-                label: "Connect";
-                is-active: root.active-tab == 2;
-                clicked => { root.tab-selected(2); }
-            }
-
-            NavItem {
-                icon: "💻";
-                label: "Devices";
-                is-active: root.active-tab == 3;
-                clicked => { root.tab-selected(3); }
-            }
-
-            NavItem {
-                icon: "📶";
-                label: "Network";
-                is-active: root.active-tab == 4;
-                clicked => { root.tab-selected(4); }
-            }
-
-            NavItem {
-                icon: "⚙";
-                label: "Settings";
-                is-active: root.active-tab == 5;
-                clicked => { root.tab-selected(5); }
-            }
-
-            NavItem {
-                icon: "ℹ";
-                label: "About";
-                is-active: root.active-tab == 6;
-                clicked => { root.tab-selected(6); }
+                Text {
+                    text: root.is-collapsed ? "v0.3" : root.system-caption;
+                    color: Theme.text-mute;
+                    font-size: root.is-collapsed ? 11px : 12px;
+                    horizontal-alignment: root.is-collapsed ? center : left;
+                }
             }
         }
     }

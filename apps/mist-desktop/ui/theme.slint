@@ -1,44 +1,93 @@
+import "../../../resources/fonts/Roboto-Regular.ttf";
+import "../../../resources/fonts/Roboto-Medium.ttf";
+import "../../../resources/fonts/Roboto-Bold.ttf";
+import "../../../resources/fonts/MaterialSymbolsRounded.ttf";
+
 export global Theme {
-    in-out property <bool> dark-mode: true;
+    // Theme Mode
+    in-out property <bool> dark-mode: false;
+    in-out property <bool> high-contrast: false;
+    in-out property <bool> compact-view: false;
 
-    // Pixel Mint Official Palette
-    out property <color> pixel-mint: #B8EBD5;
-    out property <color> fresh-mint: #8ED8BA;
-    out property <color> forest-green: #174B38;
-    out property <color> deep-evergreen: #0D3024;
-    out property <color> cloud: #F2F8F4;
-    out property <color> soft-sage: #DDEFE4;
+    // Material 3 Typography
+    out property <string> font-family: "Roboto";
+    out property <string> font-family-icon: "Material Symbols Rounded";
 
-    // Adaptive Theme Surfaces
-    out property <color> background: dark-mode ? #101A15 : #F2F8F4;
-    out property <color> surface: dark-mode ? #18231C : #FFFFFF;
-    out property <color> surface-variant: dark-mode ? #202E25 : #DDEFE4;
-    out property <color> surface-border: dark-mode ? #2A3C31 : #CADFD2;
-    out property <color> text-primary: dark-mode ? #F2F8F4 : #0D3024;
-    out property <color> text-secondary: dark-mode ? #8FAAA0 : #3B5A4D;
-    out property <color> text-disabled: dark-mode ? #4D6358 : #8E9F97;
+    // Material Design 3 Mint & White Palette (matches Mist design language)
+    out property <color> background: dark-mode ? #0c1915 : #f0faf6;
+    out property <color> surface: dark-mode ? #132621 : #ffffff;
+    out property <color> surface-glass: dark-mode ? #132621d9 : #ffffffd9;
+    out property <color> container: dark-mode ? #1c3d33 : #bff0dd;
+    out property <color> container-subtle: dark-mode ? #173229 : #e3f6ee;
+    out property <color> input-bg: dark-mode ? #162c26 : #ffffff;
+    out property <color> item-hover: dark-mode ? #1f4237 : #e3f6ee;
+    out property <color> item-active: dark-mode ? #285446 : #bff0dd;
 
-    out property <color> primary: dark-mode ? #B8EBD5 : #174B38;
-    out property <color> on-primary: dark-mode ? #0D3024 : #F2F8F4;
-    out property <color> primary-hover: dark-mode ? #9EE0C5 : #1E5C46;
-    out property <color> accent: #8ED8BA;
+    out property <color> mint: dark-mode ? #6fdcb6 : #46deb5;
+    out property <color> on-mint: dark-mode ? #00382a : #032b20;
 
-    out property <color> error: #FF6B6B;
-    out property <color> error-container: dark-mode ? #3A1E1E : #FFEBEB;
-    out property <color> success: #8ED8BA;
+    out property <color> accent: dark-mode ? #6fdcb6 : #0f8466;
+    out property <color> on-accent: #ffffff;
+    out property <color> on-container: dark-mode ? #c9f4e3 : #06382b;
 
-    // Corner Radii
+    out property <color> text-ink: dark-mode ? #e5f6f0 : #10231d;
+    out property <color> text-mute: high-contrast ? (dark-mode ? #ffffff : #000000) : (dark-mode ? #9abcb0 : #4f655d);
+    out property <color> text-placeholder: dark-mode ? #67877c : #8fa79e;
+    out property <color> border-line: high-contrast ? text-mute : (dark-mode ? #2b4c42 : #d4e7df);
+    out property <color> border-subtle: high-contrast ? text-mute : (dark-mode ? #223e36 : #e6f2ec);
+
+    // Semantic States
+    out property <color> color-ok: dark-mode ? #6fdcb6 : #0f8466;
+    out property <color> color-warn: dark-mode ? #f0bb55 : #8a5a00;
+    out property <color> color-bad: dark-mode ? #f87171 : #b3261e;
+    out property <color> ok-container: dark-mode ? #13382c : #dcf6eb;
+    out property <color> bad-container: dark-mode ? #381515 : #fee2e2;
+
+    // Shadows
+    out property <color> shadow-color: dark-mode ? #00000066 : #032b2014;
+    out property <color> glow-mint: dark-mode ? #6fdcb644 : #46deb555;
+
+    // Compatibility aliases for existing components
+    out property <color> primary: mint;
+    out property <color> primary-hover: accent;
+    out property <color> primary-pressed: on-mint;
+    out property <color> on-primary: on-mint;
+    out property <color> primary-container: container;
+    out property <color> on-primary-container: on-container;
+    out property <color> text-primary: text-ink;
+    out property <color> text-secondary: text-mute;
+    out property <color> text-disabled: dark-mode ? #557268 : #8fa497;
+    out property <color> surface-border: border-line;
+    out property <color> surface-border-strong: accent;
+    out property <color> surface-variant: container-subtle;
+    out property <color> surface-container-high: dark-mode ? #2b4c42 : #d4e7df;
+    out property <color> error: color-bad;
+    out property <color> error-container: dark-mode ? #381515 : #fee2e2;
+    out property <color> on-error-container: dark-mode ? #f87171 : #b3261e;
+    out property <color> success: color-ok;
+    out property <color> success-container: container;
+
+    // Shape Background Colors
+    out property <color> shape-1: dark-mode ? #195243 : #c2efdc;
+    out property <color> shape-2: dark-mode ? #12382f : #dcf6ec;
+    out property <color> shape-3: dark-mode ? #22705b : #a3e8cb;
+    out property <color> shape-4: dark-mode ? #0e2d25 : #d0f2e4;
+
+    // Material 3 Radii
     out property <length> radius-small: 8px;
     out property <length> radius-medium: 12px;
     out property <length> radius-large: 16px;
     out property <length> radius-xlarge: 28px;
-    out property <length> radius-pill: 999px;
+    out property <length> radius-tile: compact-view ? 18px : 24px;
+    out property <length> radius-card: compact-view ? 20px : 28px;
+    out property <length> radius-pill: 9999px;
 
-    // Spacing
+    // Dynamic Spacing (adapts with compact-view)
     out property <length> space-xs: 4px;
     out property <length> space-sm: 8px;
-    out property <length> space-md: 12px;
-    out property <length> space-lg: 16px;
-    out property <length> space-xl: 24px;
-    out property <length> space-xxl: 32px;
+    out property <length> space-md: compact-view ? 8px : 12px;
+    out property <length> space-lg: compact-view ? 12px : 16px;
+    out property <length> space-xl: compact-view ? 16px : 22px;
+    out property <length> space-xxl: compact-view ? 20px : 28px;
+    out property <length> card-padding: compact-view ? 16px : 24px;
 }

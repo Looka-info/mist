@@ -11,7 +11,7 @@ export struct DeviceItemData {
     has-input: bool,
 }
 
-export component DevicesScreen {
+export component DevicesScreen inherits Rectangle {
     in property <[DeviceItemData]> devices: [];
     in property <bool> is-locked-out: false;
     in property <int> lockout-seconds: 0;
@@ -20,7 +20,13 @@ export component DevicesScreen {
     callback start-share-clicked();
 
     Flickable {
-        VerticalLayout {
+        width: 100%;
+        height: 100%;
+        content-width: self.width;
+        content-height: max(self.height, content.preferred-height);
+
+        content := VerticalLayout {
+            width: parent.width;
             padding: Theme.space-xl;
             spacing: Theme.space-xl;
             alignment: start;
@@ -33,11 +39,11 @@ export component DevicesScreen {
                     text: "Paired Devices";
                     color: Theme.text-primary;
                     font-size: 24px;
-                    font-weight: 700;
+                    font-weight: 800;
                 }
 
                 Text {
-                    text: "Devices authorized to connect and stream with this computer.";
+                    text: "Authorized endpoints permitted to stream and control this computer.";
                     color: Theme.text-secondary;
                     font-size: 14px;
                 }
@@ -55,7 +61,7 @@ export component DevicesScreen {
 
                     Text {
                         text: "⚠ Rate limit active. Pairing locked out for " + root.lockout-seconds + " seconds due to repeated invalid attempts.";
-                        color: Theme.error;
+                        color: Theme.on-error-container;
                         font-size: 14px;
                         font-weight: 600;
                     }
@@ -85,7 +91,7 @@ export component DevicesScreen {
                 border-color: Theme.surface-border;
 
                 EmptyState {
-                    icon: "💻";
+                    icon-name: "devices";
                     title: "No Paired Devices";
                     description: "Share your screen or connect with a code to establish a trusted session.";
                     button-text: "Start Wi-Fi Share";

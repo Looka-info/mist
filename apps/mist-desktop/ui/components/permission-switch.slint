@@ -6,7 +6,7 @@ export component PermissionSwitch {
     in property <bool> enabled: true;
     callback toggled(bool);
 
-    height: 36px;
+    height: 40px;
 
     HorizontalLayout {
         alignment: space-between;
@@ -20,29 +20,33 @@ export component PermissionSwitch {
         }
 
         track := Rectangle {
-            width: 48px;
-            height: 26px;
+            width: 52px;
+            height: 30px;
             y: (parent.height - self.height) / 2;
-            border-radius: 13px;
-            background: root.checked ? Theme.primary : Theme.surface-variant;
-            border-width: 1px;
-            border-color: root.checked ? Theme.primary : Theme.surface-border;
+            border-radius: 15px;
+            background: !root.enabled ? Theme.surface-variant :
+                        root.checked ? Theme.primary : Theme.surface-container-high;
+            border-width: 1.5px;
+            border-color: !root.enabled ? Theme.surface-border :
+                          root.checked ? Theme.primary : Theme.surface-border-strong;
 
-            animate background, border-color { duration: 150ms; easing: ease-out; }
+            animate background, border-color { duration: 180ms; easing: cubic-bezier(0.2, 0.0, 0, 1.0); }
 
             thumb := Rectangle {
-                width: 20px;
-                height: 20px;
-                y: 2px;
-                x: root.checked ? 24px : 3px;
-                border-radius: 10px;
-                background: root.checked ? Theme.on-primary : Theme.text-secondary;
+                width: root.checked ? 22px : 18px;
+                height: root.checked ? 22px : 18px;
+                y: (parent.height - self.height) / 2;
+                x: root.checked ? 25px : 4px;
+                border-radius: 11px;
+                background: !root.enabled ? Theme.text-disabled :
+                            root.checked ? Theme.on-primary : Theme.text-secondary;
 
-                animate x { duration: 150ms; easing: ease-out; }
+                animate x, width, height, background { duration: 180ms; easing: cubic-bezier(0.2, 0.0, 0, 1.0); }
             }
 
             TouchArea {
                 enabled: root.enabled;
+                mouse-cursor: pointer;
                 clicked => {
                     root.checked = !root.checked;
                     root.toggled(root.checked);

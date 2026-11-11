@@ -7,24 +7,28 @@ export component StatusIndicator {
 
     HorizontalLayout {
         spacing: Theme.space-sm;
-        alignment: start;
 
-        dot := Rectangle {
-            width: 8px;
-            height: 8px;
-            y: (parent.height - self.height) / 2;
-            border-radius: 4px;
-            background: root.is-active ? Theme.fresh-mint : Theme.text-disabled;
+        VerticalLayout {
+            alignment: center;
+            dot := Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: root.is-active ? Theme.primary : Theme.text-disabled;
 
-            animate background { duration: 200ms; }
+                animate background { duration: 200ms; }
+            }
         }
 
-        Text {
-            text: root.is-active ? root.active-text : root.inactive-text;
-            color: root.is-active ? Theme.text-primary : Theme.text-secondary;
-            font-size: 13px;
-            font-weight: 500;
-            vertical-alignment: center;
+        VerticalLayout {
+            alignment: center;
+            Text {
+                text: root.is-active ? root.active-text : root.inactive-text;
+                color: root.is-active ? Theme.text-primary : Theme.text-secondary;
+                font-size: 13px;
+                font-weight: 500;
+                vertical-alignment: center;
+            }
         }
     }
 }

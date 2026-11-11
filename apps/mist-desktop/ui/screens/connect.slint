@@ -1,186 +1,552 @@
 import { Theme } from "../theme.slint";
-import { PrimaryButton } from "../components/primary-button.slint";
-import { SecondaryButton } from "../components/secondary-button.slint";
-import { PairingCodeInput } from "../components/pairing-code-input.slint";
-import { TextField } from "../components/text-field.slint";
-import { PermissionSwitch } from "../components/permission-switch.slint";
-import { ProgressIndicator } from "../components/progress-indicator.slint";
+import { MaterialIcon } from "../components/material-icon.slint";
+import { M3Switch } from "../components/m3-switch.slint";
 
-export component ConnectScreen {
-    in-out property <string> pairing-code: "";
-    in-out property <string> host-ip: "127.0.0.1";
-    in property <bool> is-connecting: false;
-    in property <int> connect-step: 0; // 0=idle, 1=validating, 2=signaling, 3=ice, 4=ready
-    in property <string> error-message: "";
+export struct HostingFriendItem {
+    tag: string,
+    is-online: bool,
+    is-hosting: bool,
+}
 
-    in-out property <bool> request-audio: true;
-    in-out property <bool> request-input: true;
+component HostingFriendsCard inherits Rectangle {
+    in property <[HostingFriendItem]> hosting-friends: [];
+    in-out property <string> direct-address: "";
+    in-out property <bool> hear-audio: true;
+    in-out property <bool> send-input: true;
 
-    callback connect-clicked();
-    callback cancel-clicked();
-    callback paste-clicked();
-    callback code-edited(string);
+    callback connect-to-friend(string);
+    callback hear-audio-toggled(bool);
+    callback send-input-toggled(bool);
 
-    Flickable {
+    horizontal-stretch: 1;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.border-line;
+    border-radius: Theme.radius-card;
+    drop-shadow-blur: 10px;
+    drop-shadow-color: Theme.shadow-color;
+
+    VerticalLayout {
+        padding: Theme.card-padding;
+        spacing: 14px;
+        alignment: space-between;
+
         VerticalLayout {
-            padding: Theme.space-xl;
-            spacing: Theme.space-xl;
-            alignment: start;
+            spacing: 12px;
 
-            // Screen Header
-            VerticalLayout {
-                spacing: Theme.space-xs;
-
-                Text {
-                    text: "Connect to a Device";
-                    color: Theme.text-primary;
-                    font-size: 24px;
-                    font-weight: 700;
-                }
-
-                Text {
-                    text: "Enter the 6-character code displayed on the host PC to initiate an authorized streaming session.";
-                    color: Theme.text-secondary;
-                    font-size: 14px;
-                }
+            Text {
+                text: "Friends hosting now";
+                font-size: 20px;
+                font-weight: 600;
+                color: Theme.text-ink;
             }
 
-            // Code Entry Section
-            Rectangle {
-                background: Theme.surface;
-                border-radius: Theme.radius-large;
-                border-width: 1px;
-                border-color: Theme.surface-border;
-
-                VerticalLayout {
-                    padding: Theme.space-xl;
-                    spacing: Theme.space-lg;
-
-                    Text {
-                        text: "Pairing Code";
-                        color: Theme.text-primary;
-                        font-size: 15px;
-                        font-weight: 600;
-                    }
-
-                    PairingCodeInput {
-                        code <=> root.pairing-code;
-                        enabled: !root.is-connecting;
-                        edited(s) => { root.code-edited(s); }
-                        paste-clicked => { root.paste-clicked(); }
-                        submitted => { root.connect-clicked(); }
-                    }
-
-                    Text {
-                        text: "Host Network Address (LAN IP / Hostname)";
-                        color: Theme.text-secondary;
-                        font-size: 13px;
-                        font-weight: 500;
-                    }
-
-                    TextField {
-                        text <=> root.host-ip;
-                        placeholder: "e.g. 192.168.1.100 or 127.0.0.1";
-                        enabled: !root.is-connecting;
-                    }
-                }
+            if root.hosting-friends.length == 0 : Text {
+                text: "None of your friends are hosting right now.";
+                font-size: 13px;
+                color: Theme.text-mute;
             }
 
-            // Requested Permissions Options
-            Rectangle {
-                background: Theme.surface;
-                border-radius: Theme.radius-large;
-                border-width: 1px;
-                border-color: Theme.surface-border;
-
-                VerticalLayout {
-                    padding: Theme.space-lg;
-                    spacing: Theme.space-md;
-
-                    Text {
-                        text: "Session Capabilities";
-                        color: Theme.text-primary;
-                        font-size: 15px;
-                        font-weight: 600;
-                    }
-
-                    PermissionSwitch {
-                        text: "Receive High-Fidelity Audio";
-                        checked <=> root.request-audio;
-                        enabled: !root.is-connecting;
-                    }
-
-                    PermissionSwitch {
-                        text: "Request Remote Control (Keyboard / Mouse / Gamepad)";
-                        checked <=> root.request-input;
-                        enabled: !root.is-connecting;
-                    }
-                }
-            }
-
-            // Connection Progress & Feedback
-            if root.is-connecting : Rectangle {
-                background: Theme.surface;
-                border-radius: Theme.radius-medium;
-                border-width: 1px;
-                border-color: Theme.primary;
-
-                VerticalLayout {
-                    padding: Theme.space-lg;
-                    spacing: Theme.space-md;
-
-                    Text {
-                        text: root.connect-step == 1 ? "1/4: Submitting code to remote host..." :
-                              root.connect-step == 2 ? "2/4: Connecting to signaling service..." :
-                              root.connect-step == 3 ? "3/4: Negotiating WebRTC peer connection..." :
-                              "4/4: Initializing hardware video decoder...";
-                        color: Theme.primary;
-                        font-size: 14px;
-                        font-weight: 600;
-                    }
-
-                    ProgressIndicator {
-                        is-loading: true;
-                    }
-                }
-            }
-
-            // Error Message Display
-            if root.error-message != "" : Rectangle {
-                background: Theme.error-container;
-                border-radius: Theme.radius-medium;
-                border-width: 1px;
-                border-color: Theme.error;
+            // Hosting Friends List
+            for friend in root.hosting-friends : HorizontalLayout {
+                padding-top: 6px;
+                padding-bottom: 6px;
+                alignment: space-between;
 
                 HorizontalLayout {
-                    padding: Theme.space-md;
-                    spacing: Theme.space-sm;
+                    spacing: 12px;
+                    alignment: start;
 
-                    Text {
-                        text: "⚠ " + root.error-message;
-                        color: Theme.error;
-                        font-size: 14px;
-                        font-weight: 500;
-                        wrap: word-wrap;
+                    Rectangle {
+                        width: 38px;
+                        height: 38px;
+                        border-radius: 19px;
+                        background: Theme.container;
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: "person";
+                            icon-size: 20px;
+                            icon-color: Theme.on-container;
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        Text { text: friend.tag; font-size: 14px; font-weight: 600; color: Theme.text-ink; overflow: elide; }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            Rectangle {
+                                width: 7px;
+                                height: 7px;
+                                border-radius: 3.5px;
+                                background: Theme.color-ok;
+                                y: 3px;
+                            }
+                            Text {
+                                text: "Hosting now";
+                                font-size: 12px;
+                                color: Theme.color-ok;
+                            }
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        height: 36px;
+                        border-radius: Theme.radius-pill;
+                        background: conn-btn.has-hover ? Theme.accent : Theme.mint;
+                        animate background { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 20px;
+                            padding-right: 20px;
+                            alignment: center;
+                            Text {
+                                text: "Connect";
+                                font-size: 13px;
+                                font-weight: 600;
+                                color: Theme.on-mint;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        conn-btn := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.connect-to-friend(friend.tag); }
+                        }
                     }
                 }
             }
 
-            // Action Buttons
-            HorizontalLayout {
-                alignment: end;
-                spacing: Theme.space-md;
+            // Direct / Internet Connect
+            Rectangle { height: 1px; background: Theme.border-line; }
 
-                if root.is-connecting : SecondaryButton {
-                    text: "Cancel";
-                    clicked => { root.cancel-clicked(); }
+            VerticalLayout {
+                spacing: 8px;
+
+                Text {
+                    text: "Direct / Internet Connect";
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: Theme.text-ink;
                 }
 
-                PrimaryButton {
-                    text: root.is-connecting ? "Connecting..." : "Connect to Host";
-                    enabled: !root.is-connecting && root.pairing-code != "";
-                    min-width: 160px;
-                    clicked => { root.connect-clicked(); }
+                Text {
+                    text: "Connect to a friend using their 6-digit pairing code, public IP, or tunnel address.";
+                    font-size: 12px;
+                    color: Theme.text-mute;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    Rectangle {
+                        height: 38px;
+                        horizontal-stretch: 1;
+                        border-radius: 10px;
+                        background: Theme.input-bg;
+                        border-width: 1.5px;
+                        border-color: Theme.border-line;
+
+                        TextInput {
+                            x: 12px;
+                            width: parent.width - 24px;
+                            text <=> root.direct-address;
+                            font-size: 13px;
+                            color: Theme.text-ink;
+                            vertical-alignment: center;
+                            accepted => {
+                                if root.direct-address != "" {
+                                    root.connect-to-friend(root.direct-address);
+                                }
+                            }
+                        }
+
+                        if root.direct-address == "" : Text {
+                            x: 12px;
+                            text: "Enter 6-digit code or IP:port";
+                            font-size: 12px;
+                            color: Theme.text-placeholder;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 86px;
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        background: dir-btn.has-hover ? Theme.accent : Theme.mint;
+                        animate background { duration: 120ms; }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Connect";
+                                font-size: 13px;
+                                font-weight: 600;
+                                color: Theme.on-mint;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        dir-btn := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                if root.direct-address != "" {
+                                    root.connect-to-friend(root.direct-address);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Option Toggles
+        VerticalLayout {
+            spacing: 8px;
+
+            Rectangle { height: 1px; background: Theme.border-line; }
+
+            HorizontalLayout {
+                padding-top: 4px;
+                padding-bottom: 4px;
+                alignment: space-between;
+
+                Text {
+                    text: "Hear remote audio";
+                    font-size: 14px;
+                    color: Theme.text-ink;
+                    vertical-alignment: center;
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    M3Switch {
+                        checked <=> root.hear-audio;
+                        toggled(v) => { root.hear-audio-toggled(v); }
+                    }
+                }
+            }
+
+            Rectangle { height: 1px; background: Theme.border-line; }
+
+            HorizontalLayout {
+                padding-top: 4px;
+                padding-bottom: 4px;
+                alignment: space-between;
+
+                Text {
+                    text: "Send my keyboard, mouse and gamepad";
+                    font-size: 14px;
+                    color: Theme.text-ink;
+                    vertical-alignment: center;
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    M3Switch {
+                        checked <=> root.send-input;
+                        toggled(v) => { root.send-input-toggled(v); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component ConnectionStatusCard inherits Rectangle {
+    in property <int> connection-step: 0;
+    in property <string> connection-message: "Pick a friend who is hosting and join their stream.";
+    in property <bool> is-connected: false;
+
+    callback disconnect();
+
+    horizontal-stretch: 1;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.border-line;
+    border-radius: Theme.radius-card;
+    drop-shadow-blur: 10px;
+    drop-shadow-color: Theme.shadow-color;
+
+    VerticalLayout {
+        padding: Theme.card-padding;
+        spacing: 16px;
+        alignment: space-between;
+
+        VerticalLayout {
+            spacing: 14px;
+
+            Text {
+                text: "Connection Progress";
+                font-size: 20px;
+                font-weight: 600;
+                color: Theme.text-ink;
+            }
+
+            // 4 Steps List with check circles
+            VerticalLayout {
+                spacing: 12px;
+
+                // Step 1: Find your friend
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        alignment: center;
+                        MaterialIcon {
+                            name: root.connection-step > 1 ? "check_circle" : (root.connection-step == 1 ? "sync" : "radio_button_unchecked");
+                            icon-size: 22px;
+                            icon-color: root.connection-step > 1 ? Theme.color-ok : (root.connection-step == 1 ? Theme.accent : Theme.border-line);
+                        }
+                    }
+                    Text {
+                        text: "Find your friend";
+                        font-size: 14px;
+                        font-weight: root.connection-step == 1 ? 700 : (root.connection-step > 1 ? 600 : 400);
+                        color: root.connection-step >= 1 ? Theme.text-ink : Theme.text-mute;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Step 2: Ask to join
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        alignment: center;
+                        MaterialIcon {
+                            name: root.connection-step > 2 ? "check_circle" : (root.connection-step == 2 ? "sync" : "radio_button_unchecked");
+                            icon-size: 22px;
+                            icon-color: root.connection-step > 2 ? Theme.color-ok : (root.connection-step == 2 ? Theme.accent : Theme.border-line);
+                        }
+                    }
+                    Text {
+                        text: "Ask to join";
+                        font-size: 14px;
+                        font-weight: root.connection-step == 2 ? 700 : (root.connection-step > 2 ? 600 : 400);
+                        color: root.connection-step >= 2 ? Theme.text-ink : Theme.text-mute;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Step 3: Open secure connection
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        alignment: center;
+                        MaterialIcon {
+                            name: root.connection-step > 3 ? "check_circle" : (root.connection-step == 3 ? "sync" : "radio_button_unchecked");
+                            icon-size: 22px;
+                            icon-color: root.connection-step > 3 ? Theme.color-ok : (root.connection-step == 3 ? Theme.accent : Theme.border-line);
+                        }
+                    }
+                    Text {
+                        text: "Open secure connection";
+                        font-size: 14px;
+                        font-weight: root.connection-step == 3 ? 700 : (root.connection-step > 3 ? 600 : 400);
+                        color: root.connection-step >= 3 ? Theme.text-ink : Theme.text-mute;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Step 4: Receive first frame
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        alignment: center;
+                        MaterialIcon {
+                            name: root.is-connected ? "check_circle" : (root.connection-step == 4 ? "sync" : "radio_button_unchecked");
+                            icon-size: 22px;
+                            icon-color: root.is-connected ? Theme.color-ok : (root.connection-step == 4 ? Theme.accent : Theme.border-line);
+                        }
+                    }
+                    Text {
+                        text: "Receive first frame";
+                        font-size: 14px;
+                        font-weight: root.is-connected ? 600 : (root.connection-step == 4 ? 700 : 400);
+                        color: root.connection-step >= 4 || root.is-connected ? Theme.text-ink : Theme.text-mute;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // Status message below & Disconnect action
+        VerticalLayout {
+            spacing: 10px;
+
+            Rectangle {
+                background: Theme.container-subtle;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Theme.border-line;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    padding-top: 10px;
+                    padding-bottom: 10px;
+                    spacing: 8px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        MaterialIcon {
+                            name: root.is-connected ? "check_circle" : (root.connection-step > 0 ? "hourglass_top" : "info");
+                            icon-size: 18px;
+                            icon-color: root.is-connected ? Theme.color-ok : (root.connection-step > 0 ? Theme.accent : Theme.text-mute);
+                        }
+                    }
+
+                    Text {
+                        text: root.connection-message;
+                        font-size: 13px;
+                        color: Theme.text-ink;
+                        wrap: word-wrap;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            if root.is-connected : HorizontalLayout {
+                alignment: end;
+                Rectangle {
+                    height: 36px;
+                    border-radius: Theme.radius-pill;
+                    background: disc-btn.has-hover ? Theme.bad-container : Theme.surface;
+                    border-width: 1px;
+                    border-color: Theme.color-bad;
+
+                    HorizontalLayout {
+                        padding-left: 16px;
+                        padding-right: 16px;
+                        spacing: 6px;
+                        alignment: center;
+
+                        VerticalLayout {
+                            alignment: center;
+                            MaterialIcon {
+                                name: "close";
+                                icon-size: 16px;
+                                icon-color: Theme.color-bad;
+                            }
+                        }
+
+                        Text {
+                            text: "Disconnect Stream";
+                            font-size: 13px;
+                            font-weight: 600;
+                            color: Theme.color-bad;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    disc-btn := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.disconnect(); }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component ConnectScreen inherits Rectangle {
+    in property <[HostingFriendItem]> hosting-friends: [];
+
+    in property <int> connection-step: 0; // 0=Not connected, 1=Find friend, 2=Ask join, 3=Open connection, 4=Connected
+    in property <string> connection-message: "Pick a friend who is hosting and join their stream.";
+    in property <bool> is-connected: false;
+
+    in-out property <string> direct-address: "";
+    in-out property <bool> hear-audio: true;
+    in-out property <bool> send-input: true;
+
+    callback connect-to-friend(string);
+    callback disconnect();
+    callback hear-audio-toggled(bool);
+    callback send-input-toggled(bool);
+
+    property <bool> is-narrow: root.width < 860px;
+
+    Flickable {
+        width: 100%;
+        height: 100%;
+        content-width: self.width;
+
+        content := VerticalLayout {
+            width: parent.width;
+            padding-left: Theme.compact-view ? 16px : 24px;
+            padding-right: Theme.compact-view ? 16px : 24px;
+            padding-top: Theme.compact-view ? 8px : 12px;
+            padding-bottom: 60px;
+            spacing: Theme.compact-view ? 16px : 22px;
+            alignment: start;
+
+            // Page Header
+            VerticalLayout {
+                spacing: 4px;
+                Text {
+                    text: "Connect";
+                    font-size: 30px;
+                    font-weight: 600;
+                    color: Theme.text-ink;
+                }
+                Text {
+                    text: "Pick a friend who is hosting and join their stream.";
+                    font-size: 14px;
+                    color: Theme.text-mute;
+                }
+            }
+
+            // Responsive 2-Card Layout: Side-by-Side when wide, Stacked when narrow
+            if !root.is-narrow : HorizontalLayout {
+                spacing: 16px;
+
+                HostingFriendsCard {
+                    hosting-friends: root.hosting-friends;
+                    direct-address <=> root.direct-address;
+                    hear-audio <=> root.hear-audio;
+                    send-input <=> root.send-input;
+                    connect-to-friend(a) => { root.connect-to-friend(a); }
+                    hear-audio-toggled(v) => { root.hear-audio-toggled(v); }
+                    send-input-toggled(v) => { root.send-input-toggled(v); }
+                }
+
+                ConnectionStatusCard {
+                    connection-step: root.connection-step;
+                    connection-message: root.connection-message;
+                    is-connected: root.is-connected;
+                    disconnect => { root.disconnect(); }
+                }
+            }
+
+            if root.is-narrow : VerticalLayout {
+                spacing: 16px;
+
+                HostingFriendsCard {
+                    hosting-friends: root.hosting-friends;
+                    direct-address <=> root.direct-address;
+                    hear-audio <=> root.hear-audio;
+                    send-input <=> root.send-input;
+                    connect-to-friend(a) => { root.connect-to-friend(a); }
+                    hear-audio-toggled(v) => { root.hear-audio-toggled(v); }
+                    send-input-toggled(v) => { root.send-input-toggled(v); }
+                }
+
+                ConnectionStatusCard {
+                    connection-step: root.connection-step;
+                    connection-message: root.connection-message;
+                    is-connected: root.is-connected;
+                    disconnect => { root.disconnect(); }
                 }
             }
         }

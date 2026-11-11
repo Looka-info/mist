@@ -1,330 +1,891 @@
 import { Theme } from "theme.slint";
 import { NavigationRail } from "components/navigation-rail.slint";
-import { Dialog } from "components/dialog.slint";
+import { MaterialIcon } from "components/material-icon.slint";
 import { Toast } from "components/toast.slint";
-import { HomeScreen } from "screens/home.slint";
-import { HostScreen } from "screens/host.slint";
-import { ConnectScreen } from "screens/connect.slint";
-import { DevicesScreen, DeviceItemData } from "screens/devices.slint";
+import { LoadingScreen } from "components/loading-screen.slint";
+import { M3BackgroundShapes } from "components/m3-background-shapes.slint";
+import { SettingsDialog } from "components/settings-dialog.slint";
+import { Dialog } from "components/dialog.slint";
+import { PermissionsDialog } from "components/permissions-dialog.slint";
+import { AuthScreen } from "screens/auth.slint";
+import { HomeScreen, RecentSessionItem } from "screens/home.slint";
+import { HostScreen, FriendJoinItem, ConnectedUserItem } from "screens/host.slint";
+import { ConnectScreen, HostingFriendItem } from "screens/connect.slint";
+import { FriendsScreen, FriendItemData, FriendRequestData } from "screens/friends.slint";
 import { NetworkScreen } from "screens/network.slint";
-import { LiveSessionScreen } from "screens/live-session.slint";
-import { SettingsScreen } from "screens/settings.slint";
-import { AboutScreen } from "screens/about.slint";
 
 export component MainWindow inherits Window {
     title: "Mist — Peer-to-Peer Game Streaming";
-    min-width: 1024px;
-    min-height: 700px;
+    icon: @image-url("../../../resources/mist-logo.png");
+    default-font-family: "Roboto";
+    default-font-size: 14px;
+    min-width: 768px;
+    min-height: 540px;
     preferred-width: 1280px;
     preferred-height: 800px;
     background: Theme.background;
 
-    // Navigation state: 0=Home, 1=Share, 2=Connect, 3=Devices, 4=Network, 5=Settings, 6=About, 7=LiveSession
+    // Navigation State: 0=Home, 1=Host, 2=Connect, 3=Friends, 4=Network
     in-out property <int> active-tab: 0;
+    in-out property <bool> rail-collapsed: false;
 
-    // Wi-Fi and Hardware state
-    in property <string> wifi-adapter: "Wi-Fi";
-    in property <string> wifi-ssid: "Unavailable";
-    in property <int> wifi-signal: 0;
-    in property <string> wifi-band: "5 GHz";
-    in property <string> gpu-name: "Direct3D 11 Display Adapter";
+    // Authentication & Onboarding State
+    in-out property <bool> is-authenticated: false;
+    in-out property <string> auth-error: "";
+    in-out property <bool> auth-loading: false;
+    in-out property <bool> account-menu-open: false;
+
+    // Search Bar State
+    in-out property <string> search-text: "";
+
+    // Header State
+    in property <bool> is-streaming: false;
+    in property <bool> is-host-starting: false;
+    in property <string> host-status-text: "Stream Stopped";
+    in property <int> requests-count: 1;
+
+    // System Caption for Rail
+    in property <string> system-caption: "v0.3.0\nWindows 11 · GTX 1660 SUPER";
+
+    // Home Screen Hardware Properties
+    in property <string> gpu-name: "GTX 1660 SUPER";
+    in property <string> driver-version: "617.14";
     in property <bool> nvenc-ready: true;
+    in property <string> display-status: "Attached to a monitor";
+    in property <string> audio-status: "Default device";
+    in property <string> controller-status: "ViGEmBus missing · using fallback";
+    in property <bool> controller-ok: false;
 
-    // Pairing & Host state
-    in property <bool> is-sharing: false;
-    in property <string> pairing-code: "------";
-    in property <int> remaining-seconds: 300;
+    // Host Screen Properties
+    in property <string> host-fps: "60";
+    in property <string> host-bitrate: "11.5";
+    in property <string> host-encode-ms: "1.6";
+    in property <string> host-pairing-code: "------";
+    in property <[FriendJoinItem]> host-friends: [];
+    in-out property <[ConnectedUserItem]> host-connected-users: [];
 
-    // Connect & Client state
-    in-out property <string> connect-code: "";
-    in-out property <string> connect-host-ip: "127.0.0.1";
-    in property <bool> is-connecting: false;
+    // Manage Permissions Modal State
+    in-out property <bool> permissions-dialog-open: false;
+    in-out property <string> permissions-dialog-user-id: "";
+    in-out property <string> permissions-dialog-user-name: "";
+    in-out property <bool> permissions-dialog-keyboard: true;
+    in-out property <bool> permissions-dialog-mouse: true;
+    in-out property <bool> permissions-dialog-gamepad: true;
+    in-out property <bool> permissions-dialog-audio: true;
+
+    // Page Loading Screen State (when switching pages or loading data)
+    in-out property <bool> page-loading: false;
+    in-out property <string> page-loading-title: "Loading...";
+    in-out property <string> page-loading-subtitle: "Connecting to system...";
+    in-out property <float> page-loading-progress: 0.5;
+
+    // Connect Screen Properties
+    in property <[HostingFriendItem]> hosting-friends: [];
     in property <int> connect-step: 0;
-    in property <string> connect-error: "";
+    in property <string> connect-message: "Pick a friend who is hosting and join their stream.";
+    in property <bool> is-connected: false;
 
-    // Device Management state
-    in property <[DeviceItemData]> devices: [];
-    in property <bool> is-locked-out: false;
-    in property <int> lockout-seconds: 0;
+    // Friends Screen Properties
+    in property <string> my-tag: "";
+    in-out property <string> friend-add-input: "";
+    in property <string> friend-add-message: "";
+    in property <[FriendRequestData]> friend-requests: [];
+    in property <[FriendItemData]> all-friends: [];
 
-    // Telemetry state
-    in property <bool> is-session-active: false;
-    in property <string> telem-fps: "60 FPS";
-    in property <string> telem-bitrate: "12.0 Mbps";
-    in property <string> telem-rtt: "8.5 ms";
-    in property <string> telem-jitter: "1.2 ms";
-    in property <string> telem-loss: "0.0%";
-    in property <string> gateway-ping: "Unavailable";
-    in property <string> internet-ping: "Unavailable";
+    // Recent Sessions Properties
+    in property <[RecentSessionItem]> recent-sessions: [];
 
-    // Advanced Streaming & Session state
-    in property <string> session-codec: "AV1 (10-Bit HDR)";
-    in property <int> session-display-idx: 0;
-    in property <bool> session-relative-mouse: true;
-    in property <int> session-gamepads-count: 1;
-    in property <bool> session-rumble-active: false;
-    in property <int> host-active-guests: 0;
-    in property <bool> host-virtual-display: false;
+    // Network Screen Properties
+    in property <bool> net-is-wifi: false;
+    in property <bool> net-is-connected: true;
+    in property <string> net-adapter-name: "Ethernet";
+    in property <string> net-ssid-name: "Wired LAN";
+    in property <int> net-signal-percent: 100;
+    in property <string> net-connection-standard: "IEEE 802.3 Wired";
+    in property <string> net-band-channel: "Gigabit LAN";
+    in property <string> net-link-speed: "100 Mbps";
+    in property <string> net-local-ip: "192.168.1.6";
+    in property <string> net-gateway-ip: "192.168.1.1";
+    in property <string> net-gateway-ping: "< 1.0 ms";
+    in property <string> net-internet-ping: "38 ms";
+    in property <string> net-google-ping: "39 ms";
+    in property <string> net-public-ip: "";
+    in property <bool> net-is-refreshing: false;
+    in property <string> net-rx-speed: "0 kbps";
+    in property <string> net-tx-speed: "0 kbps";
+    in property <string> net-total-rx: "0 MB";
+    in property <string> net-total-tx: "0 MB";
+    in property <string> net-stream-bitrate: "0.0 Mbps";
+    in property <string> net-stream-rtt: "--";
+    in property <string> net-stream-loss: "0.0%";
+    in property <string> net-stream-jitter: "--";
 
-    // Advanced Settings State
-    in-out property <string> settings-codec: "auto";
-    in-out property <bool> settings-hdr: false;
-    in-out property <string> settings-capture-backend: "auto";
-    in-out property <string> settings-wol-mac: "";
-    in-out property <bool> settings-virtual-display: false;
-    in-out property <string> settings-virtual-display-res: "1080p60";
+    // Settings Modal State
+    in-out property <bool> settings-open: false;
+    in-out property <bool> settings-dark: false;
+    in-out property <bool> settings-contrast: false;
+    in-out property <bool> settings-compact: false;
+    in-out property <bool> settings-animated-shapes: true;
+    in-out property <int> settings-max-bitrate: 15;
+    in-out property <int> settings-fps: 60;
 
-    // Dialog state (Host Approval)
-    in property <bool> dialog-open: false;
-    in property <string> dialog-title: "Incoming Connection Request";
-    in property <string> dialog-message: "Device 'Remote PC' wants to pair and stream.";
-
-    // Toast state
+    // Toast State
     in property <bool> toast-visible: false;
-    in property <string> toast-message: "Action completed";
+    in property <string> toast-message: "Tag copied";
 
-    // Callbacks from UI to Rust Controller
+    // Startup Loading Overlay State
+    in-out property <bool> is-loading: true;
+    in-out property <string> loading-status: "Initializing Mist Engine...";
+    in-out property <float> loading-progress: 0.15;
+
+    // Connection Request Approval Modal State
+    in-out property <bool> approval-dialog-open: false;
+    in property <string> approval-dialog-title: "Incoming Connection Request";
+    in property <string> approval-dialog-message: "A remote device is requesting permission to connect.";
+
+    // Callbacks
     callback nav-changed(int);
-    callback start-share();
-    callback stop-share();
-    callback copy-code();
-    callback revoke-code();
-    callback connect-requested(string, string);
-    callback cancel-connect();
-    callback paste-code();
-    callback code-typed(string);
-    callback revoke-device(string);
-    callback save-settings(bool, bool, int, int, string, string, bool, string, bool, string, string, bool, string);
-    callback dialog-confirmed();
-    callback dialog-cancelled();
+    callback search-submitted(string);
+    callback toggle-host-streaming();
+    callback copy-pairing-code();
+    callback host-friend-join-toggled(int, bool);
+    callback host-manage-permissions(int);
+    callback host-disconnect-user(int);
+    callback save-user-permissions(string, bool, bool, bool, bool);
+    callback kick-user(string);
+    callback connect-to-friend(string);
     callback disconnect-stream();
-    callback toggle-fullscreen();
-    callback send-wol(string);
-    callback cycle-display();
-    callback toggle-relative-mouse();
-    callback toggle-virtual-display();
+    callback client-hear-audio-toggled(bool);
+    callback client-send-input-toggled(bool);
+    callback copy-tag();
+    callback send-friend-request(string);
+    callback accept-friend-request(int);
+    callback decline-friend-request(int);
+    callback cancel-friend-request(int);
+    callback remove-friend(int);
+    callback friend-input-toggled(int, bool);
+    callback friend-gamepad-toggled(int, bool);
+    callback refresh-network();
+    callback shuffle-shapes();
+    callback sign-in-google();
+    callback sign-in-email(string, string);
+    callback sign-up-email(string, string, string);
+    callback sign-out();
+    callback approve-request();
+    callback deny-request();
+    callback settings-closed(bool, bool, bool, bool, int, int);
 
+    // Main App Shell
     HorizontalLayout {
-        // Navigation Rail on the left (hidden during fullscreen live session)
-        if root.active-tab != 7 : NavigationRail {
+        // Left Navigation Rail
+        NavigationRail {
             active-tab: root.active-tab;
+            requests-count: root.requests-count;
+            system-caption: root.system-caption;
+            is-collapsed <=> root.rail-collapsed;
             tab-selected(idx) => {
                 root.active-tab = idx;
                 root.nav-changed(idx);
             }
         }
 
-        // Main Content Area
+        // Right Content Area
         VerticalLayout {
-            // Top App Bar
+            horizontal-stretch: 1;
+            min-width: 0px;
+
+            // Header Top Bar
             Rectangle {
-                height: 48px;
-                background: Theme.surface;
-                border-width: 1px;
-                border-color: Theme.surface-border;
+                height: 60px;
+                background: #00000000;
 
                 HorizontalLayout {
-                    padding-left: Theme.space-xl;
-                    padding-right: Theme.space-xl;
+                    padding-left: 20px;
+                    padding-right: 20px;
+                    padding-top: 10px;
+                    padding-bottom: 10px;
                     alignment: space-between;
+                    spacing: 12px;
 
-                    Text {
-                        text: root.active-tab == 0 ? "Home" :
-                              root.active-tab == 1 ? "Wi-Fi Screen Share" :
-                              root.active-tab == 2 ? "Connect to Device" :
-                              root.active-tab == 3 ? "Paired Devices" :
-                              root.active-tab == 4 ? "Network Diagnostics" :
-                              root.active-tab == 5 ? "Settings" :
-                              root.active-tab == 6 ? "About Mist" : "Live Streaming Session";
-                        color: Theme.text-primary;
-                        font-size: 15px;
-                        font-weight: 600;
-                        vertical-alignment: center;
-                    }
-
+                    // Current Screen Header / Breadcrumb
                     HorizontalLayout {
-                        spacing: Theme.space-md;
-                        alignment: center;
+                        spacing: 10px;
+                        alignment: start;
 
-                        Rectangle {
-                            width: 8px;
-                            height: 8px;
-                            border-radius: 4px;
-                            background: root.is-session-active ? Theme.fresh-mint : Theme.text-disabled;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 34px;
+                                height: 34px;
+                                border-radius: 17px;
+                                background: Theme.container-subtle;
+
+                                MaterialIcon {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    name: root.active-tab == 0 ? "home" :
+                                          root.active-tab == 1 ? "cast" :
+                                          root.active-tab == 2 ? "sports_esports" :
+                                          root.active-tab == 3 ? "group" : "network_check";
+                                    icon-size: 18px;
+                                    icon-color: Theme.accent;
+                                }
+                            }
                         }
 
-                        Text {
-                            text: root.is-session-active ? "Streaming Active" : "Ready";
-                            color: Theme.text-secondary;
-                            font-size: 13px;
-                            vertical-alignment: center;
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: root.active-tab == 0 ? "Home" :
+                                      root.active-tab == 1 ? "Host PC" :
+                                      root.active-tab == 2 ? "Connect" :
+                                      root.active-tab == 3 ? "Friends" : "Network Telemetry";
+                                font-size: 16px;
+                                font-weight: 600;
+                                color: Theme.text-ink;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Action Controls Cluster
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                    // Responsive Search Bar
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        max-width: 260px;
+                        min-width: 70px;
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.border-line;
+                        clip: true;
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 8px;
+                            alignment: start;
+
+                            VerticalLayout {
+                                alignment: center;
+                                width: 18px;
+                                MaterialIcon {
+                                    name: "search";
+                                    icon-size: 18px;
+                                    icon-color: Theme.text-mute;
+                                }
+                            }
+
+                            search-box := Rectangle {
+                                horizontal-stretch: 1;
+
+                                TextInput {
+                                    width: 100%;
+                                    height: 100%;
+                                    text <=> root.search-text;
+                                    color: Theme.text-ink;
+                                    font-size: 13px;
+                                    vertical-alignment: center;
+                                    accepted => { root.search-submitted(root.search-text); }
+                                }
+
+                                if root.search-text == "" : Text {
+                                    width: 100%;
+                                    height: 100%;
+                                    text: "Search...";
+                                    color: Theme.text-placeholder;
+                                    font-size: 13px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                    }
+
+                    // Status Pill (Streaming / Idle) with Live Pulsing Halo
+                    Rectangle {
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        background: root.is-host-starting ? Theme.container : (root.is-streaming ? Theme.ok-container : Theme.surface);
+                        border-width: 1px;
+                        border-color: root.is-host-starting ? Theme.accent : (root.is-streaming ? Theme.mint : Theme.border-line);
+                        drop-shadow-blur: root.is-streaming ? 10px : 0px;
+                        drop-shadow-color: root.is-streaming ? Theme.glow-mint : #00000000;
+                        animate drop-shadow-blur { duration: 250ms; }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 14px;
+                            spacing: 8px;
+                            alignment: center;
+
+                            // Status Dot with Radar Halo ring when Live
+                            Rectangle {
+                                width: 14px;
+                                height: 14px;
+                                y: (parent.height - self.height) / 2;
+
+                                if root.is-streaming : Rectangle {
+                                    width: 100%;
+                                    height: 100%;
+                                    border-radius: 7px;
+                                    background: Theme.mint;
+                                    opacity: 0.35;
+                                }
+
+                                Rectangle {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    width: 8px;
+                                    height: 8px;
+                                    border-radius: 4px;
+                                    background: root.is-host-starting ? Theme.accent : (root.is-streaming ? Theme.color-ok : Theme.text-mute);
+                                }
+                            }
+
+                            Text {
+                                text: root.is-host-starting ? "Starting" : (root.is-streaming ? "Live" : "Idle");
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: root.is-host-starting ? Theme.accent : (root.is-streaming ? Theme.color-ok : Theme.text-mute);
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Friends / Account Icon Button with Notification Badge
+                    Rectangle {
+                        width: 38px;
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        border-width: 1px;
+                        border-color: Theme.border-line;
+                        background: friends-touch.has-hover ? Theme.item-hover : Theme.surface;
+                        animate background { duration: 120ms; }
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: "group";
+                            icon-size: 19px;
+                            icon-color: Theme.text-ink;
+                        }
+
+                        if root.requests-count > 0 : Rectangle {
+                            x: parent.width - 13px;
+                            y: -2px;
+                            width: 16px;
+                            height: 16px;
+                            border-radius: 8px;
+                            background: Theme.mint;
+
+                            HorizontalLayout {
+                                alignment: center;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text {
+                                        text: root.requests-count;
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        color: Theme.on-mint;
+                                    }
+                                }
+                            }
+                        }
+
+                        friends-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.active-tab = 3;
+                                root.nav-changed(3);
+                            }
+                        }
+                    }
+
+                    // Settings Gear Icon Button
+                    Rectangle {
+                        width: 38px;
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        border-width: 1px;
+                        border-color: Theme.border-line;
+                        background: gear-touch.has-hover ? Theme.item-hover : Theme.surface;
+                        animate background { duration: 120ms; }
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: "settings";
+                            icon-size: 19px;
+                            icon-color: Theme.text-ink;
+                        }
+
+                        gear-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.settings-open = true;
+                            }
+                        }
+                    }
+
+                    // User Account Chip or Sign In Button
+                    if root.is-authenticated : Rectangle {
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        border-width: 1px;
+                        border-color: Theme.border-line;
+                        background: account-touch.has-hover ? Theme.item-hover : Theme.surface;
+                        animate background { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 12px;
+                            spacing: 6px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 22px;
+                                    height: 22px;
+                                    border-radius: 11px;
+                                    background: Theme.container;
+
+                                    MaterialIcon {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        name: "person";
+                                        icon-size: 14px;
+                                        icon-color: Theme.on-container;
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: root.my-tag != "" ? root.my-tag : "Account";
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: Theme.text-ink;
+                                vertical-alignment: center;
+                                max-width: 140px;
+                                overflow: elide;
+                            }
+                        }
+
+                        account-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.account-menu-open = !root.account-menu-open;
+                            }
+                        }
+                    }
+
+                    if !root.is-authenticated : Rectangle {
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        background: signin-cta.has-hover ? Theme.accent : Theme.mint;
+                        animate background { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 16px;
+                            padding-right: 16px;
+                            alignment: center;
+
+                            Text {
+                                text: "Sign In";
+                                font-size: 13px;
+                                font-weight: 600;
+                                color: Theme.on-mint;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        signin-cta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.is-authenticated = false;
+                            }
                         }
                     }
                 }
             }
+            }
 
-            // Screen Switcher
+            // Screen Switcher Canvas with M3 Background Shapes
             Rectangle {
                 clip: true;
+                horizontal-stretch: 1;
+                min-width: 0px;
 
-                if root.active-tab == 0 : HomeScreen {
-                    wifi-ssid: root.wifi-ssid;
-                    wifi-signal: root.wifi-signal;
-                    gpu-name: root.gpu-name;
-                    nvenc-ready: root.nvenc-ready;
-                    trusted-device-count: root.devices.length;
-                    is-streaming: root.is-session-active;
-                    share-clicked => { root.active-tab = 1; root.nav-changed(1); }
-                    connect-clicked => { root.active-tab = 2; root.nav-changed(2); }
+                if root.settings-animated-shapes : M3BackgroundShapes { }
+
+                // Authentication & Onboarding View (shown when not signed in)
+                if !root.is-authenticated : AuthScreen {
+                    width: 100%;
+                    height: 100%;
+                    error-message: root.auth-error;
+                    is-loading: root.auth-loading;
+                    sign-in-google => { root.sign-in-google(); }
+                    sign-in-email(email, pass) => { root.sign-in-email(email, pass); }
+                    sign-up-email(user, email, pass) => { root.sign-up-email(user, email, pass); }
+                    continue-guest => {
+                        root.is-authenticated = true;
+                    }
                 }
 
-                if root.active-tab == 1 : HostScreen {
-                    is-sharing: root.is-sharing;
-                    pairing-code: root.pairing-code;
-                    remaining-seconds: root.remaining-seconds;
-                    wifi-adapter: root.wifi-adapter;
-                    wifi-ssid: root.wifi-ssid;
-                    wifi-signal: root.wifi-signal;
-                    wifi-band: root.wifi-band;
+                // Tab 0: Home Screen
+                if root.is-authenticated && root.active-tab == 0 : HomeScreen {
+                    width: 100%;
+                    height: 100%;
+                    recent-sessions: root.recent-sessions;
+                    gpu-name: root.gpu-name;
+                    driver-version: root.driver-version;
                     nvenc-ready: root.nvenc-ready;
-                    active-guests: root.host-active-guests;
-                    virtual-display-active: root.host-virtual-display;
-                    toggle-sharing => {
-                        if root.is-sharing {
-                            root.stop-share();
-                        } else {
-                            root.start-share();
+                    display-status: root.display-status;
+                    audio-status: root.audio-status;
+                    controller-status: root.controller-status;
+                    controller-ok: root.controller-ok;
+                    host-clicked => { root.active-tab = 1; root.nav-changed(1); }
+                    connect-clicked => { root.active-tab = 2; root.nav-changed(2); }
+                    friends-clicked => { root.active-tab = 3; root.nav-changed(3); }
+                    network-clicked => { root.active-tab = 4; root.nav-changed(4); }
+                }
+
+                // Tab 1: Host Screen
+                if root.is-authenticated && root.active-tab == 1 : HostScreen {
+                    width: 100%;
+                    height: 100%;
+                    is-streaming: root.is-streaming;
+                    is-starting: root.is-host-starting;
+                    status-text: root.host-status-text;
+                    stream-fps: root.host-fps;
+                    stream-bitrate: root.host-bitrate;
+                    stream-encode-ms: root.host-encode-ms;
+                    host-pairing-code: root.host-pairing-code;
+                    friends: root.host-friends;
+                    connected-users: root.host-connected-users;
+                    toggle-streaming => { root.toggle-host-streaming(); }
+                    copy-pairing-code => { root.copy-pairing-code(); }
+                    friend-join-toggled(idx, val) => { root.host-friend-join-toggled(idx, val); }
+                    manage-permissions(idx) => { root.host-manage-permissions(idx); }
+                    disconnect-user(idx) => { root.host-disconnect-user(idx); }
+                }
+
+                // Tab 2: Connect Screen
+                if root.is-authenticated && root.active-tab == 2 : ConnectScreen {
+                    width: 100%;
+                    height: 100%;
+                    hosting-friends: root.hosting-friends;
+                    connection-step: root.connect-step;
+                    connection-message: root.connect-message;
+                    is-connected: root.is-connected;
+                    connect-to-friend(tag) => { root.connect-to-friend(tag); }
+                    disconnect => { root.disconnect-stream(); }
+                    hear-audio-toggled(val) => { root.client-hear-audio-toggled(val); }
+                    send-input-toggled(val) => { root.client-send-input-toggled(val); }
+                }
+
+                // Tab 3: Friends Screen
+                if root.is-authenticated && root.active-tab == 3 : FriendsScreen {
+                    width: 100%;
+                    height: 100%;
+                    my-tag: root.my-tag;
+                    add-input <=> root.friend-add-input;
+                    add-message: root.friend-add-message;
+                    requests: root.friend-requests;
+                    friends: root.all-friends;
+                    copy-tag => { root.copy-tag(); }
+                    send-request(tag) => { root.send-friend-request(tag); }
+                    accept-request(idx) => { root.accept-friend-request(idx); }
+                    decline-request(idx) => { root.decline-friend-request(idx); }
+                    cancel-request(idx) => { root.cancel-friend-request(idx); }
+                    remove-friend(idx) => { root.remove-friend(idx); }
+                    friend-input-toggled(idx, val) => { root.friend-input-toggled(idx, val); }
+                    friend-gamepad-toggled(idx, val) => { root.friend-gamepad-toggled(idx, val); }
+                    connect-to-friend(tag) => { root.active-tab = 2; root.nav-changed(2); root.connect-to-friend(tag); }
+                }
+
+                // Tab 4: Network Screen
+                if root.is-authenticated && root.active-tab == 4 : NetworkScreen {
+                    width: 100%;
+                    height: 100%;
+                    is-wifi: root.net-is-wifi;
+                    is-connected: root.net-is-connected;
+                    adapter-name: root.net-adapter-name;
+                    ssid-name: root.net-ssid-name;
+                    signal-percent: root.net-signal-percent;
+                    connection-standard: root.net-connection-standard;
+                    band-channel: root.net-band-channel;
+                    link-speed: root.net-link-speed;
+                    local-ip: root.net-local-ip;
+                    gateway-ip: root.net-gateway-ip;
+                    gateway-ping: root.net-gateway-ping;
+                    internet-ping: root.net-internet-ping;
+                    google-ping: root.net-google-ping;
+                    public-ip: root.net-public-ip;
+                    is-refreshing: root.net-is-refreshing;
+                    rx-speed: root.net-rx-speed;
+                    tx-speed: root.net-tx-speed;
+                    total-rx: root.net-total-rx;
+                    total-tx: root.net-total-tx;
+                    is-streaming: root.is-streaming;
+                    stream-bitrate: root.net-stream-bitrate;
+                    stream-rtt: root.net-stream-rtt;
+                    stream-loss: root.net-stream-loss;
+                    stream-jitter: root.net-stream-jitter;
+                    refresh-network => { root.refresh-network(); }
+                }
+
+                // Page Loading Screen (shows whenever a page needs time to open or refresh)
+                if root.page-loading : Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    background: Theme.dark-mode ? #0c1915f0 : #f7fbf9f0;
+                    clip: true;
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 16px;
+
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 56px;
+                                height: 56px;
+                                border-radius: 28px;
+                                background: Theme.surface;
+                                border-width: 1.5px;
+                                border-color: Theme.mint;
+                                drop-shadow-blur: 16px;
+                                drop-shadow-color: Theme.shadow-color;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        MaterialIcon {
+                                            name: "sync";
+                                            icon-size: 28px;
+                                            icon-color: Theme.accent;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            spacing: 4px;
+                            alignment: center;
+                            Text {
+                                text: root.page-loading-title;
+                                color: Theme.text-ink;
+                                font-size: 18px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                            }
+                            Text {
+                                text: root.page-loading-subtitle;
+                                color: Theme.text-mute;
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            VerticalLayout {
+                                width: 220px;
+                                spacing: 8px;
+
+                                Rectangle {
+                                    height: 4px;
+                                    border-radius: 2px;
+                                    background: Theme.border-line;
+                                    clip: true;
+
+                                    Rectangle {
+                                        x: 0px;
+                                        width: parent.width * Math.min(1.0, Math.max(0.1, root.page-loading-progress));
+                                        height: 100%;
+                                        border-radius: 2px;
+                                        background: Theme.mint;
+                                        animate width { duration: 200ms; easing: ease-out; }
+                                    }
+                                }
+                            }
                         }
                     }
-                    copy-code => { root.copy-code(); }
-                    revoke-code => { root.revoke-code(); }
-                }
-
-                if root.active-tab == 2 : ConnectScreen {
-                    pairing-code <=> root.connect-code;
-                    host-ip <=> root.connect-host-ip;
-                    is-connecting: root.is-connecting;
-                    connect-step: root.connect-step;
-                    error-message: root.connect-error;
-                    connect-clicked => { root.connect-requested(root.connect-code, root.connect-host-ip); }
-                    cancel-clicked => { root.cancel-connect(); }
-                    paste-clicked => { root.paste-code(); }
-                    code-edited(s) => { root.code-typed(s); }
-                }
-
-                if root.active-tab == 3 : DevicesScreen {
-                    devices: root.devices;
-                    is-locked-out: root.is-locked-out;
-                    lockout-seconds: root.lockout-seconds;
-                    revoke-device(id) => { root.revoke-device(id); }
-                    start-share-clicked => { root.active-tab = 1; root.nav-changed(1); }
-                }
-
-                if root.active-tab == 4 : NetworkScreen {
-                    wifi-adapter: root.wifi-adapter;
-                    wifi-ssid: root.wifi-ssid;
-                    wifi-signal: root.wifi-signal;
-                    wifi-band: root.wifi-band;
-                    media-rtt: root.telem-rtt;
-                    gateway-ping: root.gateway-ping;
-                    internet-ping: root.internet-ping;
-                    session-bitrate: root.telem-bitrate;
-                    jitter: root.telem-jitter;
-                    packet-loss: root.telem-loss;
-                    is-session-active: root.is-session-active;
-                }
-
-                if root.active-tab == 5 : SettingsScreen {
-                    codec <=> root.settings-codec;
-                    hdr-enabled <=> root.settings-hdr;
-                    capture-backend <=> root.settings-capture-backend;
-                    wol-mac <=> root.settings-wol-mac;
-                    virtual-display-enabled <=> root.settings-virtual-display;
-                    virtual-display-res <=> root.settings-virtual-display-res;
-
-                    send-wol(mac) => { root.send-wol(mac); }
-                    toggle-virtual-display => { root.toggle-virtual-display(); }
-                    save-clicked => {
-                        root.save-settings(
-                            self.dark-theme,
-                            self.high-contrast,
-                            self.fps,
-                            self.bitrate-kbps,
-                            self.signaling-url,
-                            self.stun-server,
-                            self.audio-enabled,
-                            self.codec,
-                            self.hdr-enabled,
-                            self.capture-backend,
-                            self.wol-mac,
-                            self.virtual-display-enabled,
-                            self.virtual-display-res
-                        );
-                    }
-                    reset-clicked => {
-                        self.dark-theme = true;
-                        self.high-contrast = false;
-                        self.fps = 60;
-                        self.bitrate-kbps = 12000;
-                        self.signaling-url = "ws://127.0.0.1:8080";
-                        self.stun-server = "stun:stun.l.google.com:19302";
-                        self.audio-enabled = true;
-                        self.codec = "auto";
-                        self.hdr-enabled = false;
-                        self.capture-backend = "auto";
-                        self.wol-mac = "";
-                        self.virtual-display-enabled = false;
-                        self.virtual-display-res = "1080p60";
-                    }
-                }
-
-                if root.active-tab == 6 : AboutScreen {}
-
-                if root.active-tab == 7 : LiveSessionScreen {
-                    is-active: root.is-session-active;
-                    fps-text: root.telem-fps;
-                    bitrate-text: root.telem-bitrate;
-                    rtt-text: root.telem-rtt;
-                    jitter-text: root.telem-jitter;
-                    loss-text: root.telem-loss;
-                    active-codec: root.session-codec;
-                    active-display-idx: root.session-display-idx;
-                    relative-mouse-active: root.session-relative-mouse;
-                    active-gamepads-count: root.session-gamepads-count;
-                    gamepad-rumble-active: root.session-rumble-active;
-
-                    disconnect-clicked => { root.disconnect-stream(); }
-                    fullscreen-clicked => { root.toggle-fullscreen(); }
-                    cycle-display => { root.cycle-display(); }
-                    toggle-relative-mouse => { root.toggle-relative-mouse(); }
                 }
             }
         }
     }
 
-    // Modal Approval Dialog
-    Dialog {
-        is-open: root.dialog-open;
-        title: root.dialog-title;
-        message: root.dialog-message;
-        confirm-text: "Approve";
-        cancel-text: "Deny";
-        confirmed => { root.dialog-confirmed(); }
-        cancelled => { root.dialog-cancelled(); }
+    // Account Context Menu Popup
+    if root.account-menu-open : Rectangle {
+        x: parent.width - 240px;
+        y: 64px;
+        width: 210px;
+        background: Theme.surface;
+        border-radius: 16px;
+        border-width: 1px;
+        border-color: Theme.border-line;
+        drop-shadow-blur: 16px;
+        drop-shadow-color: Theme.shadow-color;
+        drop-shadow-offset-y: 4px;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 10px;
+
+            VerticalLayout {
+                spacing: 2px;
+                Text { text: "Signed in as"; font-size: 11px; color: Theme.text-mute; }
+                Text { text: root.my-tag != "" ? root.my-tag : "Guest"; font-size: 14px; font-weight: 600; color: Theme.text-ink; }
+            }
+
+            Rectangle { height: 1px; background: Theme.border-line; }
+
+            Rectangle {
+                height: 36px;
+                border-radius: 8px;
+                background: copytag-touch.has-hover ? Theme.item-hover : Theme.surface;
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 8px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        MaterialIcon { name: "content_copy"; icon-size: 16px; icon-color: Theme.text-mute; }
+                    }
+                    Text {
+                        text: "Copy Tag";
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: Theme.text-ink;
+                        vertical-alignment: center;
+                    }
+                }
+
+                copytag-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.account-menu-open = false;
+                        root.copy-tag();
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 36px;
+                border-radius: 8px;
+                background: signout-touch.has-hover ? Theme.bad-container : Theme.surface;
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 8px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        MaterialIcon { name: "logout"; icon-size: 16px; icon-color: Theme.color-bad; }
+                    }
+                    Text {
+                        text: "Sign Out";
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: Theme.color-bad;
+                        vertical-alignment: center;
+                    }
+                }
+
+                signout-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.account-menu-open = false;
+                        root.sign-out();
+                    }
+                }
+            }
+        }
     }
 
-    // Floating Toast Notification
+    // Modal Settings Dialog
+    SettingsDialog {
+        is-open: root.settings-open;
+        dark-theme <=> root.settings-dark;
+        high-contrast <=> root.settings-contrast;
+        compact-view <=> root.settings-compact;
+        animated-shapes <=> root.settings-animated-shapes;
+        max-bitrate <=> root.settings-max-bitrate;
+        fps <=> root.settings-fps;
+        close => {
+            root.settings-open = false;
+            root.settings-closed(root.settings-dark, root.settings-contrast, root.settings-compact, root.settings-animated-shapes, root.settings-max-bitrate, root.settings-fps);
+        }
+        shuffle-shapes => { root.shuffle-shapes(); }
+    }
+
+    // Connection Request Approval Modal Dialog
+    Dialog {
+        is-open: root.approval-dialog-open;
+        title: root.approval-dialog-title;
+        message: root.approval-dialog-message;
+        confirm-text: "Allow";
+        cancel-text: "Deny";
+        confirmed => {
+            root.approval-dialog-open = false;
+            root.approve-request();
+        }
+        cancelled => {
+            root.approval-dialog-open = false;
+            root.deny-request();
+        }
+    }
+
+    // Manage Permissions Modal Dialog for Connected Users
+    PermissionsDialog {
+        is-open: root.permissions-dialog-open;
+        user-id: root.permissions-dialog-user-id;
+        user-name: root.permissions-dialog-user-name;
+        allow-keyboard <=> root.permissions-dialog-keyboard;
+        allow-mouse <=> root.permissions-dialog-mouse;
+        allow-gamepad <=> root.permissions-dialog-gamepad;
+        stream-audio <=> root.permissions-dialog-audio;
+        close => { root.permissions-dialog-open = false; }
+        save(uid, kb, mo, gp, au) => {
+            root.save-user-permissions(uid, kb, mo, gp, au);
+        }
+        kick(uid) => {
+            root.kick-user(uid);
+        }
+    }
+
+    // Toast Notification Banner
     if root.toast-visible : VerticalLayout {
         alignment: end;
-        padding-bottom: Theme.space-xl;
+        padding-bottom: 24px;
 
         HorizontalLayout {
             alignment: center;
-
             Toast {
                 is-visible: root.toast-visible;
                 message: root.toast-message;
             }
         }
+    }
+
+    // Fullscreen Animated Material 3 Startup Loading Screen
+    if root.is-loading : LoadingScreen {
+        status-text: root.loading-status;
+        progress: root.loading-progress;
     }
 }

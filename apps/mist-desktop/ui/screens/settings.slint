@@ -3,9 +3,10 @@ import { PrimaryButton } from "../components/primary-button.slint";
 import { SecondaryButton } from "../components/secondary-button.slint";
 import { PermissionSwitch } from "../components/permission-switch.slint";
 import { TextField } from "../components/text-field.slint";
+import { MaterialIcon } from "../components/material-icon.slint";
 
-export component SettingsScreen {
-    in-out property <bool> dark-theme: true;
+export component SettingsScreen inherits Rectangle {
+    in-out property <bool> dark-theme: false;
     in-out property <bool> high-contrast: false;
     in-out property <int> fps: 60;
     in-out property <int> bitrate-kbps: 12000;
@@ -29,7 +30,13 @@ export component SettingsScreen {
     callback toggle-virtual-display();
 
     Flickable {
-        VerticalLayout {
+        width: 100%;
+        height: 100%;
+        content-width: self.width;
+        content-height: max(self.height, content.preferred-height);
+
+        content := VerticalLayout {
+            width: parent.width;
             padding: Theme.space-xl;
             spacing: Theme.space-xl;
             alignment: start;
@@ -42,7 +49,7 @@ export component SettingsScreen {
                     text: "Settings & Preferences";
                     color: Theme.text-primary;
                     font-size: 24px;
-                    font-weight: 700;
+                    font-weight: 800;
                 }
 
                 Text {
@@ -63,16 +70,34 @@ export component SettingsScreen {
                     padding: Theme.space-lg;
                     spacing: Theme.space-md;
 
-                    Text {
-                        text: "Appearance";
-                        color: Theme.text-primary;
-                        font-size: 16px;
-                        font-weight: 600;
+                    HorizontalLayout {
+                        spacing: Theme.space-sm;
+
+                        VerticalLayout {
+                            alignment: center;
+                            MaterialIcon {
+                                name: "settings";
+                                icon-size: 18px;
+                                icon-color: Theme.primary;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Appearance (Material Design 3)";
+                                color: Theme.text-primary;
+                                font-size: 16px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                        }
                     }
 
                     PermissionSwitch {
-                        text: "Dark Theme (Material Design 3 Pixel Mint)";
-                        checked <=> root.dark-theme;
+                        text: "Lush Emerald Light Theme (White & Green)";
+                        checked: true;
+                        enabled: false;
                     }
 
                     PermissionSwitch {
@@ -93,11 +118,28 @@ export component SettingsScreen {
                     padding: Theme.space-lg;
                     spacing: Theme.space-md;
 
-                    Text {
-                        text: "Video Streaming & Codecs";
-                        color: Theme.text-primary;
-                        font-size: 16px;
-                        font-weight: 600;
+                    HorizontalLayout {
+                        spacing: Theme.space-sm;
+
+                        VerticalLayout {
+                            alignment: center;
+                            MaterialIcon {
+                                name: "speed";
+                                icon-size: 18px;
+                                icon-color: Theme.primary;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Video Streaming & Codecs";
+                                color: Theme.text-primary;
+                                font-size: 16px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                        }
                     }
 
                     // Codec Selection
@@ -106,7 +148,7 @@ export component SettingsScreen {
 
                         VerticalLayout {
                             spacing: Theme.space-xs;
-                            Text { text: "Video Codec: " + (root.codec == "auto" ? "Auto-Negotiated" : root.codec == "av1" ? "AV1 (Next-Gen)" : root.codec == "hevc" ? "HEVC / H.265" : "H.264 (Universal)"); color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Video Codec: " + (root.codec == "auto" ? "Auto-Negotiated" : root.codec == "av1" ? "AV1 (Next-Gen)" : root.codec == "hevc" ? "HEVC / H.265" : "H.264 (Universal)"); color: Theme.text-primary; font-size: 14px; font-weight: 600; }
                             Text { text: "AV1 offers ~30% higher compression efficiency on RTX 40-series and modern devices"; color: Theme.text-secondary; font-size: 12px; }
                         }
 
@@ -115,22 +157,22 @@ export component SettingsScreen {
 
                             SecondaryButton {
                                 text: "Auto";
-                                min-width: 60px;
+                                min-width: 64px;
                                 clicked => { root.codec = "auto"; }
                             }
                             SecondaryButton {
                                 text: "AV1";
-                                min-width: 60px;
+                                min-width: 64px;
                                 clicked => { root.codec = "av1"; }
                             }
                             SecondaryButton {
                                 text: "HEVC";
-                                min-width: 60px;
+                                min-width: 64px;
                                 clicked => { root.codec = "hevc"; }
                             }
                             SecondaryButton {
                                 text: "H.264";
-                                min-width: 60px;
+                                min-width: 64px;
                                 clicked => { root.codec = "h264"; }
                             }
                         }
@@ -148,7 +190,7 @@ export component SettingsScreen {
 
                         VerticalLayout {
                             spacing: Theme.space-xs;
-                            Text { text: "Target Frame Rate: " + root.fps + " FPS"; color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Target Frame Rate: " + root.fps + " FPS"; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
                             Text { text: "Controls rendering and encoder presentation cadence"; color: Theme.text-secondary; font-size: 12px; }
                         }
 
@@ -157,19 +199,19 @@ export component SettingsScreen {
 
                             SecondaryButton {
                                 text: "30 FPS";
-                                min-width: 70px;
+                                min-width: 74px;
                                 clicked => { root.fps = 30; }
                             }
 
                             PrimaryButton {
                                 text: "60 FPS";
-                                min-width: 70px;
+                                min-width: 74px;
                                 clicked => { root.fps = 60; }
                             }
 
                             SecondaryButton {
                                 text: "120 FPS";
-                                min-width: 70px;
+                                min-width: 74px;
                                 clicked => { root.fps = 120; }
                             }
                         }
@@ -181,7 +223,7 @@ export component SettingsScreen {
 
                         VerticalLayout {
                             spacing: Theme.space-xs;
-                            Text { text: "Streaming Bitrate: " + (root.bitrate-kbps / 1000) + " Mbps"; color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Streaming Bitrate: " + (root.bitrate-kbps / 1000) + " Mbps"; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
                             Text { text: "Strict bounded range between 2 Mbps and 25 Mbps"; color: Theme.text-secondary; font-size: 12px; }
                         }
 
@@ -190,19 +232,19 @@ export component SettingsScreen {
 
                             SecondaryButton {
                                 text: "6 Mbps";
-                                min-width: 70px;
+                                min-width: 74px;
                                 clicked => { root.bitrate-kbps = 6000; }
                             }
 
                             PrimaryButton {
                                 text: "12 Mbps";
-                                min-width: 70px;
+                                min-width: 74px;
                                 clicked => { root.bitrate-kbps = 12000; }
                             }
 
                             SecondaryButton {
                                 text: "20 Mbps";
-                                min-width: 70px;
+                                min-width: 74px;
                                 clicked => { root.bitrate-kbps = 20000; }
                             }
                         }
@@ -214,7 +256,7 @@ export component SettingsScreen {
 
                         VerticalLayout {
                             spacing: Theme.space-xs;
-                            Text { text: "Screen Capture Backend: " + (root.capture-backend == "auto" ? "Automatic (Cascading)" : root.capture-backend == "dxgi" ? "DXGI Desktop Duplication" : "Windows.Graphics.Capture"); color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Screen Capture Backend: " + (root.capture-backend == "auto" ? "Automatic (Cascading)" : root.capture-backend == "dxgi" ? "DXGI Desktop Duplication" : "Windows.Graphics.Capture"); color: Theme.text-primary; font-size: 14px; font-weight: 600; }
                             Text { text: "DXGI for discrete GPUs, WGC for hybrid multi-GPU laptops"; color: Theme.text-secondary; font-size: 12px; }
                         }
 
@@ -252,11 +294,28 @@ export component SettingsScreen {
                     padding: Theme.space-lg;
                     spacing: Theme.space-md;
 
-                    Text {
-                        text: "Remote Host & Headless Display Management";
-                        color: Theme.text-primary;
-                        font-size: 16px;
-                        font-weight: 600;
+                    HorizontalLayout {
+                        spacing: Theme.space-sm;
+
+                        VerticalLayout {
+                            alignment: center;
+                            MaterialIcon {
+                                name: "monitor";
+                                icon-size: 18px;
+                                icon-color: Theme.primary;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Remote Host & Headless Display Management";
+                                color: Theme.text-primary;
+                                font-size: 16px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                        }
                     }
 
                     PermissionSwitch {
@@ -269,7 +328,7 @@ export component SettingsScreen {
 
                         VerticalLayout {
                             spacing: Theme.space-xs;
-                            Text { text: "Virtual EDID Resolution: " + root.virtual-display-res; color: Theme.text-primary; font-size: 14px; font-weight: 500; }
+                            Text { text: "Virtual EDID Resolution: " + root.virtual-display-res; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
                             Text { text: "Generates VESA EDID 1.4 block tailored for connected client"; color: Theme.text-secondary; font-size: 12px; }
                         }
 
@@ -299,6 +358,7 @@ export component SettingsScreen {
                         text: "Wake-on-LAN Host MAC Address";
                         color: Theme.text-secondary;
                         font-size: 13px;
+                        font-weight: 600;
                     }
 
                     HorizontalLayout {
@@ -311,7 +371,8 @@ export component SettingsScreen {
 
                         PrimaryButton {
                             text: "Send WoL Magic Packet";
-                            min-width: 180px;
+                            icon-name: "power";
+                            min-width: 200px;
                             clicked => { root.send-wol(root.wol-mac); }
                         }
                     }
@@ -329,11 +390,28 @@ export component SettingsScreen {
                     padding: Theme.space-lg;
                     spacing: Theme.space-md;
 
-                    Text {
-                        text: "Audio & Network Configuration";
-                        color: Theme.text-primary;
-                        font-size: 16px;
-                        font-weight: 600;
+                    HorizontalLayout {
+                        spacing: Theme.space-sm;
+
+                        VerticalLayout {
+                            alignment: center;
+                            MaterialIcon {
+                                name: "wifi";
+                                icon-size: 18px;
+                                icon-color: Theme.primary;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "Audio & Network Configuration";
+                                color: Theme.text-primary;
+                                font-size: 16px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                        }
                     }
 
                     PermissionSwitch {
@@ -345,6 +423,7 @@ export component SettingsScreen {
                         text: "Signaling Server WebSocket URL";
                         color: Theme.text-secondary;
                         font-size: 13px;
+                        font-weight: 600;
                     }
 
                     TextField {
@@ -356,6 +435,7 @@ export component SettingsScreen {
                         text: "STUN Server Address";
                         color: Theme.text-secondary;
                         font-size: 13px;
+                        font-weight: 600;
                     }
 
                     TextField {
@@ -372,12 +452,14 @@ export component SettingsScreen {
 
                 SecondaryButton {
                     text: "Reset Defaults";
+                    icon-name: "refresh";
                     clicked => { root.reset-clicked(); }
                 }
 
                 PrimaryButton {
                     text: "Save Settings";
-                    min-width: 140px;
+                    icon-name: "check";
+                    min-width: 150px;
                     clicked => { root.save-clicked(); }
                 }
             }

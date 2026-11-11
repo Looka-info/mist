@@ -304,10 +304,7 @@ void DesktopApplication::renderHomeScreen() const {
     printHeader("HOME VIEW");
     std::cout << "Head: Game streaming, no lag\n";
     std::cout << "Subtitle: Host this PC or join another one. Everything below is ready.\n\n";
-    std::cout << "Latest Sessions:\n";
-    std::cout << "  1. Living room PC  -- Yesterday * 48 min (60 fps * 11.5 Mbps)\n";
-    std::cout << "  2. Aiden's Laptop   -- Sat * 2 h 10 min  (60 fps * 9.8 Mbps)\n";
-    std::cout << "  3. Studio desktop   -- Thu * 15 min      (30 fps * 6.2 Mbps)\n\n";
+    std::cout << "Latest Sessions: None\n\n";
     std::cout << "Quick Actions:\n";
     std::cout << "  [Cast] Host this PC      -- Let paired devices see and play on your desktop.\n";
     std::cout << "  [Pad]  Connect to a PC   -- Join a session with its ID.\n";
@@ -325,11 +322,19 @@ void DesktopApplication::renderPairingScreen() {
     printHeader("DEVICES & PAIRING VIEW");
     std::cout << "Active Pairing Code: " << pairingCode_ << "\n";
     std::cout << "Status: " << codeHintMsg_ << "\n";
-    std::cout << "Incoming Requests: " << (isDeviceApprovalPending_ ? "Aiden's Laptop (Used a code just now)" : "None") << "\n";
+    std::cout << "Incoming Requests: " << (isDeviceApprovalPending_ ? "Pending device authorization" : "None") << "\n";
     std::cout << "Trusted Devices:\n";
-    for (const auto& dev : trustedDevices_) {
-        std::cout << "  * " << dev.name << " (" << dev.lastSeen << ") [Kbd/Mouse: "
-                  << (dev.allowKbdMouse ? "YES" : "NO") << ", Pad: " << (dev.allowController ? "YES" : "NO") << "]\n";
+    if (trustedDevices_.empty()) {
+        std::cout << "  None\n";
+    } else {
+        for (const auto& dev : trustedDevices_) {
+            std::cout << "  * " << dev.name;
+            if (!dev.lastSeen.empty()) {
+                std::cout << " (" << dev.lastSeen << ")";
+            }
+            std::cout << " [Kbd/Mouse: " << (dev.allowKbdMouse ? "YES" : "NO")
+                      << ", Pad: " << (dev.allowController ? "YES" : "NO") << "]\n";
+        }
     }
 }
 
@@ -365,11 +370,19 @@ void DesktopApplication::renderDeviceManagementScreen() const {
     std::cout << "  MIST DESKTOP -- TRUSTED DEVICES\n";
     std::cout << "======================================================\n\n";
     std::cout << "Active Pairing Code: " << pairingCode_ << "\n";
-    std::cout << "Incoming Requests: " << (isDeviceApprovalPending_ ? "Aiden's Laptop (Used a code just now)" : "None") << "\n";
+    std::cout << "Incoming Requests: " << (isDeviceApprovalPending_ ? "Pending device authorization" : "None") << "\n";
     std::cout << "Trusted Devices:\n";
-    for (const auto& dev : trustedDevices_) {
-        std::cout << "  * " << dev.name << " (" << dev.lastSeen << ") [Kbd/Mouse: "
-                  << (dev.allowKbdMouse ? "YES" : "NO") << ", Pad: " << (dev.allowController ? "YES" : "NO") << "]\n";
+    if (trustedDevices_.empty()) {
+        std::cout << "  None\n";
+    } else {
+        for (const auto& dev : trustedDevices_) {
+            std::cout << "  * " << dev.name;
+            if (!dev.lastSeen.empty()) {
+                std::cout << " (" << dev.lastSeen << ")";
+            }
+            std::cout << " [Kbd/Mouse: " << (dev.allowKbdMouse ? "YES" : "NO")
+                      << ", Pad: " << (dev.allowController ? "YES" : "NO") << "]\n";
+        }
     }
 }
 
@@ -389,7 +402,6 @@ common::Result<std::optional<int>> DesktopApplication::initialize(int argc, char
 
     // Seed sample state matching Mist.html
     pairingCode_ = "7DK4LM";
-    trustedDevices_.push_back({"Living room PC", "Last seen yesterday", true, true});
 
     bitrateHistory_.assign(60, 12.0f);
     rttHistory_.assign(60, 18.0f);
@@ -3033,7 +3045,7 @@ void DesktopApplication::renderGuiDevicesScreen() {
     auto devPending = pairingManager_.getPendingRequests();
     if (!devPending.empty() || isDeviceApprovalPending_) {
         std::string pId = !devPending.empty() ? devPending[0].deviceId : "test-pending";
-        std::string pName = !devPending.empty() ? devPending[0].deviceName : "Aiden's Laptop";
+        std::string pName = !devPending.empty() ? devPending[0].deviceName : "Unknown device";
 
         if (fontBold_) ImGui::PushFont(fontBold_);
         ImGui::TextColored(c.ink, "%s", pName.c_str());

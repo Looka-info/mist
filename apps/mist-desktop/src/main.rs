@@ -1,7 +1,10 @@
+#![windows_subsystem = "windows"]
+
 //! Mist Desktop Application Entry Point
 //! Native Windows game-streaming platform built with Rust and Slint.
 
 mod app;
+mod auth;
 mod controller;
 
 fn main() {

@@ -1,5 +1,6 @@
 import { Theme } from "../theme.slint";
 import { SecondaryButton } from "secondary-button.slint";
+import { MaterialIcon } from "material-icon.slint";
 
 export component StreamingHud {
     in property <string> fps-text: "60 FPS";
@@ -12,7 +13,7 @@ export component StreamingHud {
 
     if root.is-visible : Rectangle {
         height: 48px;
-        background: #101A15DD;
+        background: #FFFFFFEE;
         border-radius: Theme.radius-pill;
         border-width: 1px;
         border-color: Theme.surface-border;
@@ -30,14 +31,14 @@ export component StreamingHud {
                     width: 8px;
                     height: 8px;
                     border-radius: 4px;
-                    background: Theme.accent;
+                    background: Theme.primary;
                 }
 
                 Text {
                     text: root.fps-text;
                     color: Theme.text-primary;
                     font-size: 13px;
-                    font-weight: 600;
+                    font-weight: 700;
                     vertical-alignment: center;
                 }
 
@@ -45,7 +46,7 @@ export component StreamingHud {
                     text: root.bitrate-text;
                     color: Theme.text-primary;
                     font-size: 13px;
-                    font-weight: 600;
+                    font-weight: 700;
                     vertical-alignment: center;
                 }
 
@@ -53,6 +54,7 @@ export component StreamingHud {
                     text: "RTT: " + root.rtt-text;
                     color: Theme.text-secondary;
                     font-size: 12px;
+                    font-weight: 600;
                     vertical-alignment: center;
                 }
 
@@ -60,6 +62,7 @@ export component StreamingHud {
                     text: "Jitter: " + root.jitter-text;
                     color: Theme.text-secondary;
                     font-size: 12px;
+                    font-weight: 600;
                     vertical-alignment: center;
                 }
 
@@ -67,6 +70,7 @@ export component StreamingHud {
                     text: "Loss: " + root.loss-text;
                     color: Theme.text-secondary;
                     font-size: 12px;
+                    font-weight: 600;
                     vertical-alignment: center;
                 }
             }
@@ -76,7 +80,8 @@ export component StreamingHud {
 
                 SecondaryButton {
                     text: "Disconnect";
-                    min-width: 90px;
+                    icon-name: "close";
+                    min-width: 110px;
                     clicked => { root.disconnect-clicked(); }
                 }
             }

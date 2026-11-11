@@ -65,10 +65,30 @@ impl SessionSupervisor {
     }
 
     fn find_binary(name: &str) -> Option<PathBuf> {
+        // 1. Check directory of the running executable
+        if let Ok(mut exe_dir) = std::env::current_exe() {
+            exe_dir.pop();
+            let next_to_exe = exe_dir.join(format!("{}.exe", name));
+            if next_to_exe.exists() {
+                return Some(next_to_exe);
+            }
+            let in_bin = exe_dir.join(format!("bin/{}.exe", name));
+            if in_bin.exists() {
+                return Some(in_bin);
+            }
+            let repo_bin = exe_dir.join(format!("../../bin/{}.exe", name));
+            if repo_bin.exists() {
+                return Some(repo_bin);
+            }
+        }
+
+        // 2. Check workspace relative candidates
         let candidates = [
             PathBuf::from(format!("bin/{}.exe", name)),
             PathBuf::from(format!("build/apps/{}/Release/{}.exe", name, name)),
             PathBuf::from(format!("build/apps/{}/{}.exe", name, name)),
+            PathBuf::from(format!("build/apps/host/{}.exe", name)),
+            PathBuf::from(format!("build/apps/client/{}.exe", name)),
             PathBuf::from(format!("{}.exe", name)),
         ];
 
@@ -115,7 +135,7 @@ impl SessionSupervisor {
                 *state_clone.lock().unwrap() = ConnectionState::Connecting;
                 cb_clone(SessionEvent::StateChanged(ConnectionState::Connecting));
             }
-            MessageType::IceConnected => {
+            MessageType::IceConnected | MessageType::StreamingActive => {
                 *state_clone.lock().unwrap() = ConnectionState::Streaming;
                 is_str_clone.store(true, Ordering::SeqCst);
                 cb_clone(SessionEvent::StateChanged(ConnectionState::Streaming));
@@ -150,13 +170,22 @@ impl SessionSupervisor {
             _ => {}
         })?;
 
+        // Auto-start signaling daemon if present
+        if let Some(sig_bin) = Self::find_binary("mist-signaling") {
+            let _ = Command::new(sig_bin).args(["--bind", "0.0.0.0:8080"]).spawn();
+        }
+
         let mut cmd = Command::new(host_bin);
         cmd.args([
             "--stream-live",
             "--session-id",
             session_id,
-            "--signaling",
+            "--signaling-url",
             &config.network.signaling_url,
+            "--auth-token",
+            "mist-dev-token",
+            "--audio",
+            "--allow-remote-input",
             "--bitrate",
             &config.video.bitrate_kbps.to_string(),
             "--fps",
@@ -269,8 +298,10 @@ impl SessionSupervisor {
             session_id,
             "--auth-token",
             auth_token,
-            "--signaling",
+            "--signaling-url",
             &config.network.signaling_url,
+            "--audio",
+            "--enable-input",
             "--ipc-pipe",
             &pipe_name,
             "--parent-hwnd",
@@ -327,7 +358,9 @@ impl SessionSupervisor {
 
         if let Some(mut child) = self.child_process.take() {
             let _ = child.kill();
-            let _ = child.wait();
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
         }
 
         if let Some(mut ipc) = self.ipc_server.take() {

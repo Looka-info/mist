@@ -1,18 +1,23 @@
 import { Theme } from "../theme.slint";
+import { MaterialIcon } from "material-icon.slint";
 
 export component MetricCard {
     in property <string> title: "Latency";
     in property <string> value: "12 ms";
     in property <string> subtitle: "Direct LAN connection";
-    in property <color> accent-color: Theme.accent;
+    in property <string> icon-name: "";
+    in property <color> accent-color: Theme.primary;
 
-    height: 100px;
+    height: 104px;
 
     rect := Rectangle {
-        background: Theme.surface;
-        border-radius: Theme.radius-medium;
+        background: touch.has-hover ? Theme.surface-container-low : Theme.surface;
+        border-radius: Theme.radius-large;
         border-width: 1px;
-        border-color: Theme.surface-border;
+        border-color: touch.has-hover ? Theme.primary : Theme.surface-border;
+
+        animate background, border-color, y { duration: 180ms; easing: cubic-bezier(0.2, 0.0, 0, 1.0); }
+        y: touch.has-hover ? -2px : 0px;
 
         VerticalLayout {
             padding: Theme.space-md;
@@ -21,25 +26,43 @@ export component MetricCard {
             HorizontalLayout {
                 alignment: space-between;
 
-                Text {
-                    text: root.title;
-                    color: Theme.text-secondary;
-                    font-size: 13px;
-                    font-weight: 500;
+                HorizontalLayout {
+                    spacing: Theme.space-xs;
+
+                    if root.icon-name != "" : VerticalLayout {
+                        alignment: center;
+                        MaterialIcon {
+                            name: root.icon-name;
+                            icon-size: 16px;
+                            icon-color: root.accent-color;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: root.title;
+                            color: Theme.text-secondary;
+                            font-size: 13px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                    }
                 }
 
                 Rectangle {
-                    width: 6px;
-                    height: 6px;
-                    border-radius: 3px;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 4px;
                     background: root.accent-color;
+                    y: (parent.height - self.height) / 2;
                 }
             }
 
             Text {
                 text: root.value;
                 color: Theme.text-primary;
-                font-size: 22px;
+                font-size: 20px;
                 font-weight: 700;
             }
 
@@ -47,7 +70,10 @@ export component MetricCard {
                 text: root.subtitle;
                 color: Theme.text-secondary;
                 font-size: 11px;
+                overflow: elide;
             }
         }
     }
+
+    touch := TouchArea {}
 }

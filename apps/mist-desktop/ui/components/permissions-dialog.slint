@@ -1,0 +1,388 @@
+import { Theme } from "../theme.slint";
+import { MaterialIcon } from "material-icon.slint";
+import { M3Switch } from "m3-switch.slint";
+
+export component PermissionsDialog inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <string> user-id: "";
+    in property <string> user-name: "";
+    in-out property <bool> allow-gamepad: true;
+    in-out property <bool> allow-keyboard: true;
+    in-out property <bool> allow-mouse: true;
+    in-out property <bool> stream-audio: true;
+
+    callback close();
+    callback save(string, bool, bool, bool, bool);
+    callback kick(string);
+
+    if root.is-open : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000073;
+
+        // Dismiss when clicking outside modal
+        TouchArea {
+            clicked => { root.close(); }
+        }
+
+        // Modal Card Container
+        Rectangle {
+            width: min(500px, parent.width - 32px);
+            height: min(600px, parent.height - 32px);
+            background: Theme.surface;
+            border-radius: Theme.radius-card;
+            border-width: 1px;
+            border-color: Theme.border-line;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: Theme.shadow-color;
+            drop-shadow-offset-y: 8px;
+            clip: true;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+
+                // Header with User Name & Close Button (Pinned)
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        Text {
+                            text: "Manage Permissions";
+                            font-size: 20px;
+                            font-weight: 600;
+                            color: Theme.text-ink;
+                        }
+                        Text {
+                            text: "User: " + (root.user-name != "" ? root.user-name : "Connected Guest");
+                            font-size: 13px;
+                            color: Theme.text-mute;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 16px;
+                        background: close-touch.has-hover ? Theme.item-hover : #00000000;
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: "close";
+                            icon-size: 20px;
+                            icon-color: Theme.text-mute;
+                        }
+
+                        close-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.close(); }
+                        }
+                    }
+                }
+
+                Rectangle { height: 1px; background: Theme.border-line; }
+
+                // Scrollable Interior
+                Flickable {
+                    vertical-stretch: 1;
+                    content-width: self.width;
+
+                    VerticalLayout {
+                        width: parent.width;
+                        spacing: 14px;
+                        padding-top: 4px;
+                        padding-bottom: 8px;
+
+                        // Quick Presets
+                        VerticalLayout {
+                            spacing: 8px;
+                            Text {
+                                text: "Quick Presets";
+                                font-size: 14px;
+                                font-weight: 600;
+                                color: Theme.text-ink;
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                // Gamepad Only
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 32px;
+                                    border-radius: Theme.radius-pill;
+                                    background: root.allow-gamepad && !root.allow-keyboard && !root.allow-mouse ? Theme.container : Theme.container-subtle;
+                                    border-width: 1px;
+                                    border-color: root.allow-gamepad && !root.allow-keyboard && !root.allow-mouse ? Theme.mint : Theme.border-line;
+
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: "Gamepad Only";
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: root.allow-gamepad && !root.allow-keyboard && !root.allow-mouse ? Theme.on-container : Theme.text-mute;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.allow-gamepad = true;
+                                            root.allow-keyboard = false;
+                                            root.allow-mouse = false;
+                                        }
+                                    }
+                                }
+
+                                // Keys & Mouse
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 32px;
+                                    border-radius: Theme.radius-pill;
+                                    background: !root.allow-gamepad && root.allow-keyboard && root.allow-mouse ? Theme.container : Theme.container-subtle;
+                                    border-width: 1px;
+                                    border-color: !root.allow-gamepad && root.allow-keyboard && root.allow-mouse ? Theme.mint : Theme.border-line;
+
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: "Keys & Mouse";
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: !root.allow-gamepad && root.allow-keyboard && root.allow-mouse ? Theme.on-container : Theme.text-mute;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.allow-gamepad = false;
+                                            root.allow-keyboard = true;
+                                            root.allow-mouse = true;
+                                        }
+                                    }
+                                }
+
+                                // Full Control
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 32px;
+                                    border-radius: Theme.radius-pill;
+                                    background: root.allow-gamepad && root.allow-keyboard && root.allow-mouse ? Theme.container : Theme.container-subtle;
+                                    border-width: 1px;
+                                    border-color: root.allow-gamepad && root.allow-keyboard && root.allow-mouse ? Theme.mint : Theme.border-line;
+
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: "Full Control";
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: root.allow-gamepad && root.allow-keyboard && root.allow-mouse ? Theme.on-container : Theme.text-mute;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.allow-gamepad = true;
+                                            root.allow-keyboard = true;
+                                            root.allow-mouse = true;
+                                        }
+                                    }
+                                }
+
+                                // View Only
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 32px;
+                                    border-radius: Theme.radius-pill;
+                                    background: !root.allow-gamepad && !root.allow-keyboard && !root.allow-mouse ? Theme.container : Theme.container-subtle;
+                                    border-width: 1px;
+                                    border-color: !root.allow-gamepad && !root.allow-keyboard && !root.allow-mouse ? Theme.mint : Theme.border-line;
+
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: "View Only";
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: !root.allow-gamepad && !root.allow-keyboard && !root.allow-mouse ? Theme.on-container : Theme.text-mute;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.allow-gamepad = false;
+                                            root.allow-keyboard = false;
+                                            root.allow-mouse = false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle { height: 1px; background: Theme.border-line; }
+
+                        // Granular Options
+                        VerticalLayout {
+                            spacing: 12px;
+
+                            // Gamepad / Keypad
+                            HorizontalLayout {
+                                alignment: space-between;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: "Gamepad & Keypad Controller"; font-size: 14px; font-weight: 500; color: Theme.text-ink; }
+                                    Text { text: "Allow connected controllers and virtual touch keypads."; font-size: 12px; color: Theme.text-mute; }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    M3Switch { checked <=> root.allow-gamepad; }
+                                }
+                            }
+
+                            // Keyboard Access
+                            HorizontalLayout {
+                                alignment: space-between;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: "Keyboard Access"; font-size: 14px; font-weight: 500; color: Theme.text-ink; }
+                                    Text { text: "Allow keystrokes, shortcuts, and typing in games."; font-size: 12px; color: Theme.text-mute; }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    M3Switch { checked <=> root.allow-keyboard; }
+                                }
+                            }
+
+                            // Mouse Access
+                            HorizontalLayout {
+                                alignment: space-between;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: "Mouse Access"; font-size: 14px; font-weight: 500; color: Theme.text-ink; }
+                                    Text { text: "Allow mouse movement and button clicks."; font-size: 12px; color: Theme.text-mute; }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    M3Switch { checked <=> root.allow-mouse; }
+                                }
+                            }
+
+                            // Stream Audio
+                            HorizontalLayout {
+                                alignment: space-between;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: "Stream Game Audio"; font-size: 14px; font-weight: 500; color: Theme.text-ink; }
+                                    Text { text: "Broadcast desktop audio to this guest."; font-size: 12px; color: Theme.text-mute; }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    M3Switch { checked <=> root.stream-audio; }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { height: 1px; background: Theme.border-line; }
+
+                // Footer Actions (Pinned at bottom)
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    // Kick / Disconnect Button
+                    Rectangle {
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        background: kick-touch.has-hover ? Theme.bad-container : Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.color-bad;
+
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            spacing: 6px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                MaterialIcon {
+                                    name: "person_remove";
+                                    icon-size: 16px;
+                                    icon-color: Theme.color-bad;
+                                }
+                            }
+                            Text {
+                                text: "Disconnect User";
+                                font-size: 13px;
+                                font-weight: 600;
+                                color: Theme.color-bad;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        kick-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.kick(root.user-id);
+                                root.close();
+                            }
+                        }
+                    }
+
+                    // Save / Apply Button
+                    Rectangle {
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        background: save-touch.has-hover ? Theme.accent : Theme.mint;
+                        animate background { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 20px;
+                            padding-right: 20px;
+                            spacing: 8px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                MaterialIcon {
+                                    name: "check";
+                                    icon-size: 18px;
+                                    icon-color: Theme.on-mint;
+                                }
+                            }
+                            Text {
+                                text: "Apply Permissions";
+                                font-size: 13px;
+                                font-weight: 600;
+                                color: Theme.on-mint;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        save-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.save(root.user-id, root.allow-keyboard, root.allow-mouse, root.allow-gamepad, root.stream-audio);
+                                root.close();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

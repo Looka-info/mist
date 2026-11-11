@@ -310,7 +310,7 @@ private:
     char clientPairingCode_[16]{""};
     bool incomingRequestActive_{true};
     std::string pendingDeviceId_{"pixel-tab-01"};
-    std::string pendingDeviceName_{"Pixel Tablet (Living Room)"};
+    std::string pendingDeviceName_{""};
     security::DevicePermissions pendingPermissions_{ true, true, false, false, false };
 
     // Settings Modal State

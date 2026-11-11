@@ -1,0 +1,420 @@
+import { Theme } from "../theme.slint";
+import { MaterialIcon } from "material-icon.slint";
+import { M3Switch } from "m3-switch.slint";
+
+export component SettingsDialog inherits Rectangle {
+    in property <bool> is-open: false;
+    in-out property <bool> dark-theme: false;
+    in-out property <bool> high-contrast: false;
+    in-out property <bool> compact-view: false;
+    in-out property <bool> animated-shapes: true;
+    in-out property <int> max-bitrate: 15;
+    in-out property <int> fps: 60;
+
+    callback close();
+    callback shuffle-shapes();
+
+    if root.is-open : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000073;
+
+        // Dismiss when clicking outside modal
+        TouchArea {
+            clicked => { root.close(); }
+        }
+
+        // Modal Card Container
+        card := Rectangle {
+            width: min(500px, parent.width - 32px);
+            height: min(620px, parent.height - 32px);
+            background: Theme.surface;
+            border-radius: Theme.radius-card;
+            border-width: 1px;
+            border-color: Theme.border-line;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: Theme.shadow-color;
+            drop-shadow-offset-y: 8px;
+            clip: true;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+
+                // Header (Pinned)
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text {
+                        text: "Settings";
+                        font-size: 20px;
+                        font-weight: 600;
+                        color: Theme.text-ink;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 16px;
+                        background: close-touch.has-hover ? Theme.item-hover : #00000000;
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: "close";
+                            icon-size: 20px;
+                            icon-color: Theme.text-mute;
+                        }
+
+                        close-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.close(); }
+                        }
+                    }
+                }
+
+                Rectangle { height: 1px; background: Theme.border-line; }
+
+                // Scrollable Content
+                Flickable {
+                    vertical-stretch: 1;
+                    content-width: self.width;
+
+                    VerticalLayout {
+                        width: parent.width;
+                        spacing: 14px;
+                        padding-top: 4px;
+                        padding-bottom: 8px;
+
+                        // Theme Segment
+                        VerticalLayout {
+                            spacing: 6px;
+                            Text {
+                                text: "Theme";
+                                font-size: 15px;
+                                font-weight: 500;
+                                color: Theme.text-ink;
+                            }
+
+                            Rectangle {
+                                height: 38px;
+                                border-radius: Theme.radius-pill;
+                                border-width: 1.5px;
+                                border-color: Theme.border-line;
+                                clip: true;
+
+                                HorizontalLayout {
+                                    // Light Option
+                                    Rectangle {
+                                        background: !root.dark-theme ? Theme.container : #00000000;
+                                        Text {
+                                            text: "Light";
+                                            font-size: 13px;
+                                            font-weight: 500;
+                                            color: !root.dark-theme ? Theme.on-container : Theme.text-ink;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.dark-theme = false; Theme.dark-mode = false; }
+                                        }
+                                    }
+
+                                    Rectangle { width: 1px; background: Theme.border-line; }
+
+                                    // Dark Option
+                                    Rectangle {
+                                        background: root.dark-theme ? Theme.container : #00000000;
+                                        Text {
+                                            text: "Dark";
+                                            font-size: 13px;
+                                            font-weight: 500;
+                                            color: root.dark-theme ? Theme.on-container : Theme.text-ink;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.dark-theme = true; Theme.dark-mode = true; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Contrast Segment
+                        VerticalLayout {
+                            spacing: 6px;
+                            Text {
+                                text: "Contrast";
+                                font-size: 15px;
+                                font-weight: 500;
+                                color: Theme.text-ink;
+                            }
+
+                            Rectangle {
+                                height: 38px;
+                                border-radius: Theme.radius-pill;
+                                border-width: 1.5px;
+                                border-color: Theme.border-line;
+                                clip: true;
+
+                                HorizontalLayout {
+                                    Rectangle {
+                                        background: !root.high-contrast ? Theme.container : #00000000;
+                                        Text {
+                                            text: "Standard";
+                                            font-size: 13px;
+                                            font-weight: 500;
+                                            color: !root.high-contrast ? Theme.on-container : Theme.text-ink;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.high-contrast = false; Theme.high-contrast = false; }
+                                        }
+                                    }
+
+                                    Rectangle { width: 1px; background: Theme.border-line; }
+
+                                    Rectangle {
+                                        background: root.high-contrast ? Theme.container : #00000000;
+                                        Text {
+                                            text: "High";
+                                            font-size: 13px;
+                                            font-weight: 500;
+                                            color: root.high-contrast ? Theme.on-container : Theme.text-ink;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.high-contrast = true; Theme.high-contrast = true; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle { height: 1px; background: Theme.border-line; }
+
+                        // Row: Compact View
+                        HorizontalLayout {
+                            alignment: space-between;
+                            VerticalLayout {
+                                spacing: 2px;
+                                Text { text: "Compact view"; font-size: 14px; font-weight: 500; color: Theme.text-ink; }
+                                Text { text: "Smaller cards and denser spacing"; font-size: 12px; color: Theme.text-mute; }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                M3Switch {
+                                    checked <=> root.compact-view;
+                                    toggled(v) => { Theme.compact-view = v; }
+                                }
+                            }
+                        }
+
+                        Rectangle { height: 1px; background: Theme.border-line; }
+
+                        // Row: Animated Shapes
+                        HorizontalLayout {
+                            alignment: space-between;
+                            VerticalLayout {
+                                spacing: 2px;
+                                Text { text: "Animated shapes"; font-size: 14px; font-weight: 500; color: Theme.text-ink; }
+                                Text { text: "Organic shapes drifting in background"; font-size: 12px; color: Theme.text-mute; }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                M3Switch {
+                                    checked <=> root.animated-shapes;
+                                }
+                            }
+                        }
+
+                        Rectangle { height: 1px; background: Theme.border-line; }
+
+                        // Row: Shapes Shuffle
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "Shuffle Shapes"; font-size: 14px; font-weight: 500; color: Theme.text-ink; vertical-alignment: center; }
+
+                            Rectangle {
+                                height: 34px;
+                                border-radius: Theme.radius-pill;
+                                border-width: 1px;
+                                border-color: Theme.border-line;
+                                background: shuf-touch.has-hover ? Theme.item-hover : Theme.surface;
+
+                                HorizontalLayout {
+                                    padding-left: 14px;
+                                    padding-right: 14px;
+                                    spacing: 6px;
+                                    alignment: center;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        MaterialIcon {
+                                            name: "casino";
+                                            icon-size: 18px;
+                                            icon-color: Theme.accent;
+                                        }
+                                    }
+                                    Text {
+                                        text: "Shuffle";
+                                        font-size: 13px;
+                                        font-weight: 500;
+                                        color: Theme.accent;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                shuf-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.shuffle-shapes(); }
+                                }
+                            }
+                        }
+
+                        Rectangle { height: 1px; background: Theme.border-line; }
+
+                        // Row: Maximum video bitrate
+                        VerticalLayout {
+                            spacing: 6px;
+                            HorizontalLayout {
+                                alignment: start;
+                                spacing: 6px;
+                                Text { text: "Maximum video bitrate:"; font-size: 13px; font-weight: 500; color: Theme.text-mute; }
+                                Text { text: root.max-bitrate + " Mbps"; font-size: 13px; font-weight: 600; color: Theme.text-ink; }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: center;
+
+                                Rectangle {
+                                    width: 28px;
+                                    height: 28px;
+                                    border-radius: 14px;
+                                    background: minus-touch.has-hover ? Theme.item-hover : Theme.container-subtle;
+                                    Text { text: "-"; font-size: 16px; font-weight: 600; color: Theme.text-ink; x: 10px; y: 2px; }
+                                    minus-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { if root.max-bitrate > 3 { root.max-bitrate -= 1; } }
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 6px;
+                                    border-radius: 3px;
+                                    background: Theme.container-subtle;
+                                    Rectangle {
+                                        width: parent.width * (root.max-bitrate - 3) / 37;
+                                        height: 100%;
+                                        border-radius: 3px;
+                                        background: Theme.accent;
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: 28px;
+                                    height: 28px;
+                                    border-radius: 14px;
+                                    background: plus-touch.has-hover ? Theme.item-hover : Theme.container-subtle;
+                                    Text { text: "+"; font-size: 16px; font-weight: 600; color: Theme.text-ink; x: 8px; y: 4px; }
+                                    plus-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { if root.max-bitrate < 40 { root.max-bitrate += 1; } }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Row: Frame rate
+                        VerticalLayout {
+                            spacing: 4px;
+                            Text { text: "Frame rate"; font-size: 13px; font-weight: 500; color: Theme.text-mute; }
+
+                            Rectangle {
+                                height: 42px;
+                                border-radius: 10px;
+                                border-width: 1.5px;
+                                border-color: Theme.border-line;
+                                background: Theme.surface;
+
+                                HorizontalLayout {
+                                    padding-left: 14px;
+                                    padding-right: 14px;
+                                    alignment: space-between;
+
+                                    Text {
+                                        text: root.fps == 60 ? "60 frames per second" : "30 frames per second";
+                                        font-size: 14px;
+                                        color: Theme.text-ink;
+                                        vertical-alignment: center;
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        MaterialIcon {
+                                            name: "unfold_more";
+                                            icon-size: 18px;
+                                            icon-color: Theme.text-mute;
+                                        }
+                                    }
+                                }
+
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.fps = root.fps == 60 ? 30 : 60;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { height: 1px; background: Theme.border-line; }
+
+                // Done Button (Pinned at bottom)
+                HorizontalLayout {
+                    alignment: end;
+
+                    Rectangle {
+                        height: 38px;
+                        border-radius: Theme.radius-pill;
+                        background: done-touch.has-hover ? Theme.accent : Theme.mint;
+                        animate background { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 24px;
+                            padding-right: 24px;
+                            alignment: center;
+
+                            Text {
+                                text: "Done";
+                                font-size: 14px;
+                                font-weight: 600;
+                                color: Theme.on-mint;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        done-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.close(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

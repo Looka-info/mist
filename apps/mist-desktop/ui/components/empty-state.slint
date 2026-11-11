@@ -1,8 +1,10 @@
 import { Theme } from "../theme.slint";
 import { PrimaryButton } from "primary-button.slint";
+import { MaterialIcon } from "material-icon.slint";
 
 export component EmptyState {
-    in property <string> icon: "📡";
+    in property <string> icon: "";
+    in property <string> icon-name: "devices";
     in property <string> title: "No Devices Paired";
     in property <string> description: "Start Wi-Fi Screen Share or connect with a 6-character code to begin streaming.";
     in property <string> button-text: "Start Sharing";
@@ -12,10 +14,23 @@ export component EmptyState {
         alignment: center;
         spacing: Theme.space-lg;
 
-        Text {
-            text: root.icon;
-            font-size: 48px;
-            horizontal-alignment: center;
+        HorizontalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 72px;
+                height: 72px;
+                border-radius: 36px;
+                background: Theme.primary-container;
+
+                MaterialIcon {
+                    name: root.icon-name != "" ? root.icon-name : "devices";
+                    icon-size: 36px;
+                    icon-color: Theme.primary;
+                    y: (parent.height - self.height) / 2;
+                    x: (parent.width - self.width) / 2;
+                }
+            }
         }
 
         VerticalLayout {
@@ -24,7 +39,7 @@ export component EmptyState {
             Text {
                 text: root.title;
                 color: Theme.text-primary;
-                font-size: 18px;
+                font-size: 19px;
                 font-weight: 700;
                 horizontal-alignment: center;
             }
@@ -42,6 +57,7 @@ export component EmptyState {
 
             PrimaryButton {
                 text: root.button-text;
+                icon-name: "wifi_tethering";
                 clicked => { root.action-clicked(); }
             }
         }

@@ -1,4 +1,5 @@
 import { Theme } from "../theme.slint";
+import { MaterialIcon } from "material-icon.slint";
 
 export component Toast {
     in property <bool> is-visible: false;
@@ -6,21 +7,31 @@ export component Toast {
 
     if root.is-visible : Rectangle {
         height: 48px;
-        background: Theme.surface-variant;
+        background: Theme.primary-container;
         border-radius: Theme.radius-pill;
         border-width: 1px;
         border-color: Theme.primary;
 
         HorizontalLayout {
-            padding-left: Theme.space-xl;
+            padding-left: Theme.space-lg;
             padding-right: Theme.space-xl;
+            spacing: Theme.space-sm;
             alignment: center;
+
+            VerticalLayout {
+                alignment: center;
+                MaterialIcon {
+                    name: "check_circle";
+                    icon-size: 18px;
+                    icon-color: Theme.primary;
+                }
+            }
 
             Text {
                 text: root.message;
-                color: Theme.text-primary;
+                color: Theme.on-primary-container;
                 font-size: 14px;
-                font-weight: 600;
+                font-weight: 700;
                 vertical-alignment: center;
             }
         }

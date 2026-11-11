@@ -303,3 +303,26 @@ impl Default for SecurityStatus {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FriendRecord {
+    pub tag: String,
+    pub is_online: bool,
+    pub is_hosting: bool,
+    pub can_join: bool,
+    pub allow_input: bool,
+    pub allow_gamepad: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FriendRequestRecord {
+    pub tag: String,
+    pub is_outgoing: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecentSessionRecord {
+    pub tag: String,
+    pub date_time: String,
+    pub stats_summary: String,
+}

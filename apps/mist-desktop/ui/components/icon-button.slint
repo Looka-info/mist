@@ -1,24 +1,40 @@
 import { Theme } from "../theme.slint";
+import { MaterialIcon } from "material-icon.slint";
 
 export component IconButton {
-    in property <string> text: "✕";
+    in property <string> text: "";
+    in property <string> icon-name: "";
     in property <bool> enabled: true;
-    in property <length> size: 36px;
+    in property <length> size: 38px;
+    in property <color> icon-color: Theme.text-primary;
     callback clicked();
 
     width: size;
     height: size;
 
     rect := Rectangle {
-        background: touch.pressed ? Theme.surface-variant :
+        background: !root.enabled ? #00000000 :
+                    touch.pressed ? Theme.surface-container-high :
                     touch.has-hover ? Theme.surface-variant : #00000000;
         border-radius: Theme.radius-pill;
+        border-width: touch.has-hover ? 1px : 0px;
+        border-color: Theme.surface-border;
 
-        animate background { duration: 120ms; easing: ease-out; }
+        animate background, border-color { duration: 150ms; easing: ease-out; }
 
-        Text {
+        if root.icon-name != "" : MaterialIcon {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            name: root.icon-name;
+            icon-size: root.size * 0.52;
+            icon-color: !root.enabled ? Theme.text-disabled :
+                        touch.has-hover ? Theme.primary : root.icon-color;
+        }
+
+        if root.icon-name == "" : Text {
             text: root.text;
-            color: !root.enabled ? Theme.text-disabled : Theme.text-primary;
+            color: !root.enabled ? Theme.text-disabled :
+                   touch.has-hover ? Theme.primary : root.icon-color;
             font-size: 16px;
             font-weight: 600;
             horizontal-alignment: center;
@@ -28,6 +44,7 @@ export component IconButton {
 
     touch := TouchArea {
         enabled: root.enabled;
+        mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
 }

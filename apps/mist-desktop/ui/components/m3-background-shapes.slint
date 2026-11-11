@@ -1,0 +1,56 @@
+import { Theme } from "../theme.slint";
+
+export component M3BackgroundShapes inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    clip: true;
+
+    // Top-Right 8-Lobe Scalloped Organic Flower (matches user images 1, 3, 4, 5)
+    Path {
+        width: 380px;
+        height: 380px;
+        x: parent.width - 260px;
+        y: -100px;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 200;
+        viewbox-height: 200;
+        fill: #c2efdc;
+        opacity: 0.55;
+        // 8-lobed parametric curve
+        commands: "M 175 100 C 175 118 190 128 178 144 C 166 160 148 152 133 167 C 118 182 120 200 100 200 C 80 200 82 182 67 167 C 52 152 34 160 22 144 C 10 128 25 118 25 100 C 25 82 10 72 22 56 C 34 40 52 48 67 33 C 82 18 80 0 100 0 C 120 0 118 18 133 33 C 148 48 166 40 178 56 C 190 72 175 82 175 100 Z";
+    }
+
+    // Center-Right Floating Squircle Cushion
+    Rectangle {
+        width: 220px;
+        height: 200px;
+        border-radius: 64px;
+        background: #dcf6ec;
+        opacity: 0.5;
+        x: parent.width - 220px;
+        y: parent.height * 0.42;
+    }
+
+    // Bottom-Right Soft Squircle
+    Rectangle {
+        width: 260px;
+        height: 240px;
+        border-radius: 72px;
+        background: #a3e8cb;
+        opacity: 0.35;
+        x: parent.width - 180px;
+        y: parent.height - 180px;
+    }
+
+    // Bottom-Left Soft Cloud Wave
+    Rectangle {
+        width: 360px;
+        height: 280px;
+        border-radius: 120px;
+        background: #d0f2e4;
+        opacity: 0.3;
+        x: -120px;
+        y: parent.height - 160px;
+    }
+}

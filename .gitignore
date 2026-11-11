@@ -51,5 +51,8 @@ artifacts/*.json
 imgui.ini
 
 # Distribution packaging & local runtime stores
-dist/
+dist/*
+!dist/mist-v0.3.0-rc3-windows-x64.zip
+!dist/MistSetup-v0.3.0-rc3.exe
+!dist/mist-windows-x64/release-manifest.json
 trusted_devices.json

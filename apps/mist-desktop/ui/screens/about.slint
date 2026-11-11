@@ -1,30 +1,28 @@
 import { Theme } from "../theme.slint";
+import { LeafLogo } from "../components/leaf-logo.slint";
+import { MaterialIcon } from "../components/material-icon.slint";
 
-export component AboutScreen {
+export component AboutScreen inherits Rectangle {
     Flickable {
-        VerticalLayout {
+        width: 100%;
+        height: 100%;
+        content-width: self.width;
+        content-height: max(self.height, content.preferred-height);
+
+        content := VerticalLayout {
+            width: parent.width;
             padding: Theme.space-xl;
             spacing: Theme.space-xl;
             alignment: start;
 
-            // Header Section
+            // Header Section with Leaf Logo
             HorizontalLayout {
                 spacing: Theme.space-lg;
+                alignment: start;
 
-                Rectangle {
-                    width: 64px;
-                    height: 64px;
-                    border-radius: 16px;
-                    background: Theme.primary;
-
-                    Text {
-                        text: "M";
-                        color: Theme.on-primary;
-                        font-size: 32px;
-                        font-weight: 800;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
+                LeafLogo {
+                    logo-size: 68px;
+                    show-border: true;
                 }
 
                 VerticalLayout {
@@ -34,14 +32,15 @@ export component AboutScreen {
                     Text {
                         text: "Mist Desktop Platform";
                         color: Theme.text-primary;
-                        font-size: 22px;
-                        font-weight: 700;
+                        font-size: 24px;
+                        font-weight: 800;
                     }
 
                     Text {
-                        text: "Version 0.3.0 • Rust-First Native Windows Architecture";
-                        color: Theme.text-secondary;
+                        text: "Version 0.3.0 • Windows 11 Native Architecture (Material 3)";
+                        color: Theme.primary;
                         font-size: 14px;
+                        font-weight: 600;
                     }
                 }
             }
@@ -52,16 +51,49 @@ export component AboutScreen {
                 border-radius: Theme.radius-large;
                 border-width: 1px;
                 border-color: Theme.surface-border;
+                clip: true;
+
+                // Material 3 Decorative Corner Arch
+                Rectangle {
+                    width: 160px;
+                    height: 160px;
+                    border-top-left-radius: 80px;
+                    border-top-right-radius: 80px;
+                    border-bottom-left-radius: 24px;
+                    border-bottom-right-radius: 24px;
+                    background: #DCFCE745;
+                    border-width: 1px;
+                    border-color: #15803D16;
+                    x: parent.width - 110px;
+                    y: -50px;
+                }
 
                 VerticalLayout {
                     padding: Theme.space-lg;
                     spacing: Theme.space-md;
 
-                    Text {
-                        text: "About Mist";
-                        color: Theme.text-primary;
-                        font-size: 16px;
-                        font-weight: 600;
+                    HorizontalLayout {
+                        spacing: Theme.space-sm;
+
+                        VerticalLayout {
+                            alignment: center;
+                            MaterialIcon {
+                                name: "info";
+                                icon-size: 18px;
+                                icon-color: Theme.primary;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "About Mist";
+                                color: Theme.text-primary;
+                                font-size: 16px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+                        }
                     }
 
                     Text {
@@ -84,11 +116,26 @@ export component AboutScreen {
                     padding: Theme.space-lg;
                     spacing: Theme.space-sm;
 
-                    Text {
-                        text: "Underlying Subsystems & Technologies";
-                        color: Theme.text-primary;
-                        font-size: 16px;
-                        font-weight: 600;
+                    HorizontalLayout {
+                        spacing: Theme.space-sm;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            MaterialIcon {
+                                name: "settings";
+                                icon-size: 18px;
+                                icon-color: Theme.primary;
+                            }
+                        }
+
+                        Text {
+                            text: "Underlying Subsystems & Technologies";
+                            color: Theme.text-primary;
+                            font-size: 16px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
                     }
 
                     Text { text: "• Application & UI: Rust 2021 + Slint 1.18.1 Native Desktop Engine"; color: Theme.text-secondary; font-size: 13px; }
@@ -116,7 +163,7 @@ export component AboutScreen {
                         text: "Open Source Licensing & Third-Party Attribution";
                         color: Theme.text-primary;
                         font-size: 16px;
-                        font-weight: 600;
+                        font-weight: 700;
                     }
 
                     Text { text: "Slint UI Toolkit © SixtyFPS GmbH. Licensed under GPLv3 / Commercial."; color: Theme.text-secondary; font-size: 12px; }

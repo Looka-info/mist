@@ -1,5 +1,6 @@
 import { Theme } from "../theme.slint";
 import { SecondaryButton } from "secondary-button.slint";
+import { MaterialIcon } from "material-icon.slint";
 
 export component DeviceCard {
     in property <string> device-name: "Remote PC";
@@ -10,54 +11,85 @@ export component DeviceCard {
     in property <bool> has-input: true;
     callback revoke-clicked();
 
-    height: 72px;
+    height: 76px;
 
     rect := Rectangle {
-        background: Theme.surface;
-        border-radius: Theme.radius-medium;
+        background: touch.has-hover ? Theme.surface-container-low : Theme.surface;
+        border-radius: Theme.radius-large;
         border-width: 1px;
-        border-color: Theme.surface-border;
+        border-color: touch.has-hover ? Theme.primary : Theme.surface-border;
+
+        animate background, border-color, y { duration: 180ms; easing: cubic-bezier(0.2, 0.0, 0, 1.0); }
+        y: touch.has-hover ? -2px : 0px;
 
         HorizontalLayout {
             padding-left: Theme.space-lg;
             padding-right: Theme.space-lg;
             alignment: space-between;
 
-            VerticalLayout {
-                alignment: center;
-                spacing: Theme.space-xs;
+            HorizontalLayout {
+                spacing: Theme.space-md;
+                alignment: start;
 
-                HorizontalLayout {
-                    spacing: Theme.space-sm;
+                // Device avatar icon
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 44px;
+                        height: 44px;
+                        border-radius: Theme.radius-medium;
+                        background: Theme.primary-container;
 
-                    Text {
-                        text: root.device-name;
-                        color: Theme.text-primary;
-                        font-size: 15px;
-                        font-weight: 600;
-                    }
-
-                    badge := Rectangle {
-                        background: Theme.surface-variant;
-                        border-radius: Theme.radius-small;
-                        height: 20px;
-                        width: 60px;
-
-                        Text {
-                            text: root.is-trusted ? "Trusted" : "Pending";
-                            color: Theme.accent;
-                            font-size: 11px;
-                            font-weight: 500;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                        MaterialIcon {
+                            name: "devices";
+                            icon-size: 22px;
+                            icon-color: Theme.primary;
+                            y: (parent.height - self.height) / 2;
+                            x: (parent.width - self.width) / 2;
                         }
                     }
                 }
 
-                Text {
-                    text: "ID: " + root.device-id + " • Last active: " + root.last-connected;
-                    color: Theme.text-secondary;
-                    font-size: 12px;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 3px;
+
+                    HorizontalLayout {
+                        spacing: Theme.space-sm;
+
+                        Text {
+                            text: root.device-name;
+                            color: Theme.text-primary;
+                            font-size: 15px;
+                            font-weight: 700;
+                        }
+
+                        badge := Rectangle {
+                            background: root.is-trusted ? Theme.primary-container : Theme.surface-variant;
+                            border-radius: Theme.radius-pill;
+                            height: 20px;
+
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                alignment: center;
+
+                                Text {
+                                    text: root.is-trusted ? "Authorized" : "Pending";
+                                    color: root.is-trusted ? Theme.primary : Theme.text-secondary;
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "ID: " + root.device-id + " • Last active: " + root.last-connected;
+                        color: Theme.text-secondary;
+                        font-size: 12px;
+                    }
                 }
             }
 
@@ -66,10 +98,13 @@ export component DeviceCard {
 
                 SecondaryButton {
                     text: "Revoke";
-                    min-width: 80px;
+                    icon-name: "delete";
+                    min-width: 96px;
                     clicked => { root.revoke-clicked(); }
                 }
             }
         }
     }
+
+    touch := TouchArea {}
 }

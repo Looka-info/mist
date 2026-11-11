@@ -1,0 +1,134 @@
+import { Theme } from "../theme.slint";
+import { LeafLogo } from "leaf-logo.slint";
+
+export component LoadingScreen inherits Rectangle {
+    in property <bool> is-active: true;
+    in property <string> status-text: "Initializing Mist Engine...";
+    in property <float> progress: 0.35; // 0.0 to 1.0
+
+    width: 100%;
+    height: 100%;
+    background: Theme.background;
+    clip: true;
+
+    // Ambient background decorative glow circles (Material 3)
+    Rectangle {
+        width: 500px;
+        height: 500px;
+        border-radius: 250px;
+        background: #DCFCE740;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2 - 40px;
+    }
+
+    Rectangle {
+        width: 360px;
+        height: 360px;
+        border-radius: 180px;
+        border-width: 1.5px;
+        border-color: #15803D16;
+        background: #15803D04;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2 - 40px;
+    }
+
+    // Central Loading Stack
+    VerticalLayout {
+        alignment: center;
+        spacing: Theme.space-xl;
+
+        HorizontalLayout {
+            alignment: center;
+
+            // Brand Logo with Outer Accent Ring
+            Rectangle {
+                width: 96px;
+                height: 96px;
+                border-radius: 48px;
+                background: Theme.surface;
+                border-width: 2px;
+                border-color: Theme.primary;
+
+                VerticalLayout {
+                    alignment: center;
+                    HorizontalLayout {
+                        alignment: center;
+                        LeafLogo {
+                            logo-size: 56px;
+                            show-border: false;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Title and Subtitle
+        VerticalLayout {
+            spacing: Theme.space-xs;
+            alignment: center;
+
+            Text {
+                text: "M I S T";
+                color: Theme.primary;
+                font-size: 28px;
+                font-weight: 800;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "Peer-to-Peer Native Game Streaming • Windows 11";
+                color: Theme.text-secondary;
+                font-size: 13px;
+                font-weight: 500;
+                horizontal-alignment: center;
+            }
+        }
+
+        // Material 3 Progress Bar Container
+        HorizontalLayout {
+            alignment: center;
+
+            VerticalLayout {
+                width: 320px;
+                spacing: Theme.space-sm;
+
+                // Track
+                Rectangle {
+                    height: 5px;
+                    border-radius: 2.5px;
+                    background: Theme.primary-container;
+                    clip: true;
+
+                    // Progress fill
+                    Rectangle {
+                        x: 0px;
+                        width: parent.width * Math.min(1.0, Math.max(0.05, root.progress));
+                        height: 100%;
+                        border-radius: 2.5px;
+                        background: Theme.primary;
+                        animate width { duration: 250ms; easing: ease-out; }
+                    }
+                }
+
+                // Status text underneath progress bar
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    Text {
+                        text: root.status-text;
+                        color: Theme.text-secondary;
+                        font-size: 12px;
+                        font-weight: 500;
+                    }
+
+                    Text {
+                        text: Math.round(root.progress * 100) + "%";
+                        color: Theme.primary;
+                        font-size: 12px;
+                        font-weight: 700;
+                    }
+                }
+            }
+        }
+    }
+}

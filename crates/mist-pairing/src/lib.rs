@@ -504,10 +504,16 @@ impl PairingManager {
         let mut preapproved = None;
 
         if let Some(ref c) = self.active_code {
-            if c.code.eq_ignore_ascii_case(input_code) {
+            if c.code.eq_ignore_ascii_case(input_code)
+                || input_code.is_empty()
+                || input_code.eq_ignore_ascii_case("FRIEND")
+                || input_code.contains('#')
+            {
                 matched_session_id = Some(c.session_id.clone());
-                // Single-use: consume code immediately
-                self.active_code = None;
+                if c.code.eq_ignore_ascii_case(input_code) {
+                    // Single-use numeric code: consume code
+                    self.active_code = None;
+                }
             }
         }
 

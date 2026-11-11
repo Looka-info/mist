@@ -1,0 +1,56 @@
+﻿{
+    "product":  "Mist Native Game Streaming",
+    "version":  "0.3.0-rc1",
+    "milestone":  7,
+    "generated_at":  "2026-11-12T02:27:17.8519949+05:00",
+    "files":  [
+                  {
+                      "filename":  "mist-signaling.exe",
+                      "relative_path":  "dist\\mist-windows-x64\\bin\\mist-signaling.exe",
+                      "size_bytes":  5396920,
+                      "sha256":  "EF7D4F0B709C0CDEF83070945FE4D6BDB71B1CDEBA9C439C9BA850CF37F6926B",
+                      "signature_status":  "UnknownError",
+                      "cert_thumbprint":  "5BBF1BACD3CDE907ECC41E4001F35F459CEBB86F"
+                  },
+                  {
+                      "filename":  "mist.exe",
+                      "relative_path":  "dist\\mist-windows-x64\\bin\\mist.exe",
+                      "size_bytes":  41353144,
+                      "sha256":  "75A1E3BCC786315296ACEADC5DBBFF9AE178F937C277FEAB2D7C52FF2EF8981F",
+                      "signature_status":  "UnknownError",
+                      "cert_thumbprint":  "5BBF1BACD3CDE907ECC41E4001F35F459CEBB86F"
+                  },
+                  {
+                      "filename":  "mist_client.exe",
+                      "relative_path":  "dist\\mist-windows-x64\\bin\\mist_client.exe",
+                      "size_bytes":  4968376,
+                      "sha256":  "DCB35BF6680BFB5FD4ABA102F3D14DD5D4B0FC3883AD1E4713155800B63FDDCB",
+                      "signature_status":  "UnknownError",
+                      "cert_thumbprint":  "5BBF1BACD3CDE907ECC41E4001F35F459CEBB86F"
+                  },
+                  {
+                      "filename":  "mist_desktop.exe",
+                      "relative_path":  "dist\\mist-windows-x64\\bin\\mist_desktop.exe",
+                      "size_bytes":  41353144,
+                      "sha256":  "75A1E3BCC786315296ACEADC5DBBFF9AE178F937C277FEAB2D7C52FF2EF8981F",
+                      "signature_status":  "UnknownError",
+                      "cert_thumbprint":  "5BBF1BACD3CDE907ECC41E4001F35F459CEBB86F"
+                  },
+                  {
+                      "filename":  "mist_host.exe",
+                      "relative_path":  "dist\\mist-windows-x64\\bin\\mist_host.exe",
+                      "size_bytes":  5386168,
+                      "sha256":  "40244EEEECC71784B4FCB201CC849E71B5759BE2D8EF3A15E412F46B8483C1F5",
+                      "signature_status":  "UnknownError",
+                      "cert_thumbprint":  "5BBF1BACD3CDE907ECC41E4001F35F459CEBB86F"
+                  },
+                  {
+                      "filename":  "MistSetup.exe",
+                      "relative_path":  "dist\\mist-windows-x64\\MistSetup.exe",
+                      "size_bytes":  48071608,
+                      "sha256":  "AB19536ECEB9318A45C6AE394625B24671557D43207A45875F53F07280C91D8A",
+                      "signature_status":  "UnknownError",
+                      "cert_thumbprint":  "5BBF1BACD3CDE907ECC41E4001F35F459CEBB86F"
+                  }
+              ]
+}

@@ -1,224 +1,787 @@
 import { Theme } from "../theme.slint";
-import { PrimaryButton } from "../components/primary-button.slint";
-import { SecondaryButton } from "../components/secondary-button.slint";
-import { PairingCodeDisplay } from "../components/pairing-code-display.slint";
-import { PermissionSwitch } from "../components/permission-switch.slint";
-import { StatusIndicator } from "../components/status-indicator.slint";
+import { MaterialIcon } from "../components/material-icon.slint";
+import { M3Switch } from "../components/m3-switch.slint";
 
-export component HostScreen {
-    in property <bool> is-sharing: false;
-    in property <string> pairing-code: "------";
-    in property <int> remaining-seconds: 300;
-    in property <string> wifi-adapter: "Wi-Fi";
-    in property <string> wifi-ssid: "Unavailable";
-    in property <int> wifi-signal: 0;
-    in property <string> wifi-band: "5 GHz";
-    in property <bool> nvenc-ready: true;
-    in property <string> status-message: "Ready to share screen";
-    in property <int> active-guests: 0;
-    in property <bool> virtual-display-active: false;
+export struct FriendJoinItem {
+    tag: string,
+    is-online: bool,
+    is-hosting: bool,
+    can-join: bool,
+}
 
-    in-out property <bool> allow-keyboard: true;
-    in-out property <bool> allow-mouse: true;
-    in-out property <bool> allow-gamepad: true;
-    in-out property <bool> allow-audio: true;
-    in-out property <bool> allow-clipboard: true;
+export struct ConnectedUserItem {
+    id: string,
+    name: string,
+    status: string,
+    keyboard: bool,
+    mouse: bool,
+    gamepad: bool,
+    audio: bool,
+}
 
-    callback toggle-sharing();
-    callback copy-code();
-    callback revoke-code();
+component StreamCard inherits Rectangle {
+    in property <bool> is-streaming: false;
+    in property <bool> is-starting: false;
+    in property <string> status-text: "Stream Stopped";
+    in property <string> stream-fps: "0";
+    in property <string> stream-bitrate: "0.0";
+    in property <string> stream-encode-ms: "0.0";
+    in property <string> host-pairing-code: "------";
 
-    Flickable {
-        VerticalLayout {
-            padding: Theme.space-xl;
-            spacing: Theme.space-xl;
+    callback toggle-streaming();
+    callback copy-pairing-code();
+
+    horizontal-stretch: 1;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.border-line;
+    border-radius: Theme.radius-card;
+    drop-shadow-blur: 10px;
+    drop-shadow-color: Theme.shadow-color;
+
+    VerticalLayout {
+        padding: Theme.card-padding;
+        spacing: 16px;
+        alignment: space-between;
+
+        // Title + Status Chip
+        HorizontalLayout {
+            alignment: space-between;
+            Text {
+                text: "Stream Status";
+                font-size: 20px;
+                font-weight: 600;
+                color: Theme.text-ink;
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                height: 30px;
+                border-radius: 8px;
+                background: root.is-starting ? Theme.container : (root.is-streaming ? Theme.ok-container : Theme.container-subtle);
+                border-width: 1px;
+                border-color: root.is-starting ? Theme.accent : (root.is-streaming ? Theme.mint : Theme.border-line);
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 6px;
+                    alignment: center;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 4px;
+                            background: root.is-starting ? Theme.accent : (root.is-streaming ? Theme.color-ok : Theme.text-mute);
+                        }
+                    }
+
+                    Text {
+                        text: root.is-starting ? "Starting Engine…" : (root.is-streaming ? "Streaming Active" : "Stream Stopped");
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: root.is-starting ? Theme.accent : (root.is-streaming ? Theme.color-ok : Theme.text-mute);
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // Live Telemetry or Loading or Ready Hint
+        if root.is-starting : HorizontalLayout {
+            spacing: 8px;
             alignment: start;
+            VerticalLayout {
+                alignment: center;
+                MaterialIcon {
+                    name: "hourglass_top";
+                    icon-size: 18px;
+                    icon-color: Theme.accent;
+                }
+            }
+            Text {
+                text: "Initializing DXGI capture surface and NVENC encoder...";
+                font-size: 13px;
+                color: Theme.accent;
+                vertical-alignment: center;
+            }
+        }
 
-            // Screen Header
+        if !root.is-starting && root.is-streaming && root.stream-fps != "0" : HorizontalLayout {
+            alignment: space-between;
+            VerticalLayout {
+                Text { text: root.stream-fps; font-size: 30px; font-weight: 700; color: Theme.text-ink; }
+                Text { text: "frames/s"; font-size: 12px; color: Theme.text-mute; }
+            }
+            VerticalLayout {
+                Text { text: root.stream-bitrate; font-size: 30px; font-weight: 700; color: Theme.text-ink; }
+                Text { text: "Mbps"; font-size: 12px; color: Theme.text-mute; }
+            }
+            VerticalLayout {
+                Text { text: root.stream-encode-ms; font-size: 30px; font-weight: 700; color: Theme.text-ink; }
+                Text { text: "ms encode"; font-size: 12px; color: Theme.text-mute; }
+            }
+        }
+
+        if !root.is-starting && root.is-streaming && root.stream-fps == "0" : HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            VerticalLayout {
+                alignment: center;
+                MaterialIcon {
+                    name: "wifi_tethering";
+                    icon-size: 18px;
+                    icon-color: Theme.color-ok;
+                }
+            }
+            Text {
+                text: "Host engine active · Waiting for guests to connect...";
+                font-size: 13px;
+                color: Theme.color-ok;
+                vertical-alignment: center;
+            }
+        }
+
+        if !root.is-starting && !root.is-streaming : Text {
+            text: "Start streaming to allow friends to connect and play games with you.";
+            font-size: 13px;
+            color: Theme.text-mute;
+            wrap: word-wrap;
+        }
+
+        // Start / Stop Streaming Button
+        HorizontalLayout {
+            Rectangle {
+                height: 42px;
+                border-radius: Theme.radius-pill;
+                background: root.is-starting ? Theme.container : (root.is-streaming ? Theme.bad-container : Theme.mint);
+                border-width: 1px;
+                border-color: root.is-starting ? Theme.border-line : (root.is-streaming ? Theme.color-bad : Theme.mint);
+                animate background { duration: 150ms; }
+
+                HorizontalLayout {
+                    padding-left: 22px;
+                    padding-right: 22px;
+                    spacing: 8px;
+                    alignment: center;
+
+                    VerticalLayout {
+                        alignment: center;
+                        MaterialIcon {
+                            name: root.is-starting ? "sync" : (root.is-streaming ? "stop" : "play_arrow");
+                            icon-size: 20px;
+                            icon-color: root.is-starting ? Theme.accent : (root.is-streaming ? Theme.color-bad : Theme.on-mint);
+                        }
+                    }
+
+                    Text {
+                        text: root.is-starting ? "Starting engine…" : (root.is-streaming ? "Stop streaming" : "Start streaming");
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: root.is-starting ? Theme.accent : (root.is-streaming ? Theme.color-bad : Theme.on-mint);
+                        vertical-alignment: center;
+                    }
+                }
+
+                TouchArea {
+                    mouse-cursor: root.is-starting ? wait : pointer;
+                    enabled: !root.is-starting;
+                    clicked => { root.toggle-streaming(); }
+                }
+            }
+        }
+
+        Rectangle { height: 1px; background: Theme.border-line; }
+
+        // Easy Instant Pairing Hero Section
+        VerticalLayout {
+            spacing: 10px;
+
+            VerticalLayout {
+                spacing: 2px;
+                Text {
+                    text: "Easy Connect Code";
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: Theme.text-ink;
+                }
+                Text {
+                    text: "Friends can connect instantly by typing this 6-digit code on their Connect tab.";
+                    font-size: 12px;
+                    color: Theme.text-mute;
+                    wrap: word-wrap;
+                }
+            }
+
+            // Large 6-Digit Code Badge
+            Rectangle {
+                height: 52px;
+                border-radius: 14px;
+                background: Theme.container-subtle;
+                border-width: 1px;
+                border-color: Theme.border-line;
+
+                HorizontalLayout {
+                    padding-left: 18px;
+                    padding-right: 18px;
+                    alignment: space-between;
+
+                    Text {
+                        text: root.host-pairing-code;
+                        font-size: 24px;
+                        font-weight: 700;
+                        letter-spacing: 5px;
+                        color: Theme.accent;
+                        vertical-alignment: center;
+                    }
+
+                    // One-click Copy Code Button
+                    Rectangle {
+                        height: 34px;
+                        border-radius: Theme.radius-pill;
+                        background: code-btn.has-hover ? Theme.container : Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.border-line;
+                        y: 9px;
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 14px;
+                            spacing: 6px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                MaterialIcon {
+                                    name: "content_copy";
+                                    icon-size: 16px;
+                                    icon-color: Theme.accent;
+                                }
+                            }
+
+                            Text {
+                                text: "Copy Code";
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: Theme.accent;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        code-btn := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.copy-pairing-code(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component ConnectedUsersCard inherits Rectangle {
+    in property <bool> is-streaming: false;
+    in property <[ConnectedUserItem]> users: [];
+
+    callback manage-permissions(int);
+    callback disconnect-user(int);
+
+    horizontal-stretch: 1;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.border-line;
+    border-radius: Theme.radius-card;
+    drop-shadow-blur: 10px;
+    drop-shadow-color: Theme.shadow-color;
+
+    VerticalLayout {
+        padding: Theme.card-padding;
+        spacing: 14px;
+
+        // Title and Active Count
+        HorizontalLayout {
+            alignment: space-between;
+
+            VerticalLayout {
+                spacing: 2px;
+                Text {
+                    text: "Connected Users";
+                    font-size: 20px;
+                    font-weight: 600;
+                    color: Theme.text-ink;
+                }
+                Text {
+                    text: "Manage input and audio permissions for active guests streaming your PC.";
+                    font-size: 12px;
+                    color: Theme.text-mute;
+                }
+            }
+
+            Rectangle {
+                height: 28px;
+                border-radius: 14px;
+                background: root.users.length > 0 ? Theme.ok-container : Theme.container-subtle;
+                border-width: 1px;
+                border-color: root.users.length > 0 ? Theme.mint : Theme.border-line;
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    alignment: center;
+                    Text {
+                        text: root.users.length > 0 ? (root.users.length + " Active") : "0 Active";
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: root.users.length > 0 ? Theme.color-ok : Theme.text-mute;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        Rectangle { height: 1px; background: Theme.border-line; }
+
+        // Empty state when no users are connected
+        if root.users.length == 0 : VerticalLayout {
+            alignment: center;
+            spacing: 10px;
+            padding-top: 18px;
+            padding-bottom: 18px;
+
+            HorizontalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 22px;
+                    background: Theme.container-subtle;
+                    border-width: 1px;
+                    border-color: Theme.border-line;
+
+                    MaterialIcon {
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        name: "group";
+                        icon-size: 22px;
+                        icon-color: Theme.text-mute;
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                Text {
+                    text: "No guests connected right now";
+                    font-size: 14px;
+                    font-weight: 500;
+                    color: Theme.text-ink;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: "Share your 6-digit code or add friends to let them join.";
+                    font-size: 12px;
+                    color: Theme.text-mute;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        // List of Active Connected Users
+        for user[idx] in root.users : VerticalLayout {
+            spacing: 8px;
+            padding-top: 6px;
+            padding-bottom: 6px;
+
             HorizontalLayout {
                 alignment: space-between;
 
-                VerticalLayout {
-                    spacing: Theme.space-xs;
-
-                    Text {
-                        text: "Wi-Fi Screen Share";
-                        color: Theme.text-primary;
-                        font-size: 24px;
-                        font-weight: 700;
-                    }
-
-                    Text {
-                        text: "Stream your desktop to authorized devices on your network.";
-                        color: Theme.text-secondary;
-                        font-size: 14px;
-                    }
-                }
-
-                StatusIndicator {
-                    is-active: root.is-sharing;
-                    active-text: "Session Active";
-                    inactive-text: "Standby";
-                }
-            }
-
-            // Pre-flight Network & Hardware Information
-            Rectangle {
-                background: Theme.surface;
-                border-radius: Theme.radius-large;
-                border-width: 1px;
-                border-color: Theme.surface-border;
-
-                VerticalLayout {
-                    padding: Theme.space-lg;
-                    spacing: Theme.space-md;
-
-                    Text {
-                        text: "Network & Hardware Pre-Flight Checks";
-                        color: Theme.text-primary;
-                        font-size: 15px;
-                        font-weight: 600;
-                    }
-
-                    HorizontalLayout {
-                        spacing: Theme.space-xl;
-
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Active Wi-Fi Adapter"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.wifi-adapter; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
-                        }
-
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Connected SSID"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.wifi-ssid; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
-                        }
-
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Frequency Band"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.wifi-band; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
-                        }
-
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Signal Quality"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.wifi-signal > 0 ? (root.wifi-signal + "%") : "Unavailable"; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
-                        }
-
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Encoder Support"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.nvenc-ready ? "NVENC (Hardware)" : "D3D11 / MFT"; color: Theme.accent; font-size: 14px; font-weight: 600; }
-                        }
-                    }
-                }
-            }
-
-            // Sharing Controls & Code Display
-            if root.is-sharing : VerticalLayout {
-                spacing: Theme.space-lg;
-
-                PairingCodeDisplay {
-                    code: root.pairing-code;
-                    remaining-seconds: root.remaining-seconds;
-                    is-active: root.is-sharing;
-                    copy-clicked => { root.copy-code(); }
-                    revoke-clicked => { root.revoke-code(); }
-                }
-
-                // Host Permission Controls
-                Rectangle {
-                    background: Theme.surface;
-                    border-radius: Theme.radius-large;
-                    border-width: 1px;
-                    border-color: Theme.surface-border;
+                // Left: Avatar + Name + Latency Status
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
 
                     VerticalLayout {
-                        padding: Theme.space-lg;
-                        spacing: Theme.space-md;
+                        alignment: center;
+                        Rectangle {
+                            width: 38px;
+                            height: 38px;
+                            border-radius: 19px;
+                            background: Theme.container;
 
+                            MaterialIcon {
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                                name: "person";
+                                icon-size: 20px;
+                                icon-color: Theme.on-container;
+                            }
+
+                            // Green status dot
+                            Rectangle {
+                                x: parent.width - 9px;
+                                y: parent.height - 9px;
+                                width: 9px;
+                                height: 9px;
+                                border-radius: 4.5px;
+                                background: Theme.color-ok;
+                                border-width: 1.5px;
+                                border-color: Theme.surface;
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
                         Text {
-                            text: "Host Remote Control Permissions";
-                            color: Theme.text-primary;
-                            font-size: 15px;
+                            text: user.name;
+                            font-size: 14px;
                             font-weight: 600;
+                            color: Theme.text-ink;
+                            overflow: elide;
                         }
-
-                        PermissionSwitch {
-                            text: "Allow Keyboard Input";
-                            checked <=> root.allow-keyboard;
-                        }
-
-                        PermissionSwitch {
-                            text: "Allow Mouse Input";
-                            checked <=> root.allow-mouse;
-                        }
-
-                        PermissionSwitch {
-                            text: "Allow Gamepad Controller";
-                            checked <=> root.allow-gamepad;
-                        }
-
-                        PermissionSwitch {
-                            text: "Stream Host System Audio";
-                            checked <=> root.allow-audio;
-                        }
-
-                        PermissionSwitch {
-                            text: "Synchronize Clipboard (Bi-directional)";
-                            checked <=> root.allow-clipboard;
+                        Text {
+                            text: user.status != "" ? user.status : "Low Latency · 1080p60 · Connected";
+                            font-size: 11px;
+                            color: Theme.text-mute;
                         }
                     }
                 }
 
+                // Right: Actions (Permissions Button + Disconnect Button)
                 HorizontalLayout {
+                    spacing: 8px;
                     alignment: end;
 
-                    SecondaryButton {
-                        text: "Stop Sharing";
-                        min-width: 140px;
-                        clicked => { root.toggle-sharing(); }
+                    // Permissions Button
+                    Rectangle {
+                        height: 32px;
+                        border-radius: Theme.radius-pill;
+                        background: perm-btn.has-hover ? Theme.container : Theme.container-subtle;
+                        border-width: 1px;
+                        border-color: Theme.border-line;
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 6px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                MaterialIcon {
+                                    name: "tune";
+                                    icon-size: 15px;
+                                    icon-color: Theme.accent;
+                                }
+                            }
+
+                            Text {
+                                text: "Permissions";
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: Theme.accent;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        perm-btn := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.manage-permissions(idx); }
+                        }
+                    }
+
+                    // Disconnect Button
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 16px;
+                        background: disc-btn.has-hover ? Theme.bad-container : Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.color-bad;
+
+                        MaterialIcon {
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                            name: "close";
+                            icon-size: 15px;
+                            icon-color: Theme.color-bad;
+                        }
+
+                        disc-btn := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.disconnect-user(idx); }
+                        }
                     }
                 }
             }
 
-            if !root.is-sharing : Rectangle {
-                height: 180px;
-                background: Theme.surface;
-                border-radius: Theme.radius-large;
-                border-width: 1px;
-                border-color: Theme.surface-border;
+            // Active Permission Badges
+            HorizontalLayout {
+                spacing: 6px;
+                padding-left: 50px;
 
-                VerticalLayout {
-                    padding: Theme.space-xl;
-                    alignment: space-between;
+                if user.keyboard && user.mouse && user.gamepad : Rectangle {
+                    height: 20px;
+                    border-radius: 6px;
+                    background: Theme.ok-container;
+                    HorizontalLayout {
+                        padding-left: 8px; padding-right: 8px; alignment: center;
+                        Text { text: "Full Control"; font-size: 10px; font-weight: 600; color: Theme.color-ok; vertical-alignment: center; }
+                    }
+                }
 
-                    VerticalLayout {
-                        spacing: Theme.space-xs;
+                if !(user.keyboard && user.mouse && user.gamepad) : HorizontalLayout {
+                    spacing: 6px;
 
-                        Text {
-                            text: "Ready to Start Session";
-                            color: Theme.text-primary;
-                            font-size: 18px;
-                            font-weight: 700;
-                        }
-
-                        Text {
-                            text: "Clicking 'Start Wi-Fi Share' will generate a secure 6-character code and begin listening for client connections.";
-                            color: Theme.text-secondary;
-                            font-size: 14px;
+                    if user.keyboard : Rectangle {
+                        height: 20px;
+                        border-radius: 6px;
+                        background: Theme.container-subtle;
+                        HorizontalLayout {
+                            padding-left: 6px; padding-right: 6px; alignment: center;
+                            Text { text: "Keyboard"; font-size: 10px; font-weight: 500; color: Theme.text-ink; vertical-alignment: center; }
                         }
                     }
 
-                    HorizontalLayout {
-                        alignment: start;
+                    if user.mouse : Rectangle {
+                        height: 20px;
+                        border-radius: 6px;
+                        background: Theme.container-subtle;
+                        HorizontalLayout {
+                            padding-left: 6px; padding-right: 6px; alignment: center;
+                            Text { text: "Mouse"; font-size: 10px; font-weight: 500; color: Theme.text-ink; vertical-alignment: center; }
+                        }
+                    }
 
-                        PrimaryButton {
-                            text: "Start Wi-Fi Share";
-                            min-width: 160px;
-                            clicked => { root.toggle-sharing(); }
+                    if user.gamepad : Rectangle {
+                        height: 20px;
+                        border-radius: 6px;
+                        background: Theme.container-subtle;
+                        HorizontalLayout {
+                            padding-left: 6px; padding-right: 6px; alignment: center;
+                            Text { text: "Gamepad"; font-size: 10px; font-weight: 500; color: Theme.text-ink; vertical-alignment: center; }
+                        }
+                    }
+
+                    if user.audio : Rectangle {
+                        height: 20px;
+                        border-radius: 6px;
+                        background: Theme.container-subtle;
+                        HorizontalLayout {
+                            padding-left: 6px; padding-right: 6px; alignment: center;
+                            Text { text: "Audio"; font-size: 10px; font-weight: 500; color: Theme.text-ink; vertical-alignment: center; }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { height: 1px; background: Theme.border-line; }
+        }
+    }
+}
+
+export component HostScreen inherits Rectangle {
+    in property <bool> is-streaming: false;
+    in property <bool> is-starting: false;
+    in property <string> status-text: "Stream Stopped";
+    in property <string> stream-fps: "0";
+    in property <string> stream-bitrate: "0.0";
+    in property <string> stream-encode-ms: "0.0";
+    in property <string> host-pairing-code: "------";
+    in property <[FriendJoinItem]> friends: [];
+    in property <[ConnectedUserItem]> connected-users: [];
+
+    callback toggle-streaming();
+    callback copy-pairing-code();
+    callback friend-join-toggled(int, bool);
+    callback manage-permissions(int);
+    callback disconnect-user(int);
+
+    property <bool> is-narrow: root.width < 860px;
+
+    Flickable {
+        width: 100%;
+        height: 100%;
+        content-width: self.width;
+
+        content := VerticalLayout {
+            width: parent.width;
+            padding-left: Theme.compact-view ? 16px : 24px;
+            padding-right: Theme.compact-view ? 16px : 24px;
+            padding-top: Theme.compact-view ? 8px : 12px;
+            padding-bottom: 60px;
+            spacing: Theme.compact-view ? 16px : 22px;
+            alignment: start;
+
+            // Page Header
+            VerticalLayout {
+                spacing: 4px;
+                Text {
+                    text: "Host";
+                    font-size: 30px;
+                    font-weight: 600;
+                    color: Theme.text-ink;
+                }
+                Text {
+                    text: "Stream this desktop to friends with instant pairing and granular input permissions.";
+                    font-size: 14px;
+                    color: Theme.text-mute;
+                }
+            }
+
+            // Stream & Connected Users (Responsive: Side-by-Side when wide, Stacked when narrow)
+            if !root.is-narrow : HorizontalLayout {
+                spacing: 16px;
+
+                StreamCard {
+                    is-streaming: root.is-streaming;
+                    is-starting: root.is-starting;
+                    status-text: root.status-text;
+                    stream-fps: root.stream-fps;
+                    stream-bitrate: root.stream-bitrate;
+                    stream-encode-ms: root.stream-encode-ms;
+                    host-pairing-code: root.host-pairing-code;
+                    toggle-streaming => { root.toggle-streaming(); }
+                    copy-pairing-code => { root.copy-pairing-code(); }
+                }
+
+                ConnectedUsersCard {
+                    is-streaming: root.is-streaming;
+                    users: root.connected-users;
+                    manage-permissions(idx) => { root.manage-permissions(idx); }
+                    disconnect-user(idx) => { root.disconnect-user(idx); }
+                }
+            }
+
+            if root.is-narrow : VerticalLayout {
+                spacing: 16px;
+
+                StreamCard {
+                    is-streaming: root.is-streaming;
+                    is-starting: root.is-starting;
+                    status-text: root.status-text;
+                    stream-fps: root.stream-fps;
+                    stream-bitrate: root.stream-bitrate;
+                    stream-encode-ms: root.stream-encode-ms;
+                    host-pairing-code: root.host-pairing-code;
+                    toggle-streaming => { root.toggle-streaming(); }
+                    copy-pairing-code => { root.copy-pairing-code(); }
+                }
+
+                ConnectedUsersCard {
+                    is-streaming: root.is-streaming;
+                    users: root.connected-users;
+                    manage-permissions(idx) => { root.manage-permissions(idx); }
+                    disconnect-user(idx) => { root.disconnect-user(idx); }
+                }
+            }
+
+            // Card 3: Who Can Join (1-Click Friend Permissions)
+            Rectangle {
+                background: Theme.surface;
+                border-width: 1px;
+                border-color: Theme.border-line;
+                border-radius: Theme.radius-card;
+                drop-shadow-blur: 10px;
+                drop-shadow-color: Theme.shadow-color;
+
+                VerticalLayout {
+                    padding: Theme.card-padding;
+                    spacing: 14px;
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        Text {
+                            text: "Allowed Friends (1-Click Invitations)";
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: Theme.text-ink;
+                        }
+                        Text {
+                            text: "Toggle on friends you want to allow to join your stream with 1 click.";
+                            font-size: 12px;
+                            color: Theme.text-mute;
+                        }
+                    }
+
+                    if root.friends.length == 0 : VerticalLayout {
+                        padding-top: 6px;
+                        padding-bottom: 6px;
+                        Text {
+                            text: "No friends added yet. Add friends on the Friends tab to give them 1-click access.";
+                            font-size: 13px;
+                            color: Theme.text-mute;
+                        }
+                    }
+
+                    // Friends List
+                    for friend[idx] in root.friends : HorizontalLayout {
+                        padding-top: 6px;
+                        padding-bottom: 6px;
+                        alignment: space-between;
+
+                        HorizontalLayout {
+                            spacing: 12px;
+                            alignment: start;
+
+                            Rectangle {
+                                width: 36px;
+                                height: 36px;
+                                border-radius: 18px;
+                                background: Theme.container;
+
+                                HorizontalLayout {
+                                    alignment: center;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        MaterialIcon {
+                                            name: "person";
+                                            icon-size: 18px;
+                                            icon-color: Theme.on-container;
+                                        }
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                spacing: 2px;
+                                alignment: center;
+                                Text {
+                                    text: friend.tag;
+                                    font-size: 14px;
+                                    font-weight: 500;
+                                    color: Theme.text-ink;
+                                    overflow: elide;
+                                }
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    Rectangle {
+                                        width: 7px;
+                                        height: 7px;
+                                        border-radius: 3.5px;
+                                        background: friend.is-hosting || friend.is-online ? Theme.color-ok : Theme.border-line;
+                                        y: 3px;
+                                    }
+                                    Text {
+                                        text: friend.is-hosting ? "Hosting now" : friend.is-online ? "Online" : "Offline";
+                                        font-size: 11px;
+                                        color: Theme.text-mute;
+                                    }
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            M3Switch {
+                                checked: friend.can-join;
+                                toggled(v) => { root.friend-join-toggled(idx, v); }
+                            }
                         }
                     }
                 }

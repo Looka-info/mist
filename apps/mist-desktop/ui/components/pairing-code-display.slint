@@ -35,7 +35,7 @@ export component PairingCodeDisplay {
                     text: root.remaining-seconds > 0 ?
                         ("Expires in: " + Math.floor(root.remaining-seconds / 60) + "m " + Math.mod(root.remaining-seconds, 60) + "s") :
                         "Code Expired";
-                    color: root.remaining-seconds > 30 ? Theme.accent : Theme.error;
+                    color: root.remaining-seconds > 30 ? Theme.primary : Theme.error;
                     font-size: 13px;
                     font-weight: 500;
                 }

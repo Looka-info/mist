@@ -1,174 +1,498 @@
 import { Theme } from "../theme.slint";
-import { MetricCard } from "../components/metric-card.slint";
-import { StatusIndicator } from "../components/status-indicator.slint";
+import { MaterialIcon } from "../components/material-icon.slint";
 
-export component NetworkScreen {
-    in property <string> wifi-adapter: "Wi-Fi";
-    in property <string> wifi-ssid: "Unavailable";
-    in property <int> wifi-signal: 0;
-    in property <string> wifi-band: "5 GHz";
-    in property <string> radio-type: "802.11ax";
-    in property <int> wifi-channel: 36;
+component PingCard inherits Rectangle {
+    in property <string> internet-ping: "38 ms";
+    in property <string> gateway-ping: "< 1.0 ms";
 
-    in property <string> media-rtt: "Unavailable";
-    in property <string> gateway-ping: "Unavailable";
-    in property <string> internet-ping: "Unavailable";
-    in property <string> session-bitrate: "Unavailable";
-    in property <string> jitter: "Unavailable";
-    in property <string> packet-loss: "0.0%";
-    in property <bool> is-session-active: false;
+    horizontal-stretch: 1;
+    background: Theme.container-subtle;
+    border-radius: Theme.radius-large;
+    border-width: 1px;
+    border-color: Theme.border-line;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+
+        HorizontalLayout {
+            alignment: space-between;
+            Text { text: "Ping Latency"; font-size: 13px; font-weight: 600; color: Theme.accent; }
+            Rectangle {
+                height: 20px;
+                border-radius: 10px;
+                background: Theme.ok-container;
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: center;
+                    Text { text: "Low Latency"; font-size: 10px; font-weight: 600; color: Theme.color-ok; }
+                }
+            }
+        }
+
+        Text {
+            text: root.internet-ping;
+            font-size: 26px;
+            font-weight: 700;
+            color: Theme.text-ink;
+        }
+
+        Text {
+            text: "Router: " + root.gateway-ping + " · Internet: " + root.internet-ping;
+            font-size: 11px;
+            color: Theme.text-mute;
+        }
+    }
+}
+
+component SpeedCard inherits Rectangle {
+    in property <string> link-speed: "100 Mbps";
+    in property <bool> is-wifi: false;
+    in property <int> signal-percent: 100;
+
+    horizontal-stretch: 1;
+    background: Theme.container-subtle;
+    border-radius: Theme.radius-large;
+    border-width: 1px;
+    border-color: Theme.border-line;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+
+        HorizontalLayout {
+            alignment: space-between;
+            Text { text: "Link Speed"; font-size: 13px; font-weight: 600; color: Theme.text-ink; }
+            Rectangle {
+                height: 20px;
+                border-radius: 10px;
+                background: Theme.container;
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: center;
+                    Text { text: root.is-wifi ? "Wi-Fi" : "Ethernet"; font-size: 10px; font-weight: 600; color: Theme.on-container; }
+                }
+            }
+        }
+
+        Text {
+            text: root.link-speed;
+            font-size: 26px;
+            font-weight: 700;
+            color: Theme.text-ink;
+        }
+
+        Text {
+            text: root.is-wifi ? ("Wi-Fi Signal: " + root.signal-percent + "%") : "Direct Cable Connection";
+            font-size: 11px;
+            color: Theme.text-mute;
+        }
+    }
+}
+
+component TrafficCard inherits Rectangle {
+    in property <string> rx-speed: "0 kbps";
+    in property <string> tx-speed: "0 kbps";
+
+    horizontal-stretch: 1;
+    background: Theme.container-subtle;
+    border-radius: Theme.radius-large;
+    border-width: 1px;
+    border-color: Theme.border-line;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+
+        HorizontalLayout {
+            alignment: space-between;
+            Text { text: "Live Data Usage"; font-size: 13px; font-weight: 600; color: Theme.text-ink; }
+            Rectangle {
+                height: 20px;
+                border-radius: 10px;
+                background: Theme.container;
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: center;
+                    Text { text: "Active"; font-size: 10px; font-weight: 600; color: Theme.on-container; }
+                }
+            }
+        }
+
+        Text {
+            text: root.rx-speed;
+            font-size: 26px;
+            font-weight: 700;
+            color: Theme.text-ink;
+        }
+
+        Text {
+            text: "Down: " + root.rx-speed + " · Up: " + root.tx-speed;
+            font-size: 11px;
+            color: Theme.text-mute;
+        }
+    }
+}
+
+export component NetworkScreen inherits Rectangle {
+    // Physical Adapter Properties (Real from OS)
+    in property <bool> is-wifi: false;
+    in property <bool> is-connected: true;
+    in property <string> adapter-name: "Ethernet";
+    in property <string> ssid-name: "Wired LAN";
+    in property <int> signal-percent: 100;
+    in property <string> connection-standard: "IEEE 802.3 Wired";
+    in property <string> band-channel: "Gigabit LAN";
+    in property <string> link-speed: "100 Mbps";
+
+    // Real Latency & IP Properties
+    in property <string> local-ip: "192.168.1.6";
+    in property <string> gateway-ip: "192.168.1.1";
+    in property <string> gateway-ping: "< 1.0 ms";
+    in property <string> internet-ping: "38 ms";
+    in property <string> google-ping: "39 ms";
+    in property <string> public-ip: "";
+    in property <bool> is-refreshing: false;
+
+    // Real Interface Active Traffic (Bytes / sec from OS network counters)
+    in property <string> rx-speed: "0 kbps";
+    in property <string> tx-speed: "0 kbps";
+    in property <string> total-rx: "0 MB";
+    in property <string> total-tx: "0 MB";
+
+    // Real WebRTC Streaming Telemetry (Only active during a real session)
+    in property <bool> is-streaming: false;
+    in property <string> stream-bitrate: "0.0 Mbps";
+    in property <string> stream-rtt: "--";
+    in property <string> stream-loss: "0.0%";
+    in property <string> stream-jitter: "--";
+
+    callback refresh-network();
+
+    property <bool> is-narrow: root.width < 820px;
 
     Flickable {
-        VerticalLayout {
-            padding: Theme.space-xl;
-            spacing: Theme.space-xl;
+        width: 100%;
+        height: 100%;
+        content-width: self.width;
+
+        content := VerticalLayout {
+            width: parent.width;
+            padding-left: Theme.compact-view ? 16px : 24px;
+            padding-right: Theme.compact-view ? 16px : 24px;
+            padding-top: Theme.compact-view ? 8px : 12px;
+            padding-bottom: 60px;
+            spacing: Theme.compact-view ? 16px : 22px;
             alignment: start;
 
-            // Screen Header
+            // Page Header with Live Status & Test Button
             HorizontalLayout {
                 alignment: space-between;
 
                 VerticalLayout {
-                    spacing: Theme.space-xs;
-
+                    spacing: 4px;
                     Text {
-                        text: "Network Health & Diagnostics";
-                        color: Theme.text-primary;
-                        font-size: 24px;
-                        font-weight: 700;
-                    }
-
-                    Text {
-                        text: "Real-time network telemetry and Wi-Fi interface analysis.";
-                        color: Theme.text-secondary;
-                        font-size: 14px;
-                    }
-                }
-
-                StatusIndicator {
-                    is-active: root.is-session-active;
-                    active-text: "Live Stream Telemetry";
-                    inactive-text: "No Active Stream";
-                }
-            }
-
-            // Wi-Fi Connection Details
-            Rectangle {
-                background: Theme.surface;
-                border-radius: Theme.radius-large;
-                border-width: 1px;
-                border-color: Theme.surface-border;
-
-                VerticalLayout {
-                    padding: Theme.space-lg;
-                    spacing: Theme.space-md;
-
-                    Text {
-                        text: "Active Wireless Interface";
-                        color: Theme.text-primary;
-                        font-size: 16px;
+                        text: "Network";
+                        font-size: 30px;
                         font-weight: 600;
+                        color: Theme.text-ink;
                     }
+                    Text {
+                        text: "Check your internet health, ping, and connection speed for game streaming.";
+                        font-size: 14px;
+                        color: Theme.text-mute;
+                    }
+                }
+
+                // Friendly One-Click "Test Connection" Button
+                Rectangle {
+                    height: 38px;
+                    border-radius: Theme.radius-pill;
+                    background: ref-touch.has-hover ? Theme.accent : Theme.mint;
+                    border-width: 1px;
+                    border-color: Theme.border-line;
+                    animate background { duration: 150ms; }
 
                     HorizontalLayout {
-                        spacing: Theme.space-xl;
+                        padding-left: 16px;
+                        padding-right: 18px;
+                        spacing: 8px;
+                        alignment: center;
 
                         VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Interface Name"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.wifi-adapter; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                            alignment: center;
+                            MaterialIcon {
+                                name: "speed";
+                                icon-size: 18px;
+                                icon-color: Theme.on-mint;
+                            }
                         }
 
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Network SSID"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.wifi-ssid; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
+                        Text {
+                            text: root.is-refreshing ? "Testing Connection..." : "Test Connection";
+                            font-size: 13px;
+                            font-weight: 600;
+                            color: Theme.on-mint;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    ref-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.refresh-network(); }
+                    }
+                }
+            }
+
+            // Card 1: Easy Network Health Dashboard
+            Rectangle {
+                background: Theme.surface;
+                border-width: 1px;
+                border-color: Theme.border-line;
+                border-radius: Theme.radius-card;
+                drop-shadow-blur: 10px;
+                drop-shadow-color: Theme.shadow-color;
+
+                VerticalLayout {
+                    padding: Theme.card-padding;
+                    spacing: 18px;
+
+                    // Header Row: Connection info + Status badge
+                    HorizontalLayout {
+                        alignment: space-between;
+
+                        HorizontalLayout {
+                            spacing: 14px;
+
+                            Rectangle {
+                                width: 42px;
+                                height: 42px;
+                                border-radius: 21px;
+                                background: root.is-connected ? Theme.ok-container : Theme.bad-container;
+
+                                HorizontalLayout {
+                                    alignment: center;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        MaterialIcon {
+                                            name: root.is-wifi ? "wifi" : "lan";
+                                            icon-size: 22px;
+                                            icon-color: root.is-connected ? Theme.color-ok : Theme.color-bad;
+                                        }
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+                                Text {
+                                    text: root.ssid-name != "" ? root.ssid-name : (root.is-wifi ? "Wi-Fi Connection" : "Wired Ethernet");
+                                    font-size: 17px;
+                                    font-weight: 600;
+                                    color: Theme.text-ink;
+                                    overflow: elide;
+                                }
+                                Text {
+                                    text: root.adapter-name != "" ? root.adapter-name : "Network Adapter";
+                                    font-size: 12px;
+                                    color: Theme.text-mute;
+                                    overflow: elide;
+                                }
+                            }
                         }
 
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Radio Standard"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.radio-type; color: Theme.text-primary; font-size: 14px; font-weight: 600; }
-                        }
+                        // Status Badge
+                        Rectangle {
+                            height: 30px;
+                            border-radius: 15px;
+                            background: root.is-connected ? Theme.ok-container : Theme.bad-container;
 
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Operating Band"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.wifi-band + (root.wifi-channel > 0 ? (" (Ch " + root.wifi-channel + ")") : ""); color: Theme.text-primary; font-size: 14px; font-weight: 600; }
-                        }
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 14px;
+                                spacing: 6px;
+                                alignment: center;
 
-                        VerticalLayout {
-                            spacing: Theme.space-xs;
-                            Text { text: "Signal Quality"; color: Theme.text-secondary; font-size: 12px; }
-                            Text { text: root.wifi-signal > 0 ? (root.wifi-signal + "%") : "Unavailable"; color: Theme.accent; font-size: 14px; font-weight: 600; }
+                                Rectangle {
+                                    width: 7px;
+                                    height: 7px;
+                                    border-radius: 3.5px;
+                                    background: root.is-connected ? Theme.color-ok : Theme.color-bad;
+                                }
+
+                                Text {
+                                    text: root.is-connected ? "Great for Gaming" : "Offline";
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    color: root.is-connected ? Theme.color-ok : Theme.color-bad;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    // 3 Easy Gamer Stats (Ping, Speed, Activity) - Responsive Grid
+                    if !root.is-narrow : HorizontalLayout {
+                        spacing: 14px;
+                        PingCard {
+                            internet-ping: root.internet-ping;
+                            gateway-ping: root.gateway-ping;
+                        }
+                        SpeedCard {
+                            link-speed: root.link-speed;
+                            is-wifi: root.is-wifi;
+                            signal-percent: root.signal-percent;
+                        }
+                        TrafficCard {
+                            rx-speed: root.rx-speed;
+                            tx-speed: root.tx-speed;
+                        }
+                    }
+
+                    if root.is-narrow : VerticalLayout {
+                        spacing: 12px;
+                        PingCard {
+                            internet-ping: root.internet-ping;
+                            gateway-ping: root.gateway-ping;
+                        }
+                        SpeedCard {
+                            link-speed: root.link-speed;
+                            is-wifi: root.is-wifi;
+                            signal-percent: root.signal-percent;
+                        }
+                        TrafficCard {
+                            rx-speed: root.rx-speed;
+                            tx-speed: root.tx-speed;
                         }
                     }
                 }
             }
 
-            // Latency & Ping Distinction
-            Text {
-                text: "Latency & Route Separation";
-                color: Theme.text-primary;
-                font-size: 16px;
-                font-weight: 700;
-            }
+            // Card 2: Stream Performance (Active During Gameplay, Honest When Idle)
+            Rectangle {
+                background: Theme.surface;
+                border-width: 1px;
+                border-color: Theme.border-line;
+                border-radius: Theme.radius-card;
+                drop-shadow-blur: 10px;
+                drop-shadow-color: Theme.shadow-color;
 
-            HorizontalLayout {
-                spacing: Theme.space-md;
+                VerticalLayout {
+                    padding: Theme.card-padding;
+                    spacing: 16px;
 
-                MetricCard {
-                    title: "WebRTC Media RTT";
-                    value: root.media-rtt;
-                    subtitle: "Direct peer-to-peer transport latency";
-                    accent-color: root.is-session-active ? Theme.accent : Theme.text-disabled;
-                }
+                    // Header Row
+                    HorizontalLayout {
+                        alignment: space-between;
 
-                MetricCard {
-                    title: "Local Gateway Ping";
-                    value: root.gateway-ping;
-                    subtitle: "Router / Wi-Fi Access Point ICMP echo";
-                    accent-color: Theme.accent;
-                }
+                        VerticalLayout {
+                            spacing: 2px;
+                            Text {
+                                text: "Live Stream Quality";
+                                font-size: 18px;
+                                font-weight: 600;
+                                color: Theme.text-ink;
+                            }
+                            Text {
+                                text: root.is-streaming ?
+                                    "Real-time video bitrate and latency to your connected friend." :
+                                    "Telemetry automatically activates whenever you host or join a stream.";
+                                font-size: 12px;
+                                color: Theme.text-mute;
+                            }
+                        }
 
-                MetricCard {
-                    title: "Internet ICMP Ping";
-                    value: root.internet-ping;
-                    subtitle: "Cloud DNS / Public WAN ping";
-                    accent-color: Theme.text-secondary;
-                }
-            }
+                        Rectangle {
+                            height: 30px;
+                            border-radius: 8px;
+                            background: root.is-streaming ? Theme.ok-container : Theme.container-subtle;
 
-            // WebRTC Quality Telemetry
-            Text {
-                text: "Transport Quality";
-                color: Theme.text-primary;
-                font-size: 16px;
-                font-weight: 700;
-            }
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                alignment: center;
+                                Text {
+                                    text: root.is-streaming ? "Streaming Active" : "Stream Idle";
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    color: root.is-streaming ? Theme.color-ok : Theme.text-mute;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
 
-            HorizontalLayout {
-                spacing: Theme.space-md;
+                    if !root.is-streaming : Rectangle {
+                        background: Theme.container-subtle;
+                        border-radius: Theme.radius-large;
+                        border-width: 1px;
+                        border-color: Theme.border-line;
+                        height: 74px;
 
-                MetricCard {
-                    title: "Session Bitrate";
-                    value: root.session-bitrate;
-                    subtitle: "Real video & audio transport throughput";
-                    accent-color: root.is-session-active ? Theme.accent : Theme.text-disabled;
-                }
+                        HorizontalLayout {
+                            padding-left: 18px;
+                            padding-right: 18px;
+                            spacing: 14px;
+                            alignment: start;
 
-                MetricCard {
-                    title: "Jitter Variance";
-                    value: root.jitter;
-                    subtitle: "Packet inter-arrival delay variance";
-                    accent-color: root.is-session-active ? Theme.accent : Theme.text-disabled;
-                }
+                            VerticalLayout {
+                                alignment: center;
+                                MaterialIcon {
+                                    name: "cast";
+                                    icon-size: 24px;
+                                    icon-color: Theme.text-mute;
+                                }
+                            }
 
-                MetricCard {
-                    title: "Packet Loss";
-                    value: root.packet-loss;
-                    subtitle: "Unrecovered RTP transmission loss";
-                    accent-color: root.packet-loss == "0.0%" ? Theme.accent : Theme.error;
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+                                Text {
+                                    text: "Ready to stream";
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                    color: Theme.text-ink;
+                                }
+                                Text {
+                                    text: "Start streaming from the Host tab or join a friend to see live video bitrate, latency, and packet health.";
+                                    font-size: 12px;
+                                    color: Theme.text-mute;
+                                }
+                            }
+                        }
+                    }
+
+                    if root.is-streaming : HorizontalLayout {
+                        alignment: space-between;
+
+                        VerticalLayout {
+                            spacing: 2px;
+                            Text { text: root.stream-bitrate; font-size: 26px; font-weight: 700; color: Theme.text-ink; }
+                            Text { text: "Video Bitrate"; font-size: 12px; color: Theme.text-mute; }
+                        }
+
+                        VerticalLayout {
+                            spacing: 2px;
+                            Text { text: root.stream-rtt; font-size: 26px; font-weight: 700; color: Theme.text-ink; }
+                            Text { text: "Peer Latency"; font-size: 12px; color: Theme.text-mute; }
+                        }
+
+                        VerticalLayout {
+                            spacing: 2px;
+                            Text { text: root.stream-loss; font-size: 26px; font-weight: 700; color: Theme.text-ink; }
+                            Text { text: "Packet Loss"; font-size: 12px; color: Theme.text-mute; }
+                        }
+
+                        VerticalLayout {
+                            spacing: 2px;
+                            Text { text: root.stream-jitter; font-size: 26px; font-weight: 700; color: Theme.text-ink; }
+                            Text { text: "Frame Jitter"; font-size: 12px; color: Theme.text-mute; }
+                        }
+                    }
                 }
             }
         }

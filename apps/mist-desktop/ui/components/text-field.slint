@@ -7,15 +7,16 @@ export component TextField {
     callback edited(string);
     callback accepted();
 
-    height: 44px;
+    height: 46px;
 
     rect := Rectangle {
-        background: Theme.surface;
-        border-radius: Theme.radius-small;
+        background: !root.enabled ? Theme.surface-variant : Theme.surface;
+        border-radius: Theme.radius-medium;
         border-width: input.has-focus ? 2px : 1px;
-        border-color: input.has-focus ? Theme.primary : Theme.surface-border;
+        border-color: !root.enabled ? Theme.surface-border :
+                      input.has-focus ? Theme.primary : Theme.surface-border;
 
-        animate border-color { duration: 150ms; }
+        animate border-color { duration: 180ms; easing: cubic-bezier(0.2, 0.0, 0, 1.0); }
 
         input := TextInput {
             x: Theme.space-md;

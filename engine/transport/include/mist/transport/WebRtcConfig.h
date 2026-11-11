@@ -20,7 +20,12 @@ struct WebRtcTransportConfig {
     bool isHost{true};
     std::vector<IceServer> iceServers{
         {"stun:stun.l.google.com:19302", "", ""},
-        {"stun:stun1.l.google.com:19302", "", ""}
+        {"stun:stun1.l.google.com:19302", "", ""},
+        {"stun:stun2.l.google.com:19302", "", ""},
+        {"stun:stun3.l.google.com:19302", "", ""},
+        {"turn:openrelay.metered.ca:80", "openrelay", "openrelay"},
+        {"turn:openrelay.metered.ca:443", "openrelay", "openrelay"},
+        {"turn:openrelay.metered.ca:443?transport=tcp", "openrelay", "openrelay"}
     };
     uint16_t minPort{0};
     uint16_t maxPort{0};

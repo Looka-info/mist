@@ -2779,6 +2779,8 @@ dependencies = [
  "mist-platform-windows",
  "mist-session",
  "mist-telemetry",
+ "serde",
+ "serde_json",
  "slint",
  "slint-build",
  "tokio",

@@ -1,284 +1,310 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mist — Web Guest Client (WebCodecs & WebRTC)</title>
-    <style>
-        :root {
-            --pixel-mint: #B8EBD5;
-            --fresh-mint: #8ED8BA;
-            --forest-green: #174B38;
-            --deep-evergreen: #0D3024;
-            --dark-background: #101A15;
-            --dark-surface: #18231C;
-            --dark-surface-variant: #212E26;
-            --dark-outline: #2D3D34;
-            --text-primary: #F2F8F4;
-            --text-secondary: #90A398;
-            --accent-error: #FFB4AB;
-            --accent-warning: #FFD56B;
-            --font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            background-color: var(--dark-background);
-            color: var(--text-primary);
-            font-family: var(--font-family);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-            user-select: none;
-        }
-
-        header {
-            height: 56px;
-            background-color: var(--dark-surface);
-            border-bottom: 1px solid var(--dark-outline);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            z-index: 10;
-        }
-
-        .logo-group {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .logo-badge {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--pixel-mint), var(--forest-green));
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: var(--deep-evergreen);
-            font-size: 16px;
-        }
-
-        .logo-title {
-            font-size: 18px;
-            font-weight: 600;
-            letter-spacing: -0.3px;
-        }
-
-        .badge-status {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-            background: var(--dark-surface-variant);
-            color: var(--text-secondary);
-            border: 1px solid var(--dark-outline);
-        }
-
-        .badge-status.connected {
-            background: rgba(142, 216, 186, 0.15);
-            color: var(--pixel-mint);
-            border-color: var(--pixel-mint);
-        }
-
-        .controls-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        button {
-            background-color: var(--dark-surface-variant);
-            color: var(--text-primary);
-            border: 1px solid var(--dark-outline);
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        button:hover {
-            background-color: var(--dark-outline);
-            border-color: var(--fresh-mint);
-        }
-
-        button.primary {
-            background-color: var(--pixel-mint);
-            color: var(--deep-evergreen);
-            border-color: var(--pixel-mint);
-            font-weight: 600;
-        }
-
-        button.primary:hover {
-            background-color: var(--fresh-mint);
-        }
-
-        button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        main {
-            flex: 1;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #000;
-            overflow: hidden;
-        }
-
-        #viewport {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            cursor: default;
-        }
-
-        #viewport.pointer-locked {
-            cursor: none;
-        }
-
-        #hud-overlay {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            background: rgba(24, 35, 28, 0.85);
-            backdrop-filter: blur(8px);
-            border: 1px solid var(--dark-outline);
-            border-radius: 8px;
-            padding: 12px 16px;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 12px;
-            color: var(--pixel-mint);
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            pointer-events: none;
-            z-index: 5;
-        }
-
-        #connection-modal {
-            position: absolute;
-            background: var(--dark-surface);
-            border: 1px solid var(--dark-outline);
-            border-radius: 16px;
-            padding: 24px;
-            width: 380px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
-            z-index: 20;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        label {
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        input, select {
-            background: var(--dark-surface-variant);
-            border: 1px solid var(--dark-outline);
-            color: var(--text-primary);
-            padding: 10px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-        }
-
-        input:focus, select:focus {
-            border-color: var(--pixel-mint);
-        }
-
-        .hidden {
-            display: none !important;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mist: stream your PC to friends</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f0faf6;--sf:#fff;--ct:#bff0dd;--ct2:#e3f6ee;--mint:#46deb5;--onm:#032b20;--acc:#0f8466;--ink:#10231d;--mute:#4f655d;--line:#d4e7df;--bad:#b3261e;--s1:#c2efdc;--s2:#dcf6ec;--s3:#a3e8cb;--s4:#d0f2e4;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+html{scroll-behavior:smooth;scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 Roboto,system-ui,sans-serif;overflow-x:hidden}
+.ms{font-family:"Material Symbols Rounded";font-weight:400;font-style:normal;font-size:24px;line-height:1;display:inline-block;white-space:nowrap;font-feature-settings:"liga";flex:none;user-select:none}
+h1,h2,h3,p{margin:0}h1{font:700 clamp(36px,6vw,60px)/1.05 Roboto,sans-serif;letter-spacing:-.02em}h2{font:500 clamp(26px,4vw,36px)/1.15 Roboto,sans-serif}h3{font:500 18px/1.3 Roboto,sans-serif}
+.mute{color:var(--mute)}a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#wall{position:fixed;inset:0;z-index:-1;overflow:hidden}
+#wall svg{position:absolute;animation:drift var(--d) ease-in-out infinite alternate}
+@keyframes drift{from{transform:translate(0,0) rotate(0)}to{transform:translate(var(--x),var(--y)) rotate(var(--r))}}
+.wrap{max-width:1120px;margin:0 auto;padding:0 clamp(16px,4vw,32px)}
+header{display:flex;align-items:center;gap:8px;padding-top:18px;padding-bottom:6px}
+.brand{font:700 26px Roboto,sans-serif;display:flex;align-items:center;gap:10px;margin-right:auto}
+.brand i{width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--mint),var(--ct) 80%)}
+header nav{display:flex;gap:4px}header nav a{padding:8px 14px;border-radius:99px;font-weight:500;color:var(--mute)}header nav a:hover{background:var(--ct2);color:var(--ink)}header nav a[aria-current="page"]{background:var(--ct);color:var(--onm)}
+.btn{font:500 15px Roboto,sans-serif;height:44px;padding:0 26px;border-radius:99px;border:1px solid var(--line);background:var(--sf);color:var(--acc);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:var(--ct2)}.btn.p{background:var(--mint);color:var(--onm);border-color:var(--mint)}.btn.p:hover{filter:brightness(1.06)}.btn:disabled{opacity:.55;cursor:wait}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center;padding:clamp(32px,7vw,88px) 0}
+.hero p.lead{font-size:19px;color:var(--mute);margin:20px 0 28px;max-width:520px}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:99px;background:var(--sf);border:1px solid var(--line);font-size:14px;font-weight:500}
+.card{background:var(--sf);border:1px solid var(--line);border-radius:28px;padding:clamp(20px,3vw,32px)}
+.tabs{display:flex;background:var(--ct2);border-radius:99px;padding:4px;margin-bottom:22px}
+.tabs button{flex:1;height:40px;border:0;border-radius:99px;background:transparent;font:500 15px Roboto,sans-serif;color:var(--mute);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--sf);color:var(--ink);box-shadow:0 1px 3px rgba(3,43,32,.15)}
+form{display:flex;flex-direction:column;gap:16px}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500;color:var(--mute)}
+.in{display:flex;align-items:center;border:1px solid var(--mute);border-radius:14px;background:var(--sf);padding-right:6px}
+.in:focus-within{outline:2px solid var(--acc);border-color:var(--acc)}
+.in input{all:unset;flex:1;min-width:0;height:52px;padding:0 14px;font:400 16px Roboto,sans-serif;color:var(--ink)}
+.in button{border:0;background:transparent;color:var(--mute);width:40px;height:40px;border-radius:50%;cursor:pointer;display:grid;place-items:center}
+.in button:hover{background:var(--ct2)}
+.hint{font-size:13px;color:var(--mute);min-height:20px}.err{font-size:13px;color:var(--bad);min-height:18px;font-weight:500}
+.meter{display:flex;gap:4px}.meter i{flex:1;height:5px;border-radius:3px;background:var(--line)}.meter i.on{background:var(--mint)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--mute);font-weight:400}
+.check input{accent-color:var(--acc);width:18px;height:18px;margin:2px 0 0}
+.tag{font:700 clamp(30px,6vw,42px)/1.1 Roboto,sans-serif;word-break:break-all}.tag span{color:var(--acc)}
+.sec{padding:clamp(40px,7vw,80px) 0}.sec>h2{margin-bottom:10px}.sec>p.mute{max-width:600px;margin-bottom:32px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.tile{background:var(--ct2);border-radius:28px;padding:26px;display:flex;flex-direction:column;gap:12px}
+.tile .ic{width:48px;height:48px;border-radius:16px;background:var(--mint);color:var(--onm);display:grid;place-items:center}
+.steps{counter-reset:s;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.steps .card{position:relative;padding-top:56px}.steps .card::before{counter-increment:s;content:counter(s);position:absolute;top:20px;left:24px;width:28px;height:28px;border-radius:50%;background:var(--mint);color:var(--onm);display:grid;place-items:center;font-weight:700;font-size:14px}
+.demo{display:grid;grid-template-columns:150px 1fr;gap:0;overflow:hidden;padding:0;margin-top:8px}
+.demo .rail{background:var(--ct2);padding:14px 10px;display:flex;flex-direction:column;gap:4px}
+.demo .rail div{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:99px;font-size:14px;color:var(--mute);font-weight:500}
+.demo .rail .on{background:var(--ct);color:var(--onm)}
+.demo .main{padding:20px}.row{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}.row:first-of-type{border-top:0}
+.av{width:36px;height:36px;border-radius:50%;background:var(--ct);display:grid;place-items:center;font-weight:500;flex:none}
+.st{width:9px;height:9px;border-radius:50%;background:var(--line);display:inline-block;margin-right:6px}.st.on{background:var(--acc)}
+footer{padding:32px 0 48px;color:var(--mute);font-size:14px;display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-weight:500;color:var(--acc);margin-bottom:12px}
+.h-hero{min-height:calc(100vh - 80px);display:flex;flex-direction:column;justify-content:center;padding:4vh 0 8vh;position:relative}
+.giant{font:700 clamp(64px,15.5vw,260px)/.86 Roboto,sans-serif;letter-spacing:-.05em;margin:0}
+.ln{display:block;will-change:transform}.ln>span{display:inline-block;animation:up 1.1s cubic-bezier(.2,.7,.2,1) both}
+@keyframes up{from{transform:translateY(70%);opacity:0}to{transform:none;opacity:1}}
+.h-foot{display:flex;gap:32px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;margin-top:6vh}
+.lead{font-size:clamp(17px,1.6vw,21px);color:var(--mute);max-width:520px}
+.btn.big{height:56px;padding:0 34px;font-size:17px}
+.cue{position:absolute;left:0;bottom:2vh;display:flex;align-items:center;gap:8px;color:var(--mute);font-size:14px;font-weight:500}
+.cue .ms{animation:bob 1.6s ease-in-out infinite}@keyframes bob{50%{transform:translateY(6px)}}
+.bleed{width:100vw;margin-left:calc(50% - 50vw)}
+.hs{position:relative}.hs-pin{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;align-items:center}
+.hs-track{display:flex;gap:3vw;padding:0 8vw;flex:none;will-change:transform}
+.pn{flex:none;width:min(80vw,860px);height:min(72vh,600px);border-radius:56px;padding:clamp(24px,4vw,56px);display:flex;flex-direction:column;justify-content:space-between;border:1px solid var(--line)}
+.pn .n{font:500 clamp(18px,2vw,26px) Roboto,sans-serif;opacity:.6}
+.pn h2{font:700 clamp(52px,10vw,148px)/.9 Roboto,sans-serif;letter-spacing:-.04em}
+.pn p{font-size:clamp(16px,1.7vw,22px);max-width:460px}
+.pn.end{width:min(60vw,520px);align-items:flex-start;justify-content:center;gap:28px;background:transparent;border:0}
+.hs-bar{position:absolute;left:8vw;right:8vw;bottom:5vh;height:4px;border-radius:2px;background:var(--line)}.hs-bar i{display:block;height:100%;background:var(--acc);border-radius:2px;transform-origin:left;transform:scaleX(0)}
+.mq{overflow:hidden;padding:10vh 0;display:flex;flex-direction:column;gap:2vh}
+.mqr{display:flex;width:max-content;will-change:transform;font:700 clamp(56px,11vw,170px)/1 Roboto,sans-serif;letter-spacing:-.04em;white-space:nowrap}
+.mqs{display:flex}.mqs span::after{content:"";display:inline-block;width:.22em;height:.22em;border-radius:50%;background:var(--mint);margin:0 .45em;vertical-align:.12em}
+.mqs em{font-style:normal;color:var(--acc)}.mqr.out{color:transparent;-webkit-text-stroke:2px var(--ink)}
+.su{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center;padding:8vh 0 12vh}
+.giant2{font:700 clamp(52px,9vw,140px)/.9 Roboto,sans-serif;letter-spacing:-.045em}
+.rv{opacity:0;transform:translateY(48px);transition:opacity .9s,transform .9s cubic-bezier(.2,.7,.2,1)}.rv.in{opacity:1;transform:none}
+@media (max-width:860px){.su{grid-template-columns:1fr}.pn{height:min(66vh,520px);border-radius:40px}}
+@media (prefers-reduced-motion:reduce){.ln>span,.cue .ms{animation:none}.rv{opacity:1;transform:none;transition:none}.hs-pin{position:static;height:auto;overflow-x:auto;padding:4vh 0}.hs-bar{display:none}.pn{height:auto;min-height:50vh}}
+.xb{border:0;background:var(--ct2);width:40px;height:40px;border-radius:50%;cursor:pointer;display:grid;place-items:center;color:var(--ink)}.xb:hover{background:var(--ct)}
+dialog{border:0;background:transparent;padding:0;width:min(480px,94vw);max-height:94vh;overflow:visible;color:var(--ink)}
+dialog::backdrop{background:rgba(5,25,19,.45);backdrop-filter:blur(4px)}#auth{max-height:90vh;overflow:auto}
+.stmtw{padding:16vh 0}.stmt{font:700 clamp(34px,6.2vw,100px)/1.04 Roboto,sans-serif;letter-spacing:-.035em;max-width:1100px}.stmt span{opacity:.14;transition:opacity .35s}.stmt span.lit{opacity:1}
+.fl{padding:6vh 0}.fr{display:grid;grid-template-columns:70px 1fr minmax(220px,360px);gap:24px;align-items:end;padding:5vh 0;border-top:2px solid var(--ink)}
+.fr>span{font-weight:500;color:var(--mute)}.fr h2{font:700 clamp(46px,9.5vw,150px)/.9 Roboto,sans-serif;letter-spacing:-.045em;transition:color .3s}.fr:hover h2{color:var(--acc)}.fr p{color:var(--mute);font-size:clamp(16px,1.5vw,20px)}
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;padding:12vh 0}
+.big b{display:block;font:700 clamp(110px,22vw,340px)/.82 Roboto,sans-serif;letter-spacing:-.06em;color:var(--acc)}.big span{font-size:clamp(17px,1.7vw,22px);font-weight:500}
+.fin{padding:14vh 0 16vh}
+@media (max-width:860px){.fr{grid-template-columns:1fr;align-items:start}}
+@media (prefers-reduced-motion:reduce){.stmt span{opacity:1;transition:none}}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:12px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}
+#toast.show{opacity:1}[hidden]{display:none!important}
+@media (max-width:860px){.hero{grid-template-columns:1fr;gap:32px}header nav{display:none}.demo{grid-template-columns:1fr}.demo .rail{flex-direction:row;overflow-x:auto}}
+@media (prefers-reduced-motion:reduce){#wall svg{animation:none}html{scroll-behavior:auto}}
+</style>
 </head>
 <body>
-    <header>
-        <div class="logo-group">
-            <div class="logo-badge">M</div>
-            <span class="logo-title">Mist Web Guest</span>
-            <span id="status-badge" class="badge-status">Disconnected</span>
-        </div>
-        <div class="controls-group">
-            <button id="btn-mouse-lock" title="Click to lock relative mouse" disabled>Lock Mouse</button>
-            <button id="btn-fullscreen" title="Toggle Fullscreen">Fullscreen</button>
-            <button id="btn-disconnect" class="hidden">Disconnect</button>
-            <button id="btn-connect" class="primary">Connect</button>
-        </div>
-    </header>
+<div id="wall" aria-hidden="true"></div>
+<div class="wrap">
+<header>
+  <a class="brand" href="#top"><i></i>Mist</a>
+  <nav>
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="https://github.com/Looka-info/mist/releases" target="_blank" rel="noopener">Releases</a>
+  </nav>
+  <button class="btn" id="navSign"><span class="ms" style="font-size:18px">person</span>Sign in</button>
+</header>
 
-    <main>
-        <video id="remote-video" autoplay playsinline muted style="display:none;"></video>
-        <canvas id="viewport" width="1920" height="1080"></canvas>
+<main id="v-home">
+<section class="h-hero" id="top">
+  <p class="eyebrow"><span class="ms" style="font-size:20px">cast</span>Game streaming for friends</p>
+  <h1 class="giant"><span class="ln" data-s="-.6"><span>Play</span></span><span class="ln" data-s=".6"><span style="animation-delay:.12s">together.</span></span></h1>
+  <div class="h-foot">
+    <p class="lead">Mist streams games between friends with low delay. Add them by <b>username#1234</b> and connect. No IP addresses to swap.</p>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:24px">
+      <a class="btn p big" href="https://github.com/Looka-info/mist/releases" target="_blank" rel="noopener">
+        <span class="ms" style="font-size:22px">download</span>Download for Windows
+      </a>
+      <button class="btn big" id="heroStart">
+        <span class="ms" style="font-size:22px">sports_esports</span>Get Started
+      </button>
+    </div>
+  </div>
+  <div class="cue"><span class="ms">arrow_downward</span>Scroll</div>
+</section>
 
-        <div id="hud-overlay" class="hidden">
-            <div>FPS: <span id="hud-fps">0</span></div>
-            <div>Latency: <span id="hud-latency">0.0</span> ms</div>
-            <div>RTT: <span id="hud-rtt">0.0</span> ms</div>
-            <div>Loss: <span id="hud-loss">0.0%</span></div>
-            <div>Codec: <span id="hud-codec">None</span></div>
-        </div>
+<section class="stmtw"><p class="stmt">Your PC. Their screen. One tag between you. No servers to set up, no addresses to trade, no tech support call with your friend.</p></section>
 
-        <div id="connection-modal">
-            <h3 style="font-weight: 600;">Connect to Host</h3>
-            <div class="input-group">
-                <label for="cfg-signaling">Signaling WebSocket URL</label>
-                <input id="cfg-signaling" type="text" value="ws://127.0.0.1:8080" />
-            </div>
-            <div class="input-group">
-                <label for="cfg-session-id">Session ID</label>
-                <input id="cfg-session-id" type="text" value="mist-session-1" />
-            </div>
-            <div class="input-group">
-                <label for="cfg-guest-id">Guest ID</label>
-                <input id="cfg-guest-id" type="text" value="web-guest-1" />
-            </div>
-            <div class="input-group">
-                <label for="cfg-token">Authorization / Pairing Token</label>
-                <input id="cfg-token" type="text" value="mist-dev-token" />
-            </div>
-            <div class="input-group">
-                <label for="cfg-codec">Preferred Codec</label>
-                <select id="cfg-codec">
-                    <option value="avc1.64002a" selected>H.264 High 4.2</option>
-                    <option value="hvc1.1.6.L93.B0">HEVC Main</option>
-                    <option value="av01.0.08M.10">AV1 Main</option>
-                </select>
-            </div>
-            <div class="input-group">
-                <label for="cfg-fps">Target Frame Rate</label>
-                <select id="cfg-fps">
-                    <option value="60" selected>60 FPS</option>
-                    <option value="120">120 FPS</option>
-                    <option value="30">30 FPS</option>
-                </select>
-            </div>
-            <button id="btn-modal-connect" class="primary" style="margin-top: 8px;">Start Session</button>
-        </div>
-    </main>
+<section class="hs bleed" id="how" data-dir="fwd" aria-label="How Mist works"><div class="hs-pin"><div class="hs-track">
+  <article class="pn" style="background:var(--sf)"><span class="n">01</span><h2>Get<br>your tag.</h2><p>Pick a username. Mist adds a number, like nova#4821. That’s how friends find you.</p></article>
+  <article class="pn" style="background:var(--ct)"><span class="n">02</span><h2>Add<br>friends.</h2><p>Send a request with their tag. When they accept, you’re connected.</p></article>
+  <article class="pn" style="background:var(--mint);color:var(--onm)"><span class="n">03</span><h2>Host<br>or join.</h2><p>Start streaming and choose who may join, or hop into a friend’s game.</p></article>
+  <article class="pn" style="background:var(--ct2)"><span class="n">04</span><h2>You<br>decide.</h2><p>Friends only watch until you allow keyboard, mouse or controller.</p></article>
+</div><div class="hs-bar"><i></i></div></div></section>
 
-    <script src="js/mist-web-client.js"></script>
+<section class="mq bleed" aria-hidden="true">
+  <div class="mqr" id="mq1"><div class="mqs"><span>nova<em>#4821</em></span><span>kai<em>#2047</em></span><span>mira<em>#7710</em></span><span>theo<em>#0583</em></span><span>aiden<em>#3392</em></span></div><div class="mqs"><span>nova<em>#4821</em></span><span>kai<em>#2047</em></span><span>mira<em>#7710</em></span><span>theo<em>#0583</em></span><span>aiden<em>#3392</em></span></div></div>
+  <div class="mqr out" id="mq2"><div class="mqs"><span>play</span><span>together</span><span>anywhere</span><span>low delay</span></div><div class="mqs"><span>play</span><span>together</span><span>anywhere</span><span>low delay</span></div></div>
+</section>
+
+<section class="fl" id="features">
+  <div class="fr rv"><span style="display:flex;align-items:center;gap:6px"><span class="ms" style="font-size:18px">speed</span>01</span><h2>Low<br>delay.</h2><p>Your graphics card encodes the video and a native capture path keeps the wait short.</p></div>
+  <div class="fr rv"><span style="display:flex;align-items:center;gap:6px"><span class="ms" style="font-size:18px">group</span>02</span><h2>Friends,<br>not IPs.</h2><p>Add people by username#1234 and connect. Nobody has to share an address.</p></div>
+  <div class="fr rv"><span style="display:flex;align-items:center;gap:6px"><span class="ms" style="font-size:18px">sports_esports</span>03</span><h2>Your<br>controls.</h2><p>Keyboard, mouse and controller access is off until you switch it on, one friend at a time.</p></div>
+  <div class="fr rv"><span style="display:flex;align-items:center;gap:6px"><span class="ms" style="font-size:18px">memory</span>04</span><h2>Light and<br>native.</h2><p>No browser engine inside. It starts fast and stays out of your game’s way.</p></div>
+</section>
+
+<section class="nums">
+  <div class="big rv"><b>0</b><span>IP addresses to share</span></div>
+  <div class="big rv"><b>4</b><span>digits to remember</span></div>
+  <div class="big rv"><b>1</b><span>click to host or join</span></div>
+</section>
+
+<section class="hs bleed" data-dir="rev" aria-label="Ways to play"><div class="hs-pin"><div class="hs-track">
+  <article class="pn" style="background:var(--ct2)"><span class="n">&nbsp;</span><h2>Co-op,<br>online.</h2><p>Play the couch game with a friend who lives across town.</p></article>
+  <article class="pn" style="background:var(--sf)"><span class="n">&nbsp;</span><h2>Show<br>your setup.</h2><p>Let a friend try your heavy game on a laptop that could never run it.</p></article>
+  <article class="pn" style="background:var(--ct)"><span class="n">&nbsp;</span><h2>Help<br>from afar.</h2><p>Fix a settings menu together. They see exactly what you see.</p></article>
+  <article class="pn" style="background:var(--mint);color:var(--onm)"><span class="n">&nbsp;</span><h2>Watch<br>together.</h2><p>Share a match or a run live, with your friends one tag away.</p></article>
+</div><div class="hs-bar"><i></i></div></div></section>
+
+<section class="stmtw"><p class="stmt">Small app. Big screen. Everyone’s invited, and you choose who plays.</p></section>
+
+<section class="fin"><h2 class="giant2 rv">See you<br>in the game.</h2><div class="btns rv" style="margin-top:28px"><button class="btn big" id="backTop"><span class="ms">arrow_upward</span>Back to top</button></div></section>
+</main>
+
+<footer><span><b>Mist</b> · Windows 10 and 11</span><span>Made for friends who play together.</span></footer>
+</div>
+<dialog id="authDlg" aria-label="Account"><div class="card" id="auth"><div style="display:flex;justify-content:flex-end;margin:-10px -10px 6px"><button class="xb" id="authX" aria-label="Close"><span class="ms">close</span></button></div>
+    <div id="guest">
+      <div class="tabs" role="tablist"><button role="tab" id="tCreate" aria-selected="true">Create account</button><button role="tab" id="tLogin" aria-selected="false">Sign in</button></div>
+      <form id="fCreate" novalidate>
+        <label class="f">Username<div class="in"><input id="cUser" autocomplete="username" maxlength="20" placeholder="nova"></div></label>
+        <p class="hint" id="cPrev">Letters, numbers, _ and . (3 to 20). You’ll get a number like <b>#4821</b>.</p>
+        <label class="f">Email<div class="in"><input id="cMail" type="email" autocomplete="email" placeholder="you@example.com"></div></label>
+        <label class="f">Password<div class="in"><input id="cPass" type="password" autocomplete="new-password" placeholder="At least 10 characters"><button type="button" class="eye" aria-label="Show password"><span class="ms">visibility</span></button></div></label>
+        <div class="meter" id="meter" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <label class="check"><input type="checkbox" id="cTerms"><span>I agree to the Terms and Privacy Policy.</span></label>
+        <p class="err" id="cErr" role="alert"></p>
+        <button class="btn p" id="cBtn" type="submit">Create account</button>
+      </form>
+      <form id="fLogin" novalidate hidden>
+        <label class="f">Email or username#1234<div class="in"><input id="lId" autocomplete="username" placeholder="nova#4821"></div></label>
+        <label class="f">Password<div class="in"><input id="lPass" type="password" autocomplete="current-password"><button type="button" class="eye" aria-label="Show password"><span class="ms">visibility</span></button></div></label>
+        <p class="err" id="lErr" role="alert"></p>
+        <button class="btn p" id="lBtn" type="submit">Sign in</button>
+        <button class="btn" type="button" id="forgot" style="border:0;height:36px">Forgot password?</button>
+      </form>
+      <p class="hint" style="margin-top:16px">Preview mode: accounts are saved only in this browser until the Mist servers are connected.</p>
+    </div>
+    <div id="member" hidden style="display:flex;flex-direction:column;gap:16px">
+      <span class="chip" style="align-self:flex-start;background:var(--ct);border:0"><span class="ms" style="font-size:18px">check_circle</span>Signed in</span>
+      <h2 id="hi">Welcome</h2>
+      <div><p class="mute" style="font-size:14px">Your tag. Friends add you with this.</p><div class="tag" id="myTag"></div></div>
+      <div class="btns"><button class="btn p" id="copy"><span class="ms" style="font-size:20px">content_copy</span>Copy tag</button><a class="btn" href="https://github.com/Looka-info/mist" target="_blank" rel="noopener"><span class="ms" style="font-size:20px">download</span>Get Mist for Windows</a></div>
+      <button class="btn" id="out" style="align-self:flex-start;border:0;color:var(--mute)">Sign out</button>
+    </div>
+  </div></dialog>
+<div id="toast" role="status"></div>
+
+<script>
+(function(){
+var $=function(s){return document.querySelector(s)};
+function toast(t){var e=$("#toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(function(){e.classList.remove("show")},2400)}
+
+/* Flat wallpaper shapes */
+(function(){var T=[[1,8,.35],[1,7,.3],[0,5,.12],[0,4,.1],[0,9,.07],[1,9,.28]],h="",W=Math.min(innerWidth,1200);
+for(var i=0;i<6;i++){var t=T[Math.floor(Math.random()*T.length)],s=W*(.28+Math.random()*.25)+110,P=[],ph=Math.random()*6.28,f=88/(t[0]?1:1+t[2]);
+ for(var k=0;k<160;k++){var a=k/160*6.2832,r=t[0]?1-t[2]+t[2]*Math.abs(Math.cos(t[1]*a/2+ph)):1+t[2]*Math.cos(t[1]*a+ph);P.push((100+f*r*Math.cos(a)).toFixed(1)+","+(100+f*r*Math.sin(a)).toFixed(1))}
+ var L=i%2?74+Math.random()*14:-10-Math.random()*8,Y=i*18-6+Math.random()*8;
+ h+='<svg viewBox="0 0 200 200" style="width:'+s+'px;height:'+s+'px;left:'+L+'%;top:'+Y+'%;--x:'+(Math.random()*120-60)+'px;--y:'+(Math.random()*120-60)+'px;--r:'+(Math.random()*60-30)+'deg;--d:'+(30+Math.random()*25)+'s"><path d="M'+P.join("L")+'Z" fill="var(--s'+(1+i%4)+')"/></svg>'}
+$("#wall").innerHTML=h})();
+
+/* Storage with in-memory fallback */
+var mem={};
+var store={get:function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return mem[k]!==undefined?mem[k]:d}},
+ set:function(k,v){mem[k]=v;try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del:function(k){delete mem[k];try{localStorage.removeItem(k)}catch(e){}}};
+
+/* Backend adapter. Replace these four functions with fetch() calls to your Mist account API;
+   the UI below only depends on their signatures (each returns a Promise of an account {user, tag, email}). */
+var b64=function(buf){var a=new Uint8Array(buf),s="";for(var i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s)};
+var unb64=function(s){return Uint8Array.from(atob(s),function(c){return c.charCodeAt(0)})};
+function kdf(pw,salt){var c=window.crypto&&crypto.subtle;if(!c)return Promise.reject(new Error("This browser can’t secure passwords. Try a current one."));
+ return c.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveBits"]).then(function(k){return c.deriveBits({name:"PBKDF2",salt:salt,iterations:150000,hash:"SHA-256"},k,256)}).then(b64)}
+var backend={
+ current:function(){var id=store.get("mist.session",null),a=store.get("mist.accounts",[]).filter(function(x){return x.id===id})[0];return a?{user:a.user,tag:a.tag,email:a.email}:null},
+ register:function(user,email,pw){var all=store.get("mist.accounts",[]);
+  if(all.some(function(a){return a.email===email.toLowerCase()}))return Promise.reject(new Error("That email already has an account. Try signing in."));
+  var used={};all.forEach(function(a){if(a.user.toLowerCase()===user.toLowerCase())used[a.tag]=1});
+  var tag;for(var n=0;n<200;n++){tag=("000"+(1+Math.floor(Math.random()*9999))).slice(-4);if(!used[tag])break}
+  var salt=crypto.getRandomValues(new Uint8Array(16));
+  return kdf(pw,salt).then(function(h){var acct={id:"u"+Date.now().toString(36)+tag,user:user,tag:tag,email:email.toLowerCase(),salt:b64(salt),hash:h};all.push(acct);store.set("mist.accounts",all);store.set("mist.session",acct.id);return {user:user,tag:tag,email:acct.email}})},
+ login:function(idv,pw){var m=idv.trim().match(/^(.+)#(\d{4})$/),all=store.get("mist.accounts",[]),bad=new Error("Wrong email, tag or password.");
+  var a=all.filter(function(x){return m?(x.user.toLowerCase()===m[1].toLowerCase()&&x.tag===m[2]):x.email===idv.trim().toLowerCase()})[0];
+  if(!a)return kdf(pw,new Uint8Array(16)).then(function(){throw bad});
+  return kdf(pw,unb64(a.salt)).then(function(h){if(h!==a.hash)throw bad;store.set("mist.session",a.id);return {user:user,tag:a.tag,email:a.email}})},
+ logout:function(){store.del("mist.session");return Promise.resolve()}};
+
+/* UI */
+function show(a){var on=!!a;$("#navSign").textContent=on?a.user+"#"+a.tag:"Sign in";$("#guest").hidden=on;$("#member").hidden=!on;
+ if(on){$("#hi").textContent="Welcome, "+a.user;$("#myTag").innerHTML="";var t=$("#myTag");t.appendChild(document.createTextNode(a.user));var s=document.createElement("span");s.textContent="#"+a.tag;t.appendChild(s)}}
+function tab(login){$("#tCreate").setAttribute("aria-selected",!login);$("#tLogin").setAttribute("aria-selected",login);$("#fCreate").hidden=login;$("#fLogin").hidden=!login}
+$("#tCreate").onclick=function(){tab(false)};$("#tLogin").onclick=function(){tab(true)};
+function openAuth(login){var d=$("#authDlg");if(!$("#guest").hidden)tab(login);if(!d.open){if(d.showModal)d.showModal();else d.setAttribute("open","")}
+ setTimeout(function(){if(!$("#guest").hidden)(login?$("#lId"):$("#cUser")).focus({preventScroll:true})},60)}
+$("#navSign").onclick=function(){openAuth(true)};
+var hs=$("#heroStart");if(hs)hs.onclick=function(){openAuth(false)};
+$("#authX").onclick=function(){$("#authDlg").close()};
+$("#authDlg").addEventListener("click",function(e){if(e.target===this)this.close()});
+document.querySelectorAll(".eye").forEach(function(b){b.onclick=function(){var i=b.parentNode.querySelector("input"),h=i.type==="password";i.type=h?"text":"password";b.firstChild.textContent=h?"visibility_off":"visibility";b.setAttribute("aria-label",h?"Hide password":"Show password")}});
+function score(p){var s=0;if(p.length>=10)s++;if(/[a-z]/.test(p)&&/[A-Z]/.test(p))s++;if(/\d/.test(p))s++;if(/[^A-Za-z0-9]/.test(p)||p.length>=16)s++;return s}
+$("#cPass").oninput=function(){var s=this.value?score(this.value):0;document.querySelectorAll("#meter i").forEach(function(e,i){e.className=i<s?"on":""})};
+$("#cUser").oninput=function(){var v=this.value.trim();$("#cPrev").innerHTML=v&&/^[A-Za-z0-9_.]{3,20}$/.test(v)?"Your tag will look like <b></b>":"Letters, numbers, _ and . (3 to 20). You’ll get a number like <b>#4821</b>.";var b=$("#cPrev b");if(v&&/^[A-Za-z0-9_.]{3,20}$/.test(v))b.textContent=v+"#4821"};
+function busy(btn,on,txt){btn.disabled=on;btn.textContent=on?"Please wait…":txt}
+$("#fCreate").onsubmit=function(e){e.preventDefault();var u=$("#cUser").value.trim(),m=$("#cMail").value.trim(),p=$("#cPass").value,er=$("#cErr");er.textContent="";
+ if(!/^[A-Za-z0-9_.]{3,20}$/.test(u))return er.textContent="Username must be 3 to 20 letters, numbers, _ or .";
+ if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m))return er.textContent="Enter a valid email address.";
+ if(p.length<10)return er.textContent="Password needs at least 10 characters.";
+ if(p.toLowerCase().indexOf(u.toLowerCase())>-1)return er.textContent="Password can’t contain your username.";
+ if(!$("#cTerms").checked)return er.textContent="Please accept the Terms to continue.";
+ busy($("#cBtn"),true);backend.register(u,m,p).then(function(a){show(a);toast("Account created: "+a.user+"#"+a.tag);$("#fCreate").reset();$("#meter").querySelectorAll("i").forEach(function(i){i.className=""})}).catch(function(x){er.textContent=x.message}).then(function(){busy($("#cBtn"),false,"Create account")})};
+$("#fLogin").onsubmit=function(e){e.preventDefault();var er=$("#lErr");er.textContent="";
+ if(!$("#lId").value.trim()||!$("#lPass").value)return er.textContent="Enter your email or tag, and your password.";
+ busy($("#lBtn"),true);backend.login($("#lId").value,$("#lPass").value).then(function(a){show(a);toast("Welcome back, "+a.user);$("#fLogin").reset()}).catch(function(x){er.textContent=x.message}).then(function(){busy($("#lBtn"),false,"Sign in")})};
+$("#forgot").onclick=function(){toast("Password reset needs the Mist servers. Not available in preview.")};
+$("#out").onclick=function(){backend.logout().then(function(){show(null);toast("Signed out")})};
+$("#copy").onclick=function(){var t=$("#myTag").textContent;try{navigator.clipboard.writeText(t).then(function(){toast("Tag copied")},function(){toast("Select and copy: "+t)})}catch(x){toast("Select and copy: "+t)}};
+var sm=window.matchMedia("(prefers-reduced-motion: reduce)").matches,cur=window.scrollY,H={mq1:1,mq2:1};
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+var HS=[].slice.call(document.querySelectorAll(".hs")).map(function(e){return {e:e,tr:e.querySelector(".hs-track"),bar:e.querySelector(".hs-bar i"),rev:e.dataset.dir==="rev",top:0,travel:0}});
+var ST=[].slice.call(document.querySelectorAll(".stmt")).map(function(e){var w=e.textContent.trim().split(/\s+/);e.innerHTML=w.map(function(x){return "<span>"+x+"</span>"}).join(" ");return {e:e,w:[].slice.call(e.children)}});
+function layout(){if($("#v-home").hidden||sm)return;
+ HS.forEach(function(h){h.travel=Math.max(0,h.tr.scrollWidth-innerWidth);h.e.style.height=(h.travel+innerHeight)+"px"});
+ HS.forEach(function(h){h.top=h.e.getBoundingClientRect().top+window.scrollY});
+ ["mq1","mq2"].forEach(function(id){H[id]=$("#"+id).children[0].offsetWidth||1})}
+function frame(){requestAnimationFrame(frame);if($("#v-home").hidden)return;
+ var y=window.scrollY,vh=innerHeight;
+ ST.forEach(function(t){var r=t.e.getBoundingClientRect(),p=clamp((vh*.8-r.top)/(r.height+vh*.25),0,1),n=Math.round(p*t.w.length);t.w.forEach(function(w,i){w.classList.toggle("lit",i<n)})});
+ if(sm)return;
+ cur+=(y-cur)*.09;if(Math.abs(y-cur)<.05)cur=y;
+ var hv=clamp(cur,0,vh*1.2);
+ document.querySelectorAll(".ln").forEach(function(l){l.style.transform="translate3d("+(hv*parseFloat(l.dataset.s))+"px,0,0)"});
+ HS.forEach(function(h){var p=clamp((cur-h.top)/(h.travel||1),0,1);h.tr.style.transform="translate3d("+(h.rev?-(1-p)*h.travel:-p*h.travel)+"px,0,0)";h.bar.style.transform="scaleX("+p+")"});
+ $("#mq1").style.transform="translate3d("+(-((cur*.6)%H.mq1))+"px,0,0)";
+ $("#mq2").style.transform="translate3d("+(((cur*.6)%H.mq2)-H.mq2)+"px,0,0)"}
+window.addEventListener("resize",layout);window.addEventListener("load",layout);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(layout);
+$("#backTop").onclick=function(){window.scrollTo({top:0,behavior:"smooth"})};
+var io=("IntersectionObserver" in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{threshold:.25}):null;
+document.querySelectorAll(".rv").forEach(function(e){io?io.observe(e):e.classList.add("in")});
+var views=["home"];
+function route(){var h=location.hash.slice(1);if(views.indexOf(h)<0)h="home";views.forEach(function(v){$("#v-"+v).hidden=v!==h});
+ document.querySelectorAll("header nav a").forEach(function(a){if(a.getAttribute("href")==="#"+h)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});window.scrollTo(0,0);cur=0;layout()}
+window.addEventListener("hashchange",route);
+route();frame();
+show(backend.current());
+})();
+</script>
 </body>
 </html>
