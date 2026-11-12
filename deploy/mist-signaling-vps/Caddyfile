@@ -1,0 +1,4 @@
+signaling.akat-suki.site {
+    # Reverse proxy to Mist WebSocket signaling service
+    reverse_proxy 127.0.0.1:8080
+}

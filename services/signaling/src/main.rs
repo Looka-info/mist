@@ -23,7 +23,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .init();
 
-    let mut bind_addr = "0.0.0.0:8080".to_string();
+    let mut bind_addr = if let Ok(port) = std::env::var("PORT") {
+        format!("0.0.0.0:{}", port)
+    } else {
+        "0.0.0.0:8080".to_string()
+    };
     let args: Vec<String> = std::env::args().collect();
     let mut i = 1;
     while i < args.len() {

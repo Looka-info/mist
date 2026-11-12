@@ -1,0 +1,18 @@
+[Unit]
+Description=Mist WebRTC Hardened Signaling Microservice
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/mist-signaling
+ExecStart=/opt/mist-signaling/mist-signaling --bind 127.0.0.1:8080
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65535
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=multi-user.target

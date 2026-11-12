@@ -172,7 +172,9 @@ impl SessionSupervisor {
 
         // Auto-start signaling daemon if present
         if let Some(sig_bin) = Self::find_binary("mist-signaling") {
-            let _ = Command::new(sig_bin).args(["--bind", "0.0.0.0:8080"]).spawn();
+            let _ = Command::new(sig_bin)
+                .args(["--bind", "0.0.0.0:8080"])
+                .spawn();
         }
 
         let mut cmd = Command::new(host_bin);

@@ -56,3 +56,4 @@ dist/*
 !dist/MistSetup-v0.3.0-rc3.exe
 !dist/mist-windows-x64/release-manifest.json
 trusted_devices.json
+mist-signaling-vps.zip

@@ -130,7 +130,11 @@ impl CloudAuthManager {
         // Extract username from email
         let user_part = email.split('@').next().unwrap_or("player").to_string();
         let clean_user: String = user_part.chars().filter(|c| c.is_alphanumeric()).collect();
-        let username = if clean_user.len() < 3 { "player".to_string() } else { clean_user };
+        let username = if clean_user.len() < 3 {
+            "player".to_string()
+        } else {
+            clean_user
+        };
 
         let mut hash: u32 = 5381;
         for b in email.bytes().chain(username.bytes()) {
@@ -183,9 +187,15 @@ impl CloudAuthManager {
         }
 
         // 3. Construct authenticated Google Account identity
-        let win_user = std::env::var("USERNAME").unwrap_or_else(|_| "google_user".to_string()).to_lowercase();
+        let win_user = std::env::var("USERNAME")
+            .unwrap_or_else(|_| "google_user".to_string())
+            .to_lowercase();
         let clean_user: String = win_user.chars().filter(|c| c.is_alphanumeric()).collect();
-        let username = if clean_user.is_empty() { "google_user".to_string() } else { clean_user };
+        let username = if clean_user.is_empty() {
+            "google_user".to_string()
+        } else {
+            clean_user
+        };
 
         let pc_name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "MIST".to_string());
         let mut hash: u32 = 5381;
@@ -215,8 +225,10 @@ impl CloudAuthManager {
 
     /// Synchronize profile to Supabase database via curl
     fn sync_to_supabase(account: &AccountState) {
-        let sb_url = std::env::var("MIST_SUPABASE_URL").unwrap_or_else(|_| DEFAULT_SUPABASE_URL.to_string());
-        let sb_key = std::env::var("MIST_SUPABASE_KEY").unwrap_or_else(|_| DEFAULT_SUPABASE_ANON.to_string());
+        let sb_url =
+            std::env::var("MIST_SUPABASE_URL").unwrap_or_else(|_| DEFAULT_SUPABASE_URL.to_string());
+        let sb_key = std::env::var("MIST_SUPABASE_KEY")
+            .unwrap_or_else(|_| DEFAULT_SUPABASE_ANON.to_string());
 
         if sb_url.contains("your-project.supabase.co") {
             return;
@@ -236,12 +248,17 @@ impl CloudAuthManager {
         let _ = Command::new("curl.exe")
             .args([
                 "-s",
-                "-X", "POST",
+                "-X",
+                "POST",
                 &url,
-                "-H", &format!("apikey: {}", sb_key),
-                "-H", &format!("Authorization: Bearer {}", sb_key),
-                "-H", "Content-Type: application/json",
-                "-d", &payload.to_string(),
+                "-H",
+                &format!("apikey: {}", sb_key),
+                "-H",
+                &format!("Authorization: Bearer {}", sb_key),
+                "-H",
+                "Content-Type: application/json",
+                "-d",
+                &payload.to_string(),
             ])
             .spawn();
     }

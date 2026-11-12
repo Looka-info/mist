@@ -100,6 +100,9 @@ flowchart TD
 | :--- | :--- | :--- |
 | **`mist-desktop`** | Rust / Slint 1.18.1 | Primary user interface, host/guest dashboard, connection manager, active HUD. |
 | **`mist-core`** | Rust | Core domain models, session lifecycles, and configuration primitives. |
+| **`mist-input`** | Rust | Wire protocol serialization, mouse/keyboard/gamepad packing, input authorization. |
+| **`mist-bitstream`** | Rust | Zero-copy bitstream parsing for Annex-B containers, H.264, HEVC, and AV1 OBUs. |
+| **`mist-qos`** | Rust | RFC 5109 XOR Forward Error Correction, token-bucket pacer, adaptive bitrate control. |
 | **`mist-ipc`** | Rust | High-speed inter-process communication protocol between Rust UI and C++ engine. |
 | **`mist-pairing`** | Rust | Cryptographic authentication, Base32 SAS tokens, and trust validation. |
 | **`mist-session`** | Rust | Peer session orchestration, permissions management, and connection states. |

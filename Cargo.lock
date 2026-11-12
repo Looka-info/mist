@@ -2746,6 +2746,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "mist-bitstream"
+version = "0.3.0"
+dependencies = [
+ "mist-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "mist-config"
 version = "0.3.0"
 dependencies = [
@@ -2799,6 +2809,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mist-input"
+version = "0.3.0"
+dependencies = [
+ "mist-core",
+ "mist-domain",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "mist-ipc"
 version = "0.3.0"
 dependencies = [
@@ -2829,6 +2850,16 @@ dependencies = [
  "mist-core",
  "tracing",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "mist-qos"
+version = "0.3.0"
+dependencies = [
+ "mist-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

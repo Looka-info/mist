@@ -17,7 +17,11 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
     {
         let (gpu_name, driver_ver, nvenc_ready) = {
             let hw = controller.hardware_info.lock().unwrap();
-            (hw.gpu_name.clone(), hw.driver_version.clone(), hw.nvenc_supported)
+            (
+                hw.gpu_name.clone(),
+                hw.driver_version.clone(),
+                hw.nvenc_supported,
+            )
         };
 
         let short_gpu = if gpu_name.contains("1660") {
@@ -226,7 +230,10 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                 if tab_idx == 4 {
                     // Network Screen: probes Wi-Fi, ping, and network traffic
                     win.set_page_loading_title("Loading Network Diagnostics...".into());
-                    win.set_page_loading_subtitle("Probing Wi-Fi connection, ping latencies, and adapter throughput...".into());
+                    win.set_page_loading_subtitle(
+                        "Probing Wi-Fi connection, ping latencies, and adapter throughput..."
+                            .into(),
+                    );
                     win.set_page_loading_progress(0.35);
                     win.set_page_loading(true);
 
@@ -253,7 +260,9 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                 } else if tab_idx == 2 {
                     // Connect Screen: search LAN beacons and peer discovery
                     win.set_page_loading_title("Searching Local Network...".into());
-                    win.set_page_loading_subtitle("Discovering hosting friends and available game streams...".into());
+                    win.set_page_loading_subtitle(
+                        "Discovering hosting friends and available game streams...".into(),
+                    );
                     win.set_page_loading_progress(0.45);
                     win.set_page_loading(true);
 
@@ -269,8 +278,6 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                             }
                         });
                     });
-                } else if tab_idx == 1 {
-                    refresh();
                 } else {
                     refresh();
                 }
@@ -881,7 +888,9 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             ctrl.update_video_settings(max_br as u32, fps as u32);
             ctrl.update_ui_settings(dark, contrast);
             if let Some(win) = win_weak.upgrade() {
-                win.set_toast_message(format!("Settings saved: {} Mbps · {} FPS", max_br, fps).into());
+                win.set_toast_message(
+                    format!("Settings saved: {} Mbps · {} FPS", max_br, fps).into(),
+                );
                 win.set_toast_visible(true);
             }
         });
@@ -900,37 +909,35 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             let w = win_weak.clone();
             let c = ctrl.clone();
             let rf = refresh.clone();
-            std::thread::spawn(move || {
-                match CloudAuthManager::sign_in_google() {
-                    Ok(acc) => {
-                        *c.my_tag.lock().unwrap() = acc.tag.clone();
-                        let _ = slint::invoke_from_event_loop({
-                            let w = w.clone();
-                            let tag = acc.tag.clone();
-                            let rf = rf.clone();
-                            move || {
-                                if let Some(win) = w.upgrade() {
-                                    win.set_auth_loading(false);
-                                    win.set_my_tag(tag.clone().into());
-                                    win.set_is_authenticated(true);
-                                    win.set_toast_message(format!("Signed in as {}", tag).into());
-                                    win.set_toast_visible(true);
-                                    rf();
-                                }
+            std::thread::spawn(move || match CloudAuthManager::sign_in_google() {
+                Ok(acc) => {
+                    *c.my_tag.lock().unwrap() = acc.tag.clone();
+                    let _ = slint::invoke_from_event_loop({
+                        let w = w.clone();
+                        let tag = acc.tag.clone();
+                        let rf = rf.clone();
+                        move || {
+                            if let Some(win) = w.upgrade() {
+                                win.set_auth_loading(false);
+                                win.set_my_tag(tag.clone().into());
+                                win.set_is_authenticated(true);
+                                win.set_toast_message(format!("Signed in as {}", tag).into());
+                                win.set_toast_visible(true);
+                                rf();
                             }
-                        });
-                    }
-                    Err(err) => {
-                        let _ = slint::invoke_from_event_loop({
-                            let w = w.clone();
-                            move || {
-                                if let Some(win) = w.upgrade() {
-                                    win.set_auth_loading(false);
-                                    win.set_auth_error(err.into());
-                                }
+                        }
+                    });
+                }
+                Err(err) => {
+                    let _ = slint::invoke_from_event_loop({
+                        let w = w.clone();
+                        move || {
+                            if let Some(win) = w.upgrade() {
+                                win.set_auth_loading(false);
+                                win.set_auth_error(err.into());
                             }
-                        });
-                    }
+                        }
+                    });
                 }
             });
         });
@@ -950,8 +957,8 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             let w = win_weak.clone();
             let c = ctrl.clone();
             let rf = refresh.clone();
-            std::thread::spawn(move || {
-                match CloudAuthManager::sign_in_email(&e_str, &p_str) {
+            std::thread::spawn(
+                move || match CloudAuthManager::sign_in_email(&e_str, &p_str) {
                     Ok(acc) => {
                         *c.my_tag.lock().unwrap() = acc.tag.clone();
                         let _ = slint::invoke_from_event_loop({
@@ -981,8 +988,8 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                             }
                         });
                     }
-                }
-            });
+                },
+            );
         });
     }
 
@@ -1014,7 +1021,9 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                                     win.set_auth_loading(false);
                                     win.set_my_tag(tag.clone().into());
                                     win.set_is_authenticated(true);
-                                    win.set_toast_message(format!("Account created! Welcome, {}", tag).into());
+                                    win.set_toast_message(
+                                        format!("Account created! Welcome, {}", tag).into(),
+                                    );
                                     win.set_toast_visible(true);
                                     rf();
                                 }
@@ -1062,7 +1071,9 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
             if let Some(win) = win_weak.upgrade() {
                 win.set_net_is_refreshing(true);
                 win.set_page_loading_title("Testing Network Performance...".into());
-                win.set_page_loading_subtitle("Measuring Wi-Fi speed, gateway latency, and packet round-trip time...".into());
+                win.set_page_loading_subtitle(
+                    "Measuring Wi-Fi speed, gateway latency, and packet round-trip time...".into(),
+                );
                 win.set_page_loading_progress(0.25);
                 win.set_page_loading(true);
                 win.set_toast_message("Benchmarking ICMP latencies...".into());
@@ -1202,8 +1213,12 @@ pub fn run_app() -> Result<(), slint::PlatformError> {
                 let pub_ip = ctrl.get_public_ip();
                 let loc_ip = ctrl.get_local_ip();
 
-                let pings = if tick_counter % 5 == 0 {
-                    Some((ctrl.ping_gateway(), ctrl.ping_internet(), ctrl.ping_google()))
+                let pings = if tick_counter.is_multiple_of(5) {
+                    Some((
+                        ctrl.ping_gateway(),
+                        ctrl.ping_internet(),
+                        ctrl.ping_google(),
+                    ))
                 } else {
                     None
                 };

@@ -288,7 +288,8 @@ pub fn query_hardware_info() -> HardwareInfo {
                         let parts: Vec<&str> = ver.split('.').collect();
                         if parts.len() == 4 && parts[2].len() >= 2 {
                             let major = &parts[2][parts[2].len() - 1..];
-                            hw.driver_version = format!("{}{}.{}", major, &parts[3][..2], &parts[3][2..]);
+                            hw.driver_version =
+                                format!("{}{}.{}", major, &parts[3][..2], &parts[3][2..]);
                         } else {
                             hw.driver_version = ver.to_string();
                         }
@@ -304,10 +305,7 @@ pub fn query_hardware_info() -> HardwareInfo {
 /// Check if the Virtual Gamepad Emulation Bus (ViGEmBus) driver service is installed.
 pub fn check_vigembus_installed() -> bool {
     let output = Command::new("reg")
-        .args([
-            "query",
-            r"HKLM\SYSTEM\CurrentControlSet\Services\ViGEmBus",
-        ])
+        .args(["query", r"HKLM\SYSTEM\CurrentControlSet\Services\ViGEmBus"])
         .creation_flags(CREATE_NO_WINDOW)
         .output();
 

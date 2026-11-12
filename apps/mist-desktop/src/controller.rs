@@ -77,9 +77,15 @@ impl Default for DesktopController {
         let hardware_info = query_hardware_info();
 
         // 1. Derive real user tag from Windows environment & machine identifier
-        let win_user = std::env::var("USERNAME").unwrap_or_else(|_| "player".to_string()).to_lowercase();
+        let win_user = std::env::var("USERNAME")
+            .unwrap_or_else(|_| "player".to_string())
+            .to_lowercase();
         let clean_user: String = win_user.chars().filter(|c| c.is_alphanumeric()).collect();
-        let user_part = if clean_user.is_empty() { "player".to_string() } else { clean_user };
+        let user_part = if clean_user.is_empty() {
+            "player".to_string()
+        } else {
+            clean_user
+        };
 
         let pc_name = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "MIST".to_string());
         let mut hash: u32 = 5381;
@@ -95,15 +101,17 @@ impl Default for DesktopController {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
 
-        let initial_requests: Vec<FriendRequestRecord> = std::fs::read_to_string("mist_requests.json")
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+        let initial_requests: Vec<FriendRequestRecord> =
+            std::fs::read_to_string("mist_requests.json")
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
 
-        let initial_sessions: Vec<RecentSessionRecord> = std::fs::read_to_string("mist_sessions.json")
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
+        let initial_sessions: Vec<RecentSessionRecord> =
+            std::fs::read_to_string("mist_sessions.json")
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default();
 
         let my_tag = Arc::new(Mutex::new(real_tag));
         let friends = Arc::new(Mutex::new(initial_friends));
@@ -178,8 +186,12 @@ impl Default for DesktopController {
                         while let Ok((amt, src)) = s.recv_from(&mut buf) {
                             if let Ok(text) = std::str::from_utf8(&buf[..amt]) {
                                 if let Some(json_str) = text.strip_prefix("MIST_BEACON:") {
-                                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
-                                        if let Some(peer_tag) = val.get("tag").and_then(|v| v.as_str()) {
+                                    if let Ok(val) =
+                                        serde_json::from_str::<serde_json::Value>(json_str)
+                                    {
+                                        if let Some(peer_tag) =
+                                            val.get("tag").and_then(|v| v.as_str())
+                                        {
                                             let peer_hosting = val
                                                 .get("hosting")
                                                 .and_then(|v| v.as_bool())
@@ -187,7 +199,8 @@ impl Default for DesktopController {
                                             let peer_port = val
                                                 .get("port")
                                                 .and_then(|v| v.as_u64())
-                                                .unwrap_or(8085) as u16;
+                                                .unwrap_or(8085)
+                                                as u16;
                                             let peer_ip = src.ip().to_string();
 
                                             let my_t = my_tag_clone.lock().unwrap().clone();
@@ -301,7 +314,11 @@ impl DesktopController {
 
         // Validate format: username#1234
         let parts: Vec<&str> = tag.split('#').collect();
-        if parts.len() != 2 || parts[0].len() < 3 || parts[1].len() != 4 || !parts[1].chars().all(|c| c.is_ascii_digit()) {
+        if parts.len() != 2
+            || parts[0].len() < 3
+            || parts[1].len() != 4
+            || !parts[1].chars().all(|c| c.is_ascii_digit())
+        {
             return Err("Use the format username#1234.".to_string());
         }
 
@@ -609,15 +626,18 @@ impl DesktopController {
             Arc::new(move |req_id, client_id, client_name, perms| {
                 let should_auto_approve = {
                     let friends = friends_arc.lock().unwrap();
-                    friends.iter().any(|f| f.can_join && (f.tag.eq_ignore_ascii_case(&client_name) || client_name.is_empty()))
+                    friends.iter().any(|f| {
+                        f.can_join
+                            && (f.tag.eq_ignore_ascii_case(&client_name) || client_name.is_empty())
+                    })
                 };
 
                 if should_auto_approve {
                     let auth_token = {
                         let mut pm = pm_arc.lock().unwrap();
-                        let (token, _) = pm.approve_request(req_id, perms).unwrap_or_else(|| {
-                            (format!("token-{}", req_id), client_name.clone())
-                        });
+                        let (token, _) = pm
+                            .approve_request(req_id, perms)
+                            .unwrap_or_else(|| (format!("token-{}", req_id), client_name.clone()));
                         token
                     };
                     let resp = RemotePairingResponse {
@@ -676,7 +696,11 @@ impl DesktopController {
             if !list.iter().any(|u| u.id == guest.device_id.0.as_str()) {
                 list.push(ConnectedUserInfo {
                     id: guest.device_id.0.clone(),
-                    name: if guest.device_name.is_empty() { "Guest PC".to_string() } else { guest.device_name },
+                    name: if guest.device_name.is_empty() {
+                        "Guest PC".to_string()
+                    } else {
+                        guest.device_name
+                    },
                     status: "Low Latency · 1080p60 · Connected".to_string(),
                     keyboard: guest.permissions.keyboard,
                     mouse: guest.permissions.mouse,
@@ -703,7 +727,10 @@ impl DesktopController {
             audio,
             clipboard: false,
         };
-        self.pairing_manager.lock().unwrap().update_device_permissions(user_id, perms);
+        self.pairing_manager
+            .lock()
+            .unwrap()
+            .update_device_permissions(user_id, perms);
         let mut users = self.connected_users.lock().unwrap();
         if let Some(u) = users.iter_mut().find(|u| u.id == user_id) {
             u.keyboard = keyboard;
@@ -742,19 +769,19 @@ impl DesktopController {
 
         let my_tag = self.get_my_tag();
         let my_id = format!("mist-client-{}", std::process::id());
-        let req = RemotePairingRequest::new(
-            my_id,
-            my_tag,
-            "FRIEND".to_string(),
-            0x0F,
-        );
+        let req = RemotePairingRequest::new(my_id, my_tag, "FRIEND".to_string(), 0x0F);
 
         tracing::info!("Connecting to friend {} at {}:8085...", tag, target_ip);
-        let resp = RemotePairingClient::submit_request(&target_ip, 8085, req, Duration::from_millis(1500))
-            .map_err(|e| format!("Could not connect to {}: {}", tag, e))?;
+        let resp =
+            RemotePairingClient::submit_request(&target_ip, 8085, req, Duration::from_millis(1500))
+                .map_err(|e| format!("Could not connect to {}: {}", tag, e))?;
 
         if resp.success {
-            tracing::info!("Connected to {} successfully! Session ID: {}", tag, resp.session_id);
+            tracing::info!(
+                "Connected to {} successfully! Session ID: {}",
+                tag,
+                resp.session_id
+            );
             Ok(resp.auth_token)
         } else {
             Err(resp.error_message)
@@ -770,16 +797,23 @@ impl DesktopController {
                     .unwrap_or((String::new(), String::new()))
             };
 
-            let g_name = if device_name.is_empty() { "Guest PC".to_string() } else { device_name };
-            self.connected_users.lock().unwrap().push(ConnectedUserInfo {
-                id: format!("guest-{}", id),
-                name: g_name,
-                status: "Connected · Direct P2P · Low Latency".to_string(),
-                keyboard: true,
-                mouse: true,
-                gamepad: true,
-                audio: true,
-            });
+            let g_name = if device_name.is_empty() {
+                "Guest PC".to_string()
+            } else {
+                device_name
+            };
+            self.connected_users
+                .lock()
+                .unwrap()
+                .push(ConnectedUserInfo {
+                    id: format!("guest-{}", id),
+                    name: g_name,
+                    status: "Connected · Direct P2P · Low Latency".to_string(),
+                    keyboard: true,
+                    mouse: true,
+                    gamepad: true,
+                    audio: true,
+                });
 
             let resp = RemotePairingResponse {
                 success: true,
