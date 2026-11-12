@@ -4,10 +4,10 @@ FROM rust:1.80-alpine AS builder
 RUN apk add --no-cache musl-dev
 
 WORKDIR /app
-COPY services/signaling/Cargo.toml services/signaling/Cargo.lock ./
+COPY services/signaling/Cargo.toml ./
 COPY services/signaling/src ./src
 
-RUN cargo build --release --locked
+RUN cargo build --release
 
 # Final minimal runner stage
 FROM alpine:3.20

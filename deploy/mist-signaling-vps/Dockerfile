@@ -8,7 +8,7 @@ WORKDIR /app
 COPY signaling/Cargo.toml signaling/Cargo.lock ./
 COPY signaling/src ./src
 
-RUN cargo build --release --locked
+RUN cargo build --release
 
 # Final minimal runner stage
 FROM alpine:3.20
