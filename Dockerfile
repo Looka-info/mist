@@ -1,5 +1,5 @@
 # Multi-stage Docker build for Koyeb / Cloud deployment of Mist Signaling
-FROM rust:1.80-alpine AS builder
+FROM rust:alpine AS builder
 
 RUN apk add --no-cache musl-dev
 

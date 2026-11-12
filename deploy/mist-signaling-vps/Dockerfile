@@ -1,6 +1,6 @@
 # Multi-stage Docker build for Mist Signaling Server
 # Produces a minimal (~15MB) container with zero runtime dependencies.
-FROM rust:1.80-alpine AS builder
+FROM rust:alpine AS builder
 
 RUN apk add --no-cache musl-dev
 
